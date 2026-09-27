@@ -6,7 +6,7 @@ import asyncio
 from typing import Dict, Any, Optional
 import pypdf
 import docx
-from tools.gemini_client import get_gemini_client
+from tools.gemini_client import get_gemini_client, get_active_models
 from tools.ocr_vision import extract_text_from_image
 
 
@@ -124,11 +124,7 @@ Dokumen Tugas:
     except Exception:
         return None
 
-    candidate_models = [
-        "gemini-3.1-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.8-flash"
-    ]
+    candidate_models = await get_active_models("fast")
 
     for model_name in candidate_models:
         try:

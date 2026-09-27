@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 import os
 import re
 import asyncio
-from tools.gemini_client import get_gemini_client
+from tools.gemini_client import get_gemini_client, get_active_models
 
 
 def reconstruct_abstract(abstract_inverted_index: Optional[Dict[str, List[int]]]) -> str:
@@ -86,11 +86,7 @@ HANYA keluarkan kata kunci tanpa tanda kutip atau penjelasan apapun.
 Teks: {original_query}
 """
 
-    candidate_models = [
-        "gemini-3.1-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.8-flash"
-    ]
+    candidate_models = await get_active_models("fast")
     for model_name in candidate_models:
         try:
             res = await asyncio.wait_for(

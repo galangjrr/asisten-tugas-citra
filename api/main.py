@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routes import router
+from tools.gemini_client import get_active_models
 from tools.storage_cleaner import clean_storage_by_age
 
 
@@ -12,6 +13,11 @@ from tools.storage_cleaner import clean_storage_by_age
 async def lifespan(app: FastAPI):
     # Pembersihan otomatis berkas kadaluarsa (> 24 jam) saat server menyala
     clean_storage_by_age(max_age_hours=24)
+    # Pra-tarik katalog model aktif dari Google
+    try:
+        await get_active_models("generation")
+    except Exception:
+        pass
     yield
 
 

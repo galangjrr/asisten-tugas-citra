@@ -2,7 +2,7 @@ import os
 import base64
 import asyncio
 from google.genai import types
-from tools.gemini_client import get_gemini_client
+from tools.gemini_client import get_gemini_client, get_active_models
 
 
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
@@ -23,11 +23,7 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan."
     )
 
-    candidate_models = [
-        "gemini-3.1-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.8-flash"
-    ]
+    candidate_models = await get_active_models("fast")
 
     for model_name in candidate_models:
         try:

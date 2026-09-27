@@ -2,7 +2,7 @@ import json
 import asyncio
 from typing import List, Dict, Any
 from google.genai import types
-from tools.gemini_client import get_gemini_client
+from tools.gemini_client import get_gemini_client, get_active_models
 
 
 def detect_language(topic: str, custom_instructions: str = "") -> str:
@@ -476,14 +476,8 @@ async def generate_academic_draft(
         {sources_text}
         """
 
-    # Rantai model prioritas generasi 3.8 dan 3.6 dengan cadangan cepat 3.1
-    candidate_models = [
-        "gemini-3.8-flash",
-        "gemini-3.6-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-3-flash-preview"
-    ]
+    # Ambil rantai model aktif secara dinamis atau dari konfigurasi
+    candidate_models = await get_active_models("generation")
 
     last_error = None
     response = None

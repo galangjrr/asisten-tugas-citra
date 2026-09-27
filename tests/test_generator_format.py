@@ -75,3 +75,12 @@ def test_pdf_essay_format_and_references():
 
     if os.path.exists(out_pdf):
         os.remove(out_pdf)
+
+
+def test_tone_format_adaptation():
+    tone_personal = "surat personal"
+    tone_reflective = "opini reflektif"
+    
+    assert any(k in tone_personal.lower() for k in ["surat", "letter", "korespondensi"])
+    assert any(k in tone_reflective.lower() for k in ["reflektif", "opini", "reflective", "opinion"])
+

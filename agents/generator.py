@@ -44,6 +44,12 @@ async def generate_academic_draft(
 
     is_en = detect_language(topic, custom_instructions) == "en"
     estimated_pages = max(1, round(target_words / 280))
+    tone_lower = (tone or "").lower()
+    is_personal_letter = any(k in tone_lower for k in ["surat", "letter", "korespondensi"])
+    is_reflective_opinion = any(k in tone_lower for k in ["reflektif", "opini", "reflective", "opinion"])
+
+    if is_personal_letter and format_type == "otomatis":
+        format_type = "esai"
 
     # Tentukan strategi seksi dan paragraf berdasarkan target kata agar tidak diringkas LLM
     if target_words <= 400:
@@ -356,7 +362,25 @@ async def generate_academic_draft(
         - The title, all paragraph texts, headings (if any), and evidence summaries MUST be strictly in English.
         - Under NO circumstances should any Indonesian words appear in the output.
         """
-        student_voice_rules = """
+        if is_personal_letter:
+            student_voice_rules = """
+        RULES FOR PERSONAL LETTER / CORRESPONDENCE TONE:
+        1. Adopt the voice of an articulate student or thinker writing a thoughtful, warm, and engaging letter to a friend, colleague, or mentor.
+        2. Open with a natural personal greeting appropriate to the letter format (e.g. 'Dear Alex,', 'Dear Friend,').
+        3. Discuss and reflect on the topic conversationally using first-person perspective ('I have been reflecting on...', 'In my view...'), while naturally interweaving the scholarly findings and citations as insights from your reading.
+        4. Close with a warm, natural sign-off (e.g. 'Warm regards,', 'Sincerely,') rather than robotic boilerplate.
+        5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster'.
+        """
+        elif is_reflective_opinion:
+            student_voice_rules = """
+        RULES FOR REFLECTIVE OPINION & REAL-WORLD EXPERIENCE:
+        1. Adopt an articulate first-person voice ('In my view...', 'From my observation and reflection...', 'I believe...') combining personal reflection with grounded reasoning.
+        2. STRICTLY FORBIDDEN to include robotic boilerplate openings ('Hello Tutor') or conclusions ('In conclusion', 'That concludes my answer').
+        3. Ground arguments in realistic case observations or everyday experiences, supported seamlessly by empirical evidence and citations.
+        4. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era'.
+        """
+        else:
+            student_voice_rules = """
         RULES FOR GENUINE STUDENT VOICE AND TONE:
         1. Adopt the voice of an articulate, genuine university student who truly understands the subject matter.
         2. STRICTLY FORBIDDEN to include any opening salutations (e.g. 'Hello Tutor', 'Dear Lecturer', 'Good morning').
@@ -383,7 +407,26 @@ async def generate_academic_draft(
         - Topik dan tugas berbahasa INDONESIA.
         - Seluruh keluaran (judul, isi teks naskah, heading jika ada, dan evidence summary) WAJIB ditulis dalam BAHASA INDONESIA yang ilmiah, fasih, dan alami.
         """
-        student_voice_rules = """
+        if is_personal_letter:
+            student_voice_rules = """
+        ATURAN GAYA SURAT PRIBADI DAN KORESPONDENSI:
+        1. Gunakan gaya penulisan surat pribadi yang hangat, akrab, reflektif, dan mengalir santai kepada sahabat, rekan, atau kolega.
+        2. Awali naskah dengan sapaan pembuka surat yang wajar dan bersahabat (contoh: 'Kepada Sahabatku,', 'Halo Kawan,', atau 'Salam Hangat,').
+        3. Tulis dari sudut pandang orang pertama ('saya' atau 'aku') secara reflektif, membagikan pemikiran dan pengalaman pribadi sambil menganyam rujukan ilmiah dan sitasi sebagai bahan bacaan menarik yang kamu temukan.
+        4. Akhiri dengan salam penutup surat yang hangat dan wajar (contoh: 'Salam hangat,', 'Sahabatmu,') tanpa kalimat klise kaku robotik.
+        5. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'menggarisbawahi'.
+        """
+        elif is_reflective_opinion:
+            student_voice_rules = """
+        ATURAN GAYA OPINI REFLEKTIF DAN PENGALAMAN NYATA:
+        1. Gunakan sudut pandang orang pertama yang reflektif dan lugas ('Menurut pandangan saya', 'Berdasarkan pengamatan saya', 'Saya menilai bahwa...').
+        2. DILARANG KERAS menyertakan sapaan pembuka formal ('Halo Tutor', 'Selamat pagi') atau penutup klise robotik ('Demikian jawaban saya', 'In conclusion').
+        3. Tautkan opini dan pengalaman kontekstual dengan bukti rujukan ilmiah dan sitasi secara membumi dan kokoh.
+        4. HINDARI bullet points berlebihan. Susun dalam paragraf-paragraf yang mengalir kohesif.
+        5. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat'.
+        """
+        else:
+            student_voice_rules = """
         ATURAN GAYA DAN NADA BICARA MAHASISWA ASLI:
         1. Gunakan suara mahasiswa tulen yang benar-benar memahami materi, bukan ensiklopedia kaku atau robot bot.
         2. DILARANG KERAS menyertakan sapaan pembuka apapun (seperti 'Halo Tutor', 'Selamat pagi', 'Terima kasih atas pertanyaannya').

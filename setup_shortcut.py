@@ -3,16 +3,16 @@ import sys
 
 def create_desktop_shortcut():
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-    shortcut_path = os.path.join(desktop, "Makalah Kilat.lnk")
+    shortcut_path = os.path.join(desktop, "Asisten Tugas Citra.lnk")
     project_dir = os.path.dirname(os.path.abspath(__file__))
-    target_bat = os.path.join(project_dir, "Buka_Makalah_Kilat.bat")
+    target_bat = os.path.join(project_dir, "Buka_Asisten_Tugas_Citra.bat")
 
     vbs_content = f"""Set oWS = WScript.CreateObject("WScript.Shell")
 sLinkFile = "{shortcut_path}"
 Set oLink = oWS.CreateShortcut(sLinkFile)
 oLink.TargetPath = "{target_bat}"
 oLink.WorkingDirectory = "{project_dir}"
-oLink.Description = "Asisten Tugas Citra - Makalah Kilat"
+oLink.Description = "Asisten Tugas Citra"
 oLink.Save
 """
     vbs_path = os.path.join(project_dir, "temp_shortcut.vbs")

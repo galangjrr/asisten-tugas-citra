@@ -52,7 +52,7 @@ def main():
     os.chdir(project_dir)
 
     print("=" * 60)
-    print("  ASISTEN TUGAS CITRA - MAKALAH KILAT")
+    print("  ASISTEN TUGAS CITRA")
     print("  Mode Desktop Satu Klik Anti Ribet")
     print("=" * 60)
 

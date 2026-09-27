@@ -476,13 +476,12 @@ async def generate_academic_draft(
         {sources_text}
         """
 
-    # Rantai cadangan model agar tahan banting saat server Google sedang padat antrean
+    # Rantai cadangan model terverifikasi aktif untuk Google AI Studio
     candidate_models = [
         "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash-lite",
-        "gemini-3-flash-preview",
-        "gemini-flash-latest"
+        "gemini-3-flash-preview"
     ]
 
     last_error = None

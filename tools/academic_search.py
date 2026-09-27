@@ -86,7 +86,11 @@ HANYA keluarkan kata kunci tanpa tanda kutip atau penjelasan apapun.
 Teks: {original_query}
 """
 
-    candidate_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+    candidate_models = [
+        "gemini-3.1-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash"
+    ]
     for model_name in candidate_models:
         try:
             res = await asyncio.wait_for(

@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asisten Tugas Citra - Asisten Tugas Akademis Terverifikasi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-academic { font-family: 'Newsreader', serif; }
+  </style>
+</head>
+<body class="bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- Header -->
+  <header class="border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 sticky top-0 z-30 transition-colors duration-200">
+    <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-stone-900 text-stone-100 dark:bg-stone-100 dark:text-stone-900 flex items-center justify-center font-bold text-xs tracking-wider">
+          ATC
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-stone-900 dark:text-stone-100">Asisten Tugas Citra</h1>
+          <p class="text-xs text-stone-500 dark:text-stone-300 font-medium">Asisten Tugas Berbasis Sitasi Nyata</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <div id="api-status-badge" class="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-stone-700">
+          <span class="w-2 h-2 rounded-full bg-stone-400"></span>
+          <span>Memeriksa API...</span>
+        </div>
+        <button 
+          id="btn-toggle-theme" 
+          type="button" 
+          class="w-9 h-9 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 flex items-center justify-center transition shadow-sm"
+          title="Ganti Tema Terang atau Gelap"
+        >
+          <svg id="icon-sun" class="w-4 h-4 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg id="icon-moon" class="w-4 h-4 text-stone-600 dark:text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-8">
+
+    <!-- Step Progress Indicator -->
+    <div class="mb-8">
+      <div class="grid grid-cols-3 gap-3">
+        <div id="step-tab-1" class="p-3.5 rounded-xl border-2 border-stone-900 dark:border-stone-100 bg-white dark:bg-stone-900 shadow-sm transition">
+          <div class="flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-full bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-950 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+            <span class="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">Soal Tugas</span>
+          </div>
+          <p class="text-[11px] text-stone-600 dark:text-stone-300 mt-1 pl-8 hidden sm:block">Ketik atau unggah berkas</p>
+        </div>
+        <div id="step-tab-2" class="p-3.5 rounded-xl border-2 border-stone-200 dark:border-stone-800 bg-stone-100/70 dark:bg-stone-900/40 transition">
+          <div class="flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+            <span class="text-xs font-bold text-stone-600 dark:text-stone-300 truncate">Pilih Rujukan</span>
+          </div>
+          <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-8 hidden sm:block">Centang paper rujukan</p>
+        </div>
+        <div id="step-tab-3" class="p-3.5 rounded-xl border-2 border-stone-200 dark:border-stone-800 bg-stone-100/70 dark:bg-stone-900/40 transition">
+          <div class="flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+            <span class="text-xs font-bold text-stone-600 dark:text-stone-300 truncate">Naskah Selesai</span>
+          </div>
+          <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-8 hidden sm:block">Periksa & unduh Word</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert / Global Error -->
+    <div id="global-alert" class="hidden mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm"></div>
+
+    <!-- STEP 1: Input Soal Tugas -->
+    <section id="step-1" class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 sm:p-8 shadow-sm transition-colors duration-200">
+      <div class="max-w-2xl">
+        <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+          <span class="w-2 h-2 rounded-full bg-stone-900 dark:bg-stone-100"></span>
+          <span>Tahap 1 dari 3: Masukkan Soal</span>
+        </div>
+        <h2 class="text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">Apa tugas kuliah yang mau kamu selesaikan?</h2>
+        <p class="text-sm text-stone-600 dark:text-stone-400 mt-1.5 leading-relaxed">
+          Ketik pertanyaan tugas atau unggah langsung lembar soal dari dosen dalam format PDF atau Word. Aku akan mengenali inti tugas dan memisahkannya dari rubrik dosen secara otomatis.
+        </p>
+      </div>
+
+      <form id="form-search" class="mt-6 space-y-6">
+        <!-- KARTU 1: Soal atau Pertanyaan Tugas (Wajib) -->
+        <div class="p-5 rounded-2xl bg-stone-50/80 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <label for="input-topic" class="block text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">
+                1. Soal atau Topik Tugas Kuliah <span class="text-rose-600">*</span>
+              </label>
+              <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Tempel teks soal di sini, atau langsung unggah berkas lembar tugas kamu.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="file" id="upload-question-file" accept=".docx,.pdf,.txt" class="hidden">
+              <button 
+                type="button" 
+                id="btn-upload-question-file"
+                class="text-xs font-semibold text-stone-800 dark:text-stone-200 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 border border-stone-300 dark:border-stone-700 px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-2"
+              >
+                <svg class="w-4 h-4 text-stone-700 dark:text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <span>Unggah Lembar Soal (PDF / Word)</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="question-file-status" class="hidden text-xs text-stone-800 dark:text-stone-200 font-medium p-3 bg-stone-200/70 dark:bg-stone-800/80 rounded-xl flex items-center justify-between gap-2 border border-stone-300 dark:border-stone-700 animate-pulse">
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 border-2 border-stone-600 dark:border-stone-400 border-t-stone-900 dark:border-t-stone-100 rounded-full animate-spin block"></span>
+              <span id="question-file-status-text">Mengekstrak teks lembar soal...</span>
+            </div>
+          </div>
+
+          <textarea 
+            id="input-topic" 
+            required 
+            rows="4"
+            placeholder="Tempel soal tugas atau topik kuliah di sini. Contoh: 'Write a short essay explaining your personal preference between living in an urban area or a metropolitan area' atau 'Jelaskan peran tata kelola sektor publik menurut modul 3'..." 
+            class="w-full px-4 py-3 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm leading-relaxed transition bg-white dark:bg-stone-900"
+          ></textarea>
+
+          <div id="question-file-badge" class="hidden p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-start justify-between text-xs text-emerald-950 dark:text-emerald-200">
+            <div class="flex items-start space-x-2">
+              <span class="w-4 h-4 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">✓</span>
+              <span id="question-file-info">Teks lembar soal berhasil dimuat. Pertanyaan tugas dan ketentuan dosen telah dipisahkan secara otomatis.</span>
+            </div>
+            <button type="button" id="btn-clear-question-file" class="font-semibold text-rose-600 dark:text-rose-400 hover:underline ml-2 shrink-0">Hapus</button>
+          </div>
+        </div>
+
+        <!-- KARTU 2: Format & Target Naskah (Praktis & Otomatis) -->
+        <div class="p-5 rounded-2xl bg-stone-50/80 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-4">
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">2. Format dan Target Panjang Naskah</h3>
+            <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Sistem otomatis menyesuaikan struktur naskah apakah esai, jawaban bernomor, atau bab makalah formal.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label for="select-format" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Bentuk Format Naskah</label>
+              <select id="select-format" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                <option value="otomatis" selected>Otomatis Sesuai Konteks Soal (Rekomendasi)</option>
+                <option value="esai">Esai Murni (Paragraf Mengalir Alami Tanpa Heading Nomor)</option>
+                <option value="bernomor">Jawaban Tugas Bernomor (Nomor 1, 2, dst)</option>
+                <option value="makalah">Makalah Ilmiah Formal (Bab I, II, III)</option>
+                <option value="mengalir">Diskusi Tematik (Dengan Sub-bahasan)</option>
+              </select>
+              <p class="text-[11px] text-stone-500 dark:text-stone-400">Pilih 'Otomatis' agar aku mendeteksi struktur yang paling tepat dari soal kamu.</p>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="select-length" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Target Panjang Naskah</label>
+              <select id="select-length" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                <option value="sedang">Sedang (Sekitar 800 - 1.000 kata, ~3 Halaman A4)</option>
+                <option value="ringkas">Ringkas (Sekitar 300 - 500 kata, ~1-2 Halaman A4)</option>
+                <option value="panjang">Panjang & Mendalam (Sekitar 1.800 kata, ~5-6 Halaman A4)</option>
+                <option value="kustom">Kustom (Tentukan Jumlah Kata Manual)</option>
+              </select>
+              <div id="custom-words-wrapper" class="hidden pt-1">
+                <label for="input-custom-words" class="block text-xs font-semibold text-stone-600 dark:text-stone-400 mb-1">Jumlah Kata</label>
+                <input 
+                  type="number" 
+                  id="input-custom-words" 
+                  min="200" 
+                  max="5000" 
+                  step="50" 
+                  value="1200" 
+                  class="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 text-sm bg-white dark:bg-stone-900"
+                >
+              </div>
+              <p class="text-[11px] text-stone-500 dark:text-stone-400">Jika kamu mengunggah soal dengan batas kata, opsi ini otomatis disetel.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            <div class="space-y-1.5">
+              <label for="select-tone" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Gaya Nada Tulisan</label>
+              <select id="select-tone" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                <option value="akademis formal">Akademis Formal dan Lugas</option>
+                <option value="analisis kritis">Analisis Kritis dan Komparatif</option>
+                <option value="eksploratif">Eksploratif dan Teoretis</option>
+              </select>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="select-depth" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Kedalaman Tiap Paragraf</label>
+              <select id="select-depth" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                <option value="standar">Standar Seimbang (4-6 kalimat terstruktur)</option>
+                <option value="ringkas">Padat & Ringkas (3-4 kalimat to the point)</option>
+                <option value="elaboratif">Elaborasi Mendalam (5-7 kalimat kaya bukti sitasi)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pt-1">
+            <label for="input-instructions" class="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+              Catatan Khusus atau Rubrik Dosen (Opsional)
+            </label>
+            <input 
+              type="text" 
+              id="input-instructions" 
+              placeholder="Contoh: Fokus pada studi kasus 5 tahun terakhir, atau bahas perbandingan menurut modul 3..." 
+              class="w-full px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm transition bg-white dark:bg-stone-900"
+            >
+            <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1">Rubrik penilaian atau petunjuk teknis yang terdeteksi dari berkas soal otomatis disematkan di sini.</p>
+          </div>
+        </div>
+
+        <!-- KARTU 3: Rujukan Khusus Mahasiswa UT (Opsional) -->
+        <div class="p-5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-900/60 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-950 dark:text-emerald-300">
+                3. Khusus Mahasiswa Universitas Terbuka (Opsional)
+              </span>
+              <p class="text-xs text-stone-600 dark:text-stone-400 mt-0.5">Jika tugas kamu dari UT, masukkan kode mata kuliah atau kutip teks modul BMP di sini.</p>
+            </div>
+            <span class="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300/40 dark:border-emerald-800">
+              Katalog 1.712 Modul Resmi
+            </span>
+          </div>
+
+          <div class="relative">
+            <input 
+              type="text" 
+              id="input-step1-ut-code" 
+              placeholder="Ketik kode mata kuliah UT, contoh: FSSI4106, EKMA4116, MKWU4108..." 
+              autocomplete="off"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 pr-8"
+            >
+            <div id="step1-ut-lookup-spinner" class="hidden absolute right-3 top-3">
+              <span class="w-3.5 h-3.5 border-2 border-emerald-400 border-t-emerald-900 rounded-full animate-spin block"></span>
+            </div>
+          </div>
+          <div id="step1-ut-detect-result" class="hidden p-2.5 rounded-lg bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs text-emerald-950 dark:text-emerald-200 transition-all"></div>
+          
+          <div class="pt-1">
+            <button type="button" id="btn-toggle-step1-ut-content" class="text-xs font-semibold text-emerald-900 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-emerald-300 underline inline-flex items-center gap-1">
+              <span>+ Punya kutipan materi modul dari pustaka.ut.ac.id? Tempel teks atau tangkapan layar di sini</span>
+            </button>
+            <div id="step1-ut-content-wrapper" class="hidden mt-2 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                <label for="input-step1-ut-content" class="block text-[11px] font-semibold text-emerald-950 dark:text-emerald-300">Teks Modul dari Ruang Baca Virtual</label>
+                <div class="flex items-center gap-2">
+                  <input type="file" id="step1-upload-screenshot" accept="image/*" class="hidden">
+                  <button 
+                    type="button" 
+                    id="btn-pick-step1-screenshot"
+                    class="text-[11px] font-semibold text-emerald-900 dark:text-emerald-300 bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 px-2.5 py-1 rounded transition shadow-sm inline-flex items-center gap-1.5"
+                  >
+                    <svg class="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>Unggah Screenshot atau Tekan Ctrl+V</span>
+                  </button>
+                </div>
+              </div>
+              <div id="step1-ocr-status" class="hidden text-xs text-emerald-900 dark:text-emerald-300 font-medium p-2.5 bg-emerald-100/90 dark:bg-emerald-950/50 rounded-lg flex items-center gap-2 border border-emerald-300 dark:border-emerald-800 animate-pulse">
+                <span class="w-3.5 h-3.5 border-2 border-emerald-600 border-t-emerald-950 rounded-full animate-spin block"></span>
+                <span>Mengekstrak teks materi dari gambar tangkapan layar modul...</span>
+              </div>
+              <textarea 
+                id="input-step1-ut-content" 
+                rows="3" 
+                placeholder="Tempel teks materi di sini, atau tekan Ctrl+V untuk menempelkan gambar screenshot modul..."
+                class="w-full px-3.5 py-2.5 rounded-lg border border-stone-300 dark:border-stone-700 text-xs bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 leading-relaxed"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tombol Aksi Utama Langkah 1 -->
+        <div class="pt-2">
+          <button 
+            type="submit" 
+            id="btn-search"
+            class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 font-semibold text-sm transition flex items-center justify-center space-x-2 shadow-sm"
+          >
+            <span>Lanjut ke Langkah 2: Cari & Pilih Rujukan Ilmiah</span>
+            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+          <p class="text-xs text-stone-500 dark:text-stone-400 mt-2">Aku akan memindai repositori jurnal ilmiah dan mengunduh berkas fisik untuk disitir.</p>
+        </div>
+      </form>
+    </section>
+
+    <!-- STEP 2: Pilih Jurnal -->
+    <section id="step-2" class="hidden space-y-6">
+      <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 sm:p-8 shadow-sm">
+        <div class="flex items-start justify-between flex-wrap gap-4 border-b border-stone-200 dark:border-stone-800 pb-5">
+          <div>
+            <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span>Tahap 2 dari 3: Pilih Naskah</span>
+            </div>
+            <h2 class="text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">Pilih Naskah Rujukan yang Mau Disitir</h2>
+            <p class="text-sm text-stone-600 dark:text-stone-400 mt-1.5 leading-relaxed">
+              Centang minimal satu naskah di bawah ini. Naskah yang kamu pilih akan aku baca teks aslinya dan disitir secara nyata ke dalam badan tugas kamu.
+            </p>
+          </div>
+          <button id="btn-back-step-1" class="text-xs font-semibold text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 border border-stone-300 dark:border-stone-700 px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            <span>Kembali ke Soal Tugas</span>
+          </button>
+        </div>
+
+        <!-- Backend Activity Info Badge -->
+        <div id="search-backend-info" class="hidden mt-4 p-3 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300"></div>
+
+        <!-- Kotak Penajaman Kata Kunci & Input DOI Mandiri -->
+        <div class="mt-4 p-4 rounded-xl bg-stone-50 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-3">
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input 
+              type="text" 
+              id="input-refine-query" 
+              placeholder="Ketik kata kunci lebih spesifik, contoh: instagram gaya hidup remaja..."
+              class="flex-1 px-3.5 py-2.5 rounded-lg border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-xs bg-white dark:bg-stone-900"
+            >
+            <button 
+              type="button" 
+              id="btn-refine-search"
+              class="px-5 py-2.5 rounded-lg bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 font-semibold text-xs shrink-0 transition"
+            >
+              Cari Ulang
+            </button>
+          </div>
+          <div class="flex items-center justify-between pt-1 border-t border-stone-200 dark:border-stone-800 text-xs">
+            <span class="text-stone-500 dark:text-stone-400">Punya naskah incaran sendiri?</span>
+            <button type="button" id="btn-toggle-manual" class="font-semibold text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 underline">
+              + Masukkan Nomor DOI atau Judul Jurnal
+            </button>
+          </div>
+          <div id="manual-paper-wrapper" class="hidden pt-2 flex flex-col sm:flex-row gap-2">
+            <input 
+              type="text" 
+              id="input-manual-doi" 
+              placeholder="Contoh: 10.54209/judge.v3i01.354 atau judul naskah..."
+              class="flex-1 px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 text-xs bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200"
+            >
+            <button 
+              type="button" 
+              id="btn-add-manual-paper"
+              class="px-4 py-2 rounded-lg bg-stone-800 hover:bg-stone-900 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 font-semibold text-xs shrink-0 transition"
+            >
+              Tambahkan ke Daftar
+            </button>
+          </div>
+
+          <!-- Pintu Masuk Khusus Mahasiswa UT / Modul BMP -->
+          <div class="flex items-center justify-between pt-2 border-t border-stone-200 dark:border-stone-800 text-xs">
+            <span class="text-stone-500 dark:text-stone-400">Tugas Kuliah UT atau Diktat Dosen?</span>
+            <button type="button" id="btn-toggle-ut-module" class="font-semibold text-emerald-800 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-emerald-300 underline">
+              + Salin Tempel Teks Modul BMP UT
+            </button>
+          </div>
+
+          <!-- Drawer Tempel Teks Modul BMP UT -->
+          <div id="ut-module-wrapper" class="hidden pt-3 border-t border-stone-200 dark:border-stone-800 space-y-3 bg-emerald-50/50 dark:bg-emerald-950/30 p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">Salin Tempel Teks Modul BMP UT atau Bahan Ajar</span>
+              <span class="text-xs text-stone-500 dark:text-stone-400">Dari Ruang Baca Virtual UT</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="input-ut-title" class="block text-xs font-semibold text-emerald-950 dark:text-emerald-300">Nama atau Kode Mata Kuliah UT</label>
+                <span class="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">Auto-detect aktif dari 1.712 katalog resmi</span>
+              </div>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="input-ut-title" 
+                  placeholder="Ketik kode mata kuliah, misal: FSSI4106, EKMA4116, MKWU4108..." 
+                  autocomplete="off"
+                  class="w-full px-3.5 py-2.5 rounded-lg border border-stone-300 dark:border-stone-700 text-xs bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 pr-8"
+                >
+                <div id="ut-lookup-spinner" class="hidden absolute right-3 top-3">
+                  <span class="w-3.5 h-3.5 border-2 border-emerald-400 border-t-emerald-900 rounded-full animate-spin block"></span>
+                </div>
+              </div>
+              <div id="ut-detect-result" class="hidden mt-2 p-2.5 rounded-lg bg-emerald-100/90 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs text-emerald-950 dark:text-emerald-200 transition-all"></div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="input-ut-content" class="block text-xs font-semibold text-emerald-950 dark:text-emerald-300">Teks Materi dari Ruang Baca Virtual</label>
+                <div class="flex items-center gap-2">
+                  <input type="file" id="step2-upload-screenshot" accept="image/*" class="hidden">
+                  <button 
+                    type="button" 
+                    id="btn-pick-step2-screenshot"
+                    class="text-[11px] font-semibold text-emerald-900 dark:text-emerald-300 bg-white dark:bg-stone-900 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 px-2.5 py-1 rounded transition shadow-sm inline-flex items-center gap-1.5"
+                  >
+                    <svg class="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>Unggah Screenshot atau Tekan Ctrl+V</span>
+                  </button>
+                </div>
+              </div>
+              <div id="step2-ocr-status" class="hidden text-xs text-emerald-900 dark:text-emerald-300 font-medium p-2.5 bg-emerald-100/90 dark:bg-emerald-950/50 rounded-lg flex items-center gap-2 border border-emerald-300 dark:border-emerald-800 animate-pulse mb-2">
+                <span class="w-3.5 h-3.5 border-2 border-emerald-600 border-t-emerald-950 rounded-full animate-spin block"></span>
+                <span>Mengekstrak teks materi dari gambar tangkapan layar modul...</span>
+              </div>
+              <textarea 
+                id="input-ut-content" 
+                rows="4" 
+                placeholder="Cukup tempelkan kalimat atau paragraf materi yang disalin dari pustaka.ut.ac.id, atau langsung tekan Ctrl+V untuk menempelkan screenshot modul..."
+                class="w-full px-3.5 py-2.5 rounded-lg border border-stone-300 dark:border-stone-700 text-xs bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 leading-relaxed"
+              ></textarea>
+            </div>
+
+            <div class="flex justify-end">
+              <button 
+                type="button" 
+                id="btn-save-ut-module"
+                class="px-5 py-2.5 rounded-lg bg-emerald-900 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-semibold text-xs transition"
+              >
+                Gunakan Modul Ini Sebagai Rujukan Tugas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Skeleton -->
+        <div id="papers-loading" class="hidden mt-6 space-y-4">
+          <div class="p-4 rounded-xl bg-stone-100 dark:bg-stone-800/60 animate-pulse flex items-center space-x-3 text-xs text-stone-500 dark:text-stone-400 font-medium">
+            <span class="w-3 h-3 border-2 border-stone-400 border-t-stone-900 dark:border-t-stone-200 rounded-full animate-spin"></span>
+            <span>Menghubungi repositori OpenAlex dan memindai naskah fisik...</span>
+          </div>
+          <div class="h-24 rounded-xl bg-stone-100 dark:bg-stone-800 animate-pulse"></div>
+          <div class="h-24 rounded-xl bg-stone-100 dark:bg-stone-800 animate-pulse"></div>
+        </div>
+
+        <!-- Papers List Container -->
+        <div id="papers-list" class="mt-6 space-y-3"></div>
+
+        <!-- Generate Button Action -->
+        <div id="generate-actions" class="hidden mt-8 p-4 sm:p-5 rounded-2xl bg-stone-50 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <span id="selected-count-label" class="text-xs font-bold text-stone-900 dark:text-stone-100 block">0 naskah dipilih</span>
+            <span class="text-[11px] text-stone-500 dark:text-stone-400">Minimal pilih 1 naskah agar dapat disitir ke dalam tugas kamu.</span>
+          </div>
+          <button 
+            id="btn-generate"
+            disabled
+            class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-stone-900 disabled:bg-stone-300 dark:disabled:bg-stone-800 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:disabled:text-stone-600 text-white font-semibold text-sm transition flex items-center justify-center gap-2 shadow-sm"
+          >
+            <span>Mulai Tulis Naskah Tugas</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: Hasil & Pratinjau Dokumen -->
+    <section id="step-3" class="hidden space-y-6">
+      
+      <!-- Generating Status Indicator with Backend Activity Log -->
+      <div id="generating-indicator" class="hidden bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center space-y-4">
+        <div class="w-10 h-10 border-4 border-stone-200 dark:border-stone-700 border-t-stone-900 dark:border-t-stone-100 rounded-full animate-spin mx-auto"></div>
+        <div>
+          <h3 id="gen-step-title" class="text-base font-bold text-stone-900 dark:text-stone-100">Sedang memproses naskah tugas...</h3>
+          <p id="gen-step-desc" class="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-md mx-auto">Sistem backend sedang menjalankan proses secara nyata.</p>
+        </div>
+        
+        <div class="max-w-md mx-auto text-left bg-stone-50 dark:bg-stone-950/60 rounded-xl p-4 border border-stone-200 dark:border-stone-800 space-y-2.5 text-xs text-stone-600 dark:text-stone-400 font-mono">
+          <div id="log-step-1" class="flex items-center space-x-2 text-stone-400 dark:text-stone-500">
+            <span class="w-2 h-2 rounded-full bg-stone-300 dark:bg-stone-700"></span>
+            <span>1. Mengunduh berkas PDF fisik ke laptop</span>
+          </div>
+          <div id="log-step-2" class="flex items-center space-x-2 text-stone-400 dark:text-stone-500">
+            <span class="w-2 h-2 rounded-full bg-stone-300 dark:bg-stone-700"></span>
+            <span>2. Membedah isi teks dan nomor halaman</span>
+          </div>
+          <div id="log-step-3" class="flex items-center space-x-2 text-stone-400 dark:text-stone-500">
+            <span class="w-2 h-2 rounded-full bg-stone-300 dark:bg-stone-700"></span>
+            <span>3. Merangkai argumen akademis via Gemini</span>
+          </div>
+          <div id="log-step-4" class="flex items-center space-x-2 text-stone-400 dark:text-stone-500">
+            <span class="w-2 h-2 rounded-full bg-stone-300 dark:bg-stone-700"></span>
+            <span>4. Merakit dokumen docx dan pdf format A4</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Card -->
+      <div id="result-container" class="hidden space-y-6">
+        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 mb-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span>Tahap 3 Selesai: Siap Dikumpulkan</span>
+            </div>
+            <h2 id="result-title" class="text-xl font-bold text-stone-900 dark:text-stone-100 tracking-tight"></h2>
+            <p id="result-stats" class="text-xs text-stone-500 dark:text-stone-400 mt-1"></p>
+          </div>
+
+          <!-- Download Buttons -->
+          <div class="flex items-center flex-wrap gap-2.5 shrink-0">
+            <button id="btn-download-docx" class="px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 hover:border-stone-900 dark:hover:border-stone-300 bg-white dark:bg-stone-800 font-semibold text-xs text-stone-800 dark:text-stone-200 transition shadow-sm flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-stone-600 dark:text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Unduh Word (.docx)</span>
+            </button>
+            <button id="btn-download-pdf" class="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 font-semibold text-xs transition shadow-sm flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-stone-300 dark:text-stone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span>Unduh Cetak (.pdf)</span>
+            </button>
+            <button id="btn-top-restart" class="px-3.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold text-xs transition border border-stone-200 dark:border-stone-700">
+              Tulis Tugas Baru
+            </button>
+          </div>
+        </div>
+
+        <!-- Evidence Card: Bukti Sitasi & Transparansi Naskah Asli -->
+        <div id="evidence-container" class="bg-stone-50 dark:bg-stone-950/60 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 sm:p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                <span>Bukti Rujukan & Transparansi Naskah Asli</span>
+                <span id="evidence-count-badge" class="px-2 py-0.5 rounded-full text-xs bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold">0 Sumber</span>
+              </h3>
+              <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Seluruh fakta dan sitasi pada naskah terikat langsung pada ekstraksi naskah ilmiah ber-DOI berikut.</p>
+            </div>
+          </div>
+          <div id="evidence-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Preview Document Box -->
+        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-6 sm:p-10 shadow-sm font-academic text-stone-900 dark:text-stone-100 leading-relaxed text-sm space-y-6" id="preview-content"></div>
+
+        <div class="text-center pt-4">
+          <button id="btn-restart" class="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 underline">
+            Buat Tugas Baru
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-stone-200 dark:border-stone-800 py-6 text-center text-xs text-stone-400 dark:text-stone-500">
+    Asisten Tugas Citra - Bebas Halusinasi, Berbasis Naskah Asli, Format A4 Standar
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+/* DESIGN TOKENS - ASISTEN TUGAS CITRA (ATC) */
+
+:root {
+  /* Lapisan 1: Primitive Tokens */
+  --primitive-stone-50: #fafaf9;
+  --primitive-stone-100: #f5f5f4;
+  --primitive-stone-200: #e7e5e4;
+  --primitive-stone-300: #d6d3d1;
+  --primitive-stone-400: #a8a29e;
+  --primitive-stone-500: #78716c;
+  --primitive-stone-600: #57534e;
+  --primitive-stone-700: #44403c;
+  --primitive-stone-800: #292524;
+  --primitive-stone-900: #1c1917;
+  --primitive-stone-950: #0c0a09;
+
+  --primitive-emerald-50: #ecfdf5;
+  --primitive-emerald-100: #d1fae5;
+  --primitive-emerald-200: #a7f3d0;
+  --primitive-emerald-400: #34d399;
+  --primitive-emerald-500: #10b981;
+  --primitive-emerald-600: #059669;
+  --primitive-emerald-700: #047857;
+  --primitive-emerald-800: #065f46;
+  --primitive-emerald-900: #064e3b;
+  --primitive-emerald-950: #022c22;
+
+  --primitive-rose-100: #ffe4e6;
+  --primitive-rose-400: #fb7185;
+  --primitive-rose-700: #be123c;
+  --primitive-rose-950: #4c0519;
+
+  /* Lapisan 2: Semantic Tokens (Light Default) */
+  --color-canvas-bg: var(--primitive-stone-50);
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: var(--primitive-stone-100);
+  --color-surface-elevated: #ffffff;
+  --color-border-subtle: var(--primitive-stone-200);
+  --color-border-default: var(--primitive-stone-300);
+  --color-border-focus: var(--primitive-stone-900);
+  --color-text-primary: var(--primitive-stone-900);
+  --color-text-secondary: var(--primitive-stone-600);
+  --color-text-tertiary: var(--primitive-stone-500);
+  --color-accent-primary: var(--primitive-stone-900);
+  --color-accent-primary-fg: #ffffff;
+  --color-emerald-bg: var(--primitive-emerald-50);
+  --color-emerald-border: var(--primitive-emerald-200);
+  --color-emerald-text: var(--primitive-emerald-900);
+  --color-danger-bg: var(--primitive-rose-100);
+  --color-danger-border: #fda4af;
+  --color-danger-text: var(--primitive-rose-700);
+}
+
+/* Lapisan 2: Semantic Tokens (Dark Theme) */
+.dark, [data-theme="dark"] {
+  --color-canvas-bg: var(--primitive-stone-950);
+  --color-surface-card: var(--primitive-stone-900);
+  --color-surface-subtle: #161412;
+  --color-surface-elevated: #24201e;
+  --color-border-subtle: var(--primitive-stone-800);
+  --color-border-default: #3d3835;
+  --color-border-focus: var(--primitive-stone-200);
+  --color-text-primary: var(--primitive-stone-100);
+  --color-text-secondary: var(--primitive-stone-400);
+  --color-text-tertiary: var(--primitive-stone-500);
+  --color-accent-primary: var(--primitive-stone-100);
+  --color-accent-primary-fg: var(--primitive-stone-900);
+  --color-emerald-bg: var(--primitive-emerald-950);
+  --color-emerald-border: var(--primitive-emerald-800);
+  --color-emerald-text: var(--primitive-emerald-400);
+  --color-danger-bg: #2d0b13;
+  --color-danger-border: var(--primitive-rose-950);
+  --color-danger-text: var(--primitive-rose-400);
+}
+
+/* Lapisan 3: Component Token Utility Classes */
+.theme-canvas {
+  background-color: var(--color-canvas-bg);
+  color: var(--color-text-primary);
+}
+
+.theme-card {
+  background-color: var(--color-surface-card);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.theme-input {
+  background-color: var(--color-surface-card);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.theme-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.theme-input:focus {
+  border-color: var(--color-border-focus);
+}
+
+.theme-btn-primary {
+  background-color: var(--color-accent-primary);
+  color: var(--color-accent-primary-fg);
+}
+
+.theme-btn-secondary {
+  background-color: var(--color-surface-subtle);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.theme-ut-card {
+  background-color: var(--color-emerald-bg);
+  border-color: var(--color-emerald-border);
+  color: var(--color-emerald-text);
+}

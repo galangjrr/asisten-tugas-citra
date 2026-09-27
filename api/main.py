@@ -1,15 +1,25 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from api.routes import router
+from tools.storage_cleaner import clean_storage_by_age
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Pembersihan otomatis berkas kadaluarsa (> 24 jam) saat server menyala
+    clean_storage_by_age(max_age_hours=24)
+    yield
 
 
 app = FastAPI(
     title="Asisten Tugas Citra API",
     description="Asisten Penulisan Tugas Kuliah Berbasis Bukti Ilmiah Nyata",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(

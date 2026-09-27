@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -14,7 +14,8 @@ def create_assignment_pdf(
     title: str,
     sections: List[Dict[str, Any]],
     references: List[Dict[str, Any]],
-    output_filename: str = "Tugas_Kuliah.pdf"
+    output_filename: str = "Tugas_Kuliah.pdf",
+    language: Optional[str] = None
 ) -> str:
     """Merakit naskah tugas lengkap menjadi berkas PDF format A4 rapi."""
     os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -94,8 +95,11 @@ def create_assignment_pdf(
                 story.append(Paragraph(para_clean, body_style))
 
     # Daftar Pustaka / References
-    sample_text = (title + " " + " ".join(s.get("content", "")[:200] for s in sections[:2])).lower()
-    is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
+    if language:
+        is_en_doc = language.lower().startswith("en")
+    else:
+        sample_text = (title + " " + " ".join(s.get("content", "")[:200] for s in sections[:2])).lower()
+        is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
     ref_title_text = "REFERENCES" if is_en_doc else "DAFTAR PUSTAKA"
 
     story.append(Spacer(1, 10))

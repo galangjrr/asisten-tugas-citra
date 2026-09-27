@@ -2,11 +2,8 @@ import httpx
 from typing import List, Dict, Any, Optional
 import os
 import re
-from google import genai
-from dotenv import load_dotenv
-
-
-load_dotenv()
+import asyncio
+from tools.gemini_client import get_gemini_client
 
 
 def reconstruct_abstract(abstract_inverted_index: Optional[Dict[str, List[int]]]) -> str:
@@ -66,17 +63,17 @@ def extract_doi(query: str) -> str:
     return match.group(0) if match else query.strip()
 
 
-def simplify_query_with_ai(original_query: str) -> str:
+async def simplify_query_with_ai(original_query: str) -> str:
     """Mengekstrak entitas dan kata kunci esensial dari pertanyaan panjang."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
+    if not os.getenv("GEMINI_API_KEY"):
         return original_query
 
     try:
-        client = genai.Client(api_key=api_key)
-        res = client.models.generate_content(
-            model="gemini-3.5-flash-lite",
-            contents=f"""
+        client = get_gemini_client()
+    except Exception:
+        return original_query
+
+    prompt = f"""
 Tugas: Ekstrak 2 sampai 4 kata kunci pencarian jurnal akademis paling esensial dan spesifik dari teks tugas ini.
 ATURAN KRUSIAL:
 - Wajib pertahankan nama subjek spesifik atau entitas unik (contoh: 'Instagram', 'TikTok', 'Radiologi', 'Stunting', dsb).
@@ -88,11 +85,25 @@ Contoh keluaran: Instagram gaya hidup masyarakat
 HANYA keluarkan kata kunci tanpa tanda kutip atau penjelasan apapun.
 Teks: {original_query}
 """
-        )
-        cleaned = res.text.strip().replace('"', '').replace('\n', ' ')
-        return cleaned if len(cleaned) > 2 else original_query
-    except Exception:
-        return original_query
+
+    candidate_models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"]
+    for model_name in candidate_models:
+        try:
+            res = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                ),
+                timeout=4.0
+            )
+            if res.text:
+                cleaned = res.text.strip().replace('"', '').replace('\n', ' ')
+                if len(cleaned) > 2:
+                    return cleaned
+        except Exception:
+            continue
+
+    return original_query
 
 
 async def query_openalex_endpoint(search_text: str, limit: int = 30) -> List[Dict[str, Any]]:
@@ -217,7 +228,7 @@ async def search_openalex_papers(query: str, limit: int = 6) -> Dict[str, Any]:
     
     # Jika kueri adalah kalimat panjang (> 3 kata), lakukan ekstraksi kata kunci spesifik
     if len(words) > 3:
-        query_used = simplify_query_with_ai(clean_query)
+        query_used = await simplify_query_with_ai(clean_query)
         print(f"Kueri dipertajam menjadi: '{query_used}'")
 
     results: List[Dict[str, Any]] = []

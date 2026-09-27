@@ -2,10 +2,11 @@ import io
 import os
 import json
 import re
+import asyncio
 from typing import Dict, Any, Optional
 import pypdf
 import docx
-from google import genai
+from tools.gemini_client import get_gemini_client
 from tools.ocr_vision import extract_text_from_image
 
 
@@ -96,9 +97,8 @@ def split_questions_and_guidelines(text: str) -> Dict[str, str]:
 
 
 async def structure_assignment_with_ai(raw_text: str) -> Optional[Dict[str, Any]]:
-    """Memilah lembar tugas secara cerdas menggunakan Gemini 3.5 Flash Lite."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key or len(raw_text.strip()) < 40:
+    """Memilah lembar tugas secara cerdas menggunakan Gemini."""
+    if not os.getenv("GEMINI_API_KEY") or len(raw_text.strip()) < 40:
         return None
 
     prompt = """Analisis lembar tugas kuliah ini (bisa berbahasa Indonesia atau Inggris).
@@ -120,25 +120,37 @@ Dokumen Tugas:
 """ + raw_text[:3500]
 
     try:
-        client = genai.Client(api_key=api_key)
-        res = client.models.generate_content(
-            model="gemini-3.5-flash-lite",
-            contents=prompt,
-            config={"response_mime_type": "application/json"}
-        )
-        if res.text:
-            parsed = json.loads(res.text)
-            if isinstance(parsed, list) and len(parsed) > 0:
-                parsed = parsed[0]
+        client = get_gemini_client()
+    except Exception:
+        return None
 
-            # Jika guidelines berupa list, jadikan teks per baris
-            g = parsed.get("guidelines")
-            if isinstance(g, list):
-                parsed["guidelines"] = "\n".join(str(item) for item in g)
+    candidate_models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"]
 
-            return parsed
-    except Exception as e:
-        print(f"Peringatan: Gagal memilah lembar tugas via AI: {e}")
+    for model_name in candidate_models:
+        try:
+            res = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config={"response_mime_type": "application/json"}
+                ),
+                timeout=4.0
+            )
+            if res.text:
+                parsed = json.loads(res.text)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    parsed = parsed[0]
+
+                # Jika guidelines berupa list, jadikan teks per baris
+                g = parsed.get("guidelines")
+                if isinstance(g, list):
+                    parsed["guidelines"] = "\n".join(str(item) for item in g)
+
+                return parsed
+        except Exception as e:
+            print(f"Peringatan: Model {model_name} gagal memilah lembar tugas: {e}")
+            continue
+
     return None
 
 

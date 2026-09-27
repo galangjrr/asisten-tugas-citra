@@ -1,20 +1,8 @@
-import os
 import json
+import asyncio
 from typing import List, Dict, Any
-from google import genai
 from google.genai import types
-from dotenv import load_dotenv
-
-
-load_dotenv()
-
-
-def get_gemini_client() -> genai.Client:
-    """Menginisialisasi klien Gemini dengan API Key dari environment variable."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY belum disetel di berkas .env")
-    return genai.Client(api_key=api_key)
+from tools.gemini_client import get_gemini_client
 
 
 def detect_language(topic: str, custom_instructions: str = "") -> str:
@@ -96,7 +84,7 @@ async def generate_academic_draft(
     for idx, p in enumerate(papers_with_content, 1):
         author_list = p.get("authors", ["Anonim"])
         author_str = ", ".join(author_list[:2]) + (" dkk." if len(author_list) > 2 else "")
-        yr = p.get("year", "n.d.")
+        yr = p.get("year") or "n.d."
         status_info = "Naskah Fisik PDF" if p.get("has_full_pdf") else "Abstrak & Metadata Resmi"
         paper_summary_list.append(f"Sumber {idx}: {author_str} ({yr}) - '{p.get('title')}' [{status_info}]")
 
@@ -339,7 +327,7 @@ async def generate_academic_draft(
     sources_text = ""
     for idx, p in enumerate(papers_with_content, 1):
         authors = ", ".join(p.get("authors", ["Anonim"]))
-        year = p.get("year", "n.d.")
+        year = p.get("year") or "n.d."
         title = p.get("title", "")
         pages_content = p.get("pages_content", [])
         if p.get("is_manual_module"):
@@ -351,8 +339,8 @@ async def generate_academic_draft(
         sources_text += f"Judul: {title}\n"
         sources_text += f"Penulis: {authors}\n"
         sources_text += f"Tahun: {year}\n"
-        sources_text += f"Publikasi: {p.get('venue', 'Jurnal Ilmiah')}\n"
-        sources_text += f"DOI: {p.get('doi', '-')}\n"
+        sources_text += f"Publikasi: {p.get('venue') or 'Jurnal Ilmiah'}\n"
+        sources_text += f"DOI: {p.get('doi') or '-'}\n"
         sources_text += "Isi Teks Berkas:\n"
 
         for page in pages_content:
@@ -492,6 +480,7 @@ async def generate_academic_draft(
     candidate_models = [
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
         "gemini-3-flash-preview",
         "gemini-flash-latest"
     ]
@@ -502,15 +491,19 @@ async def generate_academic_draft(
     for model_name in candidate_models:
         try:
             print(f"Mencoba menyusun dengan model: {model_name} (Target: {target_words} kata)")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.4,
-                    max_output_tokens=8192,
-                    response_mime_type="application/json",
-                )
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.4,
+                        # 8192 memotong JSON untuk target 3000+ kata
+                        max_output_tokens=32768,
+                        response_mime_type="application/json",
+                    )
+                ),
+                timeout=75.0
             )
             if response and response.text:
                 print(f"Sukses mendapatkan respons dari model: {model_name}")
@@ -522,16 +515,34 @@ async def generate_academic_draft(
     if not response or not response.text:
         raise RuntimeError(f"Seluruh model Gemini sedang mengalami lonjakan antrean: {last_error}")
 
+    language = "en" if is_en else "id"
     try:
-        parsed_result = json.loads(response.text)
-        return parsed_result
-    except Exception as e:
+        parsed = json.loads(response.text)
+    except ValueError as e:
         print(f"Error parsing Gemini JSON response: {e}")
+        parsed = None
+    if isinstance(parsed, list) and parsed:
+        parsed = parsed[0]
+    if not isinstance(parsed, dict):
         return {
             "title": topic.title(),
             "sections": [
                 {"heading": "" if format_type in ("esai", "otomatis") else ("Main Analysis" if is_en else "Analisis Utama"), "content": response.text}
             ],
-            "evidence_log": []
+            "evidence_log": [],
+            "language": language,
         }
+
+    # Rapikan keluaran model agar exporter tidak crash oleh nilai null atau tipe salah
+    sections = [
+        {"heading": str(sec.get("heading") or ""), "content": str(sec.get("content") or "")}
+        for sec in parsed.get("sections") or []
+        if isinstance(sec, dict)
+    ]
+    return {
+        "title": str(parsed.get("title") or topic.title()),
+        "sections": sections,
+        "evidence_log": parsed.get("evidence_log") or [],
+        "language": language,
+    }
 

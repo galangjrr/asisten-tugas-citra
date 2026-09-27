@@ -1,17 +1,8 @@
 import os
 import base64
-from google import genai
+import asyncio
 from google.genai import types
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def get_gemini_client() -> genai.Client:
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY belum disetel di .env")
-    return genai.Client(api_key=api_key)
+from tools.gemini_client import get_gemini_client
 
 
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
@@ -32,22 +23,30 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan."
     )
 
-    candidate_models = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
+    candidate_models = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-3.8-flash"
+    ]
 
     for model_name in candidate_models:
         try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[
-                    types.Part.from_bytes(
-                        data=image_bytes,
-                        mime_type=mime_type
-                    ),
-                    prompt
-                ],
-                config=types.GenerateContentConfig(
-                    temperature=0.1
-                )
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        types.Part.from_bytes(
+                            data=image_bytes,
+                            mime_type=mime_type
+                        ),
+                        prompt
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=0.1
+                    )
+                ),
+                timeout=8.0
             )
             if response.text and response.text.strip():
                 return response.text.strip()

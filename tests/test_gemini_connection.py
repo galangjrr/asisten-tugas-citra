@@ -1,6 +1,10 @@
 import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from dotenv import load_dotenv
-from google import genai
+from tools.gemini_client import get_gemini_client
 
 
 load_dotenv()
@@ -8,15 +12,10 @@ load_dotenv()
 
 def check_gemini_connection():
     """Menguji keaktifan kunci API Gemini dan komunikasi jaringan ke Google AI Studio."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key or len(api_key) < 10:
-        print("[GAGAL] GEMINI_API_KEY belum disetel di file .env")
-        return False
-
     try:
-        client = genai.Client(api_key=api_key)
+        client = get_gemini_client()
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-3.5-flash-lite",
             contents="Jawab dengan satu kata: Aktif"
         )
         print(f"[SUKSES] Koneksi Gemini API terverifikasi: {response.text.strip()}")

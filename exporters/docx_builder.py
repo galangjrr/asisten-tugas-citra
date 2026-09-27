@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -25,7 +25,8 @@ def create_assignment_docx(
     title: str,
     sections: List[Dict[str, Any]],
     references: List[Dict[str, Any]],
-    output_filename: str = "Tugas_Kuliah.docx"
+    output_filename: str = "Tugas_Kuliah.docx",
+    language: Optional[str] = None
 ) -> str:
     """Merakit naskah tugas lengkap menjadi berkas Word docx format A4 rapi."""
     os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -82,8 +83,11 @@ def create_assignment_docx(
             p_run.font.size = Pt(12)
 
     # Daftar Pustaka / References
-    sample_text = (title + " " + " ".join(s.get("content", "")[:200] for s in sections[:2])).lower()
-    is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
+    if language:
+        is_en_doc = language.lower().startswith("en")
+    else:
+        sample_text = (title + " " + " ".join(s.get("content", "")[:200] for s in sections[:2])).lower()
+        is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
     ref_title_text = "REFERENCES" if is_en_doc else "DAFTAR PUSTAKA"
 
     ref_heading = doc.add_paragraph()

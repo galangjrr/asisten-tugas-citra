@@ -314,14 +314,16 @@ async def generate_task(payload: GenerateRequest):
         title=title,
         sections=sections,
         references=selected_papers,
-        output_filename=docx_name
+        output_filename=docx_name,
+        language=draft_result.get("language")
     )
 
     pdf_path = create_assignment_pdf(
         title=title,
         sections=sections,
         references=selected_papers,
-        output_filename=pdf_name
+        output_filename=pdf_name,
+        language=draft_result.get("language")
     )
 
     # Hitung total kata

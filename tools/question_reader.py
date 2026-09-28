@@ -20,28 +20,45 @@ def extract_course_code_from_text(text: str) -> Optional[str]:
     return None
 
 
-def _list_formats(doc) -> Dict[tuple, str]:
-    """Memetakan (numId, ilvl) ke format nomor list Word seperti decimal, lowerLetter, atau bullet."""
+def _list_formats(doc) -> Dict[tuple, tuple]:
+    """
+    Memetakan (numId, ilvl) ke (format, angka awal) list Word, misal ('decimal', 6).
+    Angka awal penting karena dosen sering melanjutkan nomor soal antar bagian, misal 1-5 lalu 6-10.
+    """
     try:
         numbering = doc.part.numbering_part.element
     except Exception:
         return {}
 
-    abstract_formats: Dict[tuple, str] = {}
+    def int_val(el, default: int = 1) -> int:
+        try:
+            return int(el.get(qn("w:val")))
+        except (AttributeError, TypeError, ValueError):
+            return default
+
+    abstract_levels: Dict[tuple, tuple] = {}
     for abstract in numbering.findall(qn("w:abstractNum")):
         abstract_id = abstract.get(qn("w:abstractNumId"))
         for lvl in abstract.findall(qn("w:lvl")):
             fmt = lvl.find(qn("w:numFmt"))
-            abstract_formats[(abstract_id, lvl.get(qn("w:ilvl")))] = fmt.get(qn("w:val")) if fmt is not None else "decimal"
+            fmt_val = fmt.get(qn("w:val")) if fmt is not None else "decimal"
+            abstract_levels[(abstract_id, lvl.get(qn("w:ilvl")))] = (fmt_val, int_val(lvl.find(qn("w:start"))))
 
-    formats: Dict[tuple, str] = {}
+    formats: Dict[tuple, tuple] = {}
     for num in numbering.findall(qn("w:num")):
+        num_id = num.get(qn("w:numId"))
         abstract_ref = num.find(qn("w:abstractNumId"))
         if abstract_ref is None:
             continue
-        for (abstract_id, ilvl), fmt in abstract_formats.items():
+        for (abstract_id, ilvl), level in abstract_levels.items():
             if abstract_id == abstract_ref.get(qn("w:val")):
-                formats[(num.get(qn("w:numId")), ilvl)] = fmt
+                formats[(num_id, ilvl)] = level
+        # startOverride di w:num mengalahkan angka awal bawaan abstractNum
+        for override in num.findall(qn("w:lvlOverride")):
+            start = override.find(qn("w:startOverride"))
+            key = (num_id, override.get(qn("w:ilvl")))
+            if start is not None and key in formats:
+                formats[key] = (formats[key][0], int_val(start))
     return formats
 
 
@@ -75,8 +92,9 @@ def read_docx_file(file_bytes: bytes) -> str:
         # numId 0 berarti penomoran sengaja dimatikan
         if key[0] == "0":
             return text
-        counters[key] = counters.get(key, 0) + 1
-        return f"{_list_marker(formats.get(key, 'decimal'), counters[key])} {text}"
+        fmt, start = formats.get(key, ("decimal", 1))
+        counters[key] = counters.get(key, start - 1) + 1
+        return f"{_list_marker(fmt, counters[key])} {text}"
 
     def table_lines(tbl) -> list:
         lines = []
@@ -231,28 +249,30 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
     combined = f"{questions}\n{guidelines}"
     count = count_numbered_questions(questions)
 
-    is_reading = re.search(
-        r'(?i)\b(?:passage|reading text|read the (?:text|paragraph)|main idea|true \(t\)|bacaan|wacana|gagasan utama|teks berikut)',
+    # Cadangan saat AI tidak tersedia, jadi sengaja hanya menangkap sinyal yang khas.
+    # Kata umum seperti 'bacaan' atau 'teks berikut' juga muncul di soal esai dan analisis.
+    is_short_answer = re.search(
+        r'(?i)\btrue\s*\(t\)|\btrue or false\b|\bbenar atau salah\b|\bmain idea\b|\bgagasan utama\b|\bfill in the blanks?\b|\bisilah titik',
         questions,
     )
     if re.search(r'(?i)\btranslat|\bterjemah', questions):
         answer_type = "terjemahan"
-    elif is_reading:
-        answer_type = "jawaban_singkat"
     elif re.search(r'(?i)\b(esai|essay)\b', questions):
         answer_type = "esai"
     elif re.search(r'(?i)\bmakalah\b|\bpaper\b|\bbab\s+i\b', questions):
         answer_type = "makalah"
+    elif is_short_answer:
+        answer_type = "jawaban_singkat"
     elif count:
         answer_type = "jawaban_bernomor"
     else:
         answer_type = None
 
-    # Terjemahan dan soal bacaan dijawab dari teks yang sudah disediakan, bukan dari jurnal
-    if answer_type == "terjemahan" or is_reading:
-        needs_citations = False
-    elif re.search(r'(?i)sitasi|referensi|daftar\s+pustaka|rujukan|kutip|citation|references?\b|cite', combined):
+    # Permintaan rujukan yang tertulis jelas selalu menang
+    if re.search(r'(?i)sitasi|referensi|daftar\s+pustaka|rujukan|kutip|citation|references?\b|cite', combined):
         needs_citations = True
+    elif answer_type in ("terjemahan", "jawaban_singkat"):
+        needs_citations = False
     else:
         needs_citations = None
 
@@ -284,12 +304,12 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
             return None
         return number if low <= number <= high else None
 
-    answer_type = raw.get("answer_type")
+    answer_type = raw.get("answer_type") if raw.get("answer_type") in ANSWER_TYPES else None
     language = raw.get("answer_language")
     needs_citations = raw.get("needs_citations")
     return {
         "question_count": as_int(raw.get("question_count"), 1, 50) or guess["question_count"],
-        "answer_type": answer_type if answer_type in ANSWER_TYPES else guess["answer_type"],
+        "answer_type": answer_type or guess["answer_type"],
         "needs_citations": needs_citations if isinstance(needs_citations, bool) else guess["needs_citations"],
         "answer_language": language if language in ("id", "en") else guess["answer_language"],
         "word_limit": as_int(raw.get("word_limit"), 50, 10000) or guess["word_limit"],
@@ -308,7 +328,7 @@ Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
 3. "course_code": Kode mata kuliah resmi jika ada (contoh: EKMA4116, FSSI4206), atau null.
 4. "answer_spec": spesifikasi bentuk jawaban yang diminta dosen:
    - "question_count": jumlah butir soal utama yang harus dijawab, atau null jika berupa satu topik esai tanpa nomor atau jika soal terdiri dari beberapa bagian yang nomornya mulai lagi dari 1.
-   - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, benar salah, pemahaman bacaan, atau jawaban pendek per butir), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian per nomor soal), atau "uraian" (uraian analitis umum).
+   - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, benar salah, pemahaman bacaan, gagasan utama, atau jawaban pendek per butir, MESKIPUN soalnya bernomor), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian atau analisis panjang per nomor soal yang butuh beberapa paragraf), atau "uraian" (uraian analitis umum). Pilih "jawaban_singkat" bila jawaban tiap butir cukup satu sampai dua kalimat atau cukup diambil dari teks bacaan.
    - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan, hitungan, atau menjawab dari teks bacaan yang sudah disediakan; null jika tidak jelas.
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
    - "word_limit": angka batas kata jika disebutkan (jika rentang seperti 250-300 kata, isi angka terbesar), atau null.

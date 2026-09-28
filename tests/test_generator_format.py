@@ -136,3 +136,14 @@ async def test_essay_spec_applies_lecturer_word_limit(monkeypatch):
     assert "maksimal 300 kata" in system
     assert "sekitar 300 kata" in system
     assert "Esai" in system
+
+
+@pytest.mark.anyio
+async def test_every_format_gets_per_item_length_rule(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    await gen.generate_academic_draft("1. Who built the tower?\n2. Analyze why it was built.", [], format_type="bernomor", target_words=950)
+
+    system = captured["system"]
+    assert "ATURAN MENJAWAB SETIAP BUTIR" in system
+    assert "1 sampai 2 kalimat" in system
+    assert "wajib bersumber dari teks itu" in system

@@ -175,7 +175,7 @@ def _numbered_paragraph(doc, text, num_id):
 
 def test_read_docx_restores_list_numbers_in_document_order():
     from docx.oxml.ns import qn
-    from tools.question_reader import read_docx_file, count_numbered_questions, guess_answer_spec
+    from tools.question_reader import read_docx_file, count_numbered_questions
     doc = docx.Document()
     num_id = doc.styles["List Number"].element.pPr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
 
@@ -197,12 +197,63 @@ def test_read_docx_restores_list_numbers_in_document_order():
     assert "2. How many people live there?" in text
     assert count_numbered_questions(text) == 2
 
-    spec = guess_answer_spec(text)
-    assert spec["answer_type"] == "jawaban_singkat"
-    assert spec["needs_citations"] is False
-
 
 def test_count_numbered_questions_multi_part_sheet_is_not_locked():
     from tools.question_reader import count_numbered_questions
     sheet = "Answer the questions.\n1. Who?\n2. Where?\nTrue or false.\n1. The tower is old.\n2. The tower is new."
     assert count_numbered_questions(sheet) == 0
+
+
+def test_read_docx_continues_numbering_from_start_override():
+    import copy
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from tools.question_reader import read_docx_file, count_numbered_questions
+    doc = docx.Document()
+    base_id = doc.styles["List Number"].element.pPr.find(qn("w:numPr")).find(qn("w:numId")).get(qn("w:val"))
+
+    # List kedua memakai startOverride 3, seperti bagian benar salah yang melanjutkan nomor soal 1-2
+    numbering = doc.part.numbering_part.element
+    base_num = next(n for n in numbering.findall(qn("w:num")) if n.get(qn("w:numId")) == base_id)
+    second = copy.deepcopy(base_num)
+    second.set(qn("w:numId"), "99")
+    override = OxmlElement("w:lvlOverride")
+    override.set(qn("w:ilvl"), "0")
+    start = OxmlElement("w:startOverride")
+    start.set(qn("w:val"), "3")
+    override.append(start)
+    second.append(override)
+    numbering.append(second)
+
+    doc.add_paragraph("Answer the questions based on the passage.")
+    _numbered_paragraph(doc, "Who built it?", base_id)
+    _numbered_paragraph(doc, "When was it built?", base_id)
+    doc.add_paragraph("Decide whether each statement is True (T) or False (F).")
+    _numbered_paragraph(doc, "It is old.", "99")
+    _numbered_paragraph(doc, "It is new.", "99")
+
+    stream = io.BytesIO()
+    doc.save(stream)
+    text = read_docx_file(stream.getvalue())
+    assert "3. It is old." in text
+    assert "4. It is new." in text
+    assert count_numbered_questions(text) == 4
+
+
+def test_normalize_answer_spec_keeps_ai_answer_type():
+    from tools.question_reader import normalize_answer_spec
+    # Keputusan jenis jawaban milik AI, pola hanya mengisi yang kosong
+    questions = "Read the passage.\n1. Who built the tower?\n2. Decide whether it is True (T) or False (F)."
+    assert normalize_answer_spec({"answer_type": "jawaban_bernomor"}, questions)["answer_type"] == "jawaban_bernomor"
+    assert normalize_answer_spec({"answer_type": None}, questions)["answer_type"] == "jawaban_singkat"
+
+
+def test_guess_answer_spec_does_not_treat_generic_text_words_as_short_answer():
+    from tools.question_reader import guess_answer_spec
+    analysis = guess_answer_spec("1. Jelaskan konsep teks berikut dalam konteks manajemen.\n2. Bandingkan dengan teori Kotler.")
+    assert analysis["answer_type"] == "jawaban_bernomor"
+
+    # Permintaan referensi yang tertulis jelas tidak boleh dimatikan oleh kata 'bacaan'
+    essay = guess_answer_spec("Setelah membaca bacaan pada Modul 3, analisis dampak kebijakan fiskal. Gunakan minimal 3 referensi.")
+    assert essay["needs_citations"] is True
+    assert essay["answer_type"] != "jawaban_singkat"

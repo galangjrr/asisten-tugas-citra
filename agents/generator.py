@@ -271,7 +271,7 @@ async def generate_academic_draft(
             FORMAT STRUCTURE: Numbered Assignment Answers (Question 1, 2, etc.)
             - Structure answers into numbered items: '1. [Clear Question/Topic 1]', '2. [Clear Question/Topic 2]', etc.
             - {section_req}
-            - Each numbered item must be thoroughly answered with {paras_per_sec}, with citations when references are provided.
+            - Answer each numbered item completely. Analytical items use {paras_per_sec}; factual or short items need only 1 to 2 sentences. Add citations when references are provided.
             """
             json_example = """
             {
@@ -290,7 +290,7 @@ async def generate_academic_draft(
             STRUKTUR FORMAT: Jawaban Tugas Bernomor (Soal 1, 2, dst)
             - Susun jawaban dalam butir-butir nomor terstruktur: '1. [Uraian Pertanyaan atau Topik Pertama]', '2. [Uraian Pertanyaan atau Topik Kedua]', dst.
             - {section_req}
-            - Setiap butir nomor wajib dijawab secara tuntas dengan {paras_per_sec}, disertai sitasi jika ada rujukan.
+            - Setiap butir nomor dijawab tuntas. Butir analitis memakai {paras_per_sec}, butir faktual atau singkat cukup 1 sampai 2 kalimat. Sertakan sitasi jika ada rujukan.
             """
             json_example = """
             {
@@ -486,20 +486,29 @@ async def generate_academic_draft(
     ATURAN JAWABAN LANGSUNG (MENGALAHKAN ATURAN FORMAT DAN PANJANG DI ATAS):
     - Jenis tugas: {DIRECT_ANSWER_LABELS[answer_type]}. Tulis langsung jawabannya dengan panjang yang dibutuhkan soal. Abaikan target jumlah kata dan aturan jumlah paragraf.
     - {section_req if question_count else "Jika soal terdiri dari beberapa bagian dengan instruksi berbeda, buat satu section per bagian dengan heading singkat sesuai instruksinya, lalu jawab setiap butir di baris baru dengan nomor aslinya. Jika hanya satu bagian, tulis dalam satu section tanpa heading."}
-    - Jika lembar soal menyertakan teks bacaan, jawab HANYA berdasarkan informasi di bacaan itu, bukan pengetahuan umum. Soal benar salah dijawab dengan True atau False (atau Benar atau Salah) disertai alasan singkat dari bacaan. Cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan bacaan; pernyataan yang hanya sebagian benar atau bagian mana pun bertentangan dengan bacaan dijawab False. Soal gagasan utama dijawab dengan satu kalimat inti per paragraf.
     - Untuk terjemahan, terjemahkan lengkap setiap butir dan pertahankan bentuk asli teksnya, misalnya nama pembicara di setiap baris dialog. Tulis setiap giliran bicara di baris baru dengan karakter \\n di dalam 'content'.
     - DILARANG menambah esai pembuka, analisis, komentar tentang proses pengerjaan, atau penutup kecuali diminta soal.
     """
     else:
         length_rules = f"""
-    ATURAN PANJANG NASKAH DAN KEDALAMAN (SANGAT KETAT):
-    - Target total panjang naskah: sekitar {target_words} kata (setara kurang lebih {estimated_pages} halaman A4 standar Times New Roman 12pt spasi 1.5).
+    ATURAN PANJANG NASKAH DAN KEDALAMAN:
+    - Target total panjang naskah: sekitar {target_words} kata (setara kurang lebih {estimated_pages} halaman A4 standar Times New Roman 12pt spasi 1.5). Target ini berlaku untuk bagian yang menuntut uraian, analisis, atau argumentasi.
     - Aturan kedalaman: {depth_instruction}
     - {section_req}
-    - Tulislah dengan ketebalan argumentasi yang tepat agar total panjang naskah mendekati target {target_words} kata.
+    - Uraikan butir analitis dengan ketebalan argumentasi yang cukup agar naskah mendekati target, tetapi JANGAN menebalkan butir faktual demi mengejar jumlah kata.
     """
     if word_limit:
         length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
+
+    # Aturan umum untuk semua jenis soal, supaya perilaku ikut isi soal dan bukan daftar format tertentu
+    length_rules += """
+    ATURAN MENJAWAB SETIAP BUTIR (BERLAKU UNTUK SEMUA FORMAT):
+    - Panjang jawaban tiap butir mengikuti apa yang ditanyakan butir itu. Pertanyaan faktual (siapa, kapan, di mana, berapa, sebutkan), isian, pilihan, dan benar salah cukup dijawab 1 sampai 2 kalimat. Pertanyaan yang meminta penjelasan, analisis, perbandingan, evaluasi, atau argumen diuraikan sesuai aturan kedalaman.
+    - DILARANG menambah latar belakang, pengulangan, atau informasi yang tidak ditanyakan hanya untuk memperpanjang jawaban.
+    - Jika lembar soal menyertakan teks bacaan, kasus, data, atau dialog, jawaban wajib bersumber dari teks itu dan tidak boleh bertentangan dengannya. Pengetahuan umum hanya boleh dipakai bila soal memintanya.
+    - Untuk pernyataan benar salah, cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan teks. Pernyataan yang sebagian isinya bertentangan dengan teks dinilai salah, lalu beri alasan singkat dari teks.
+    - Pertahankan nomor butir sesuai lembar soal.
+    """
 
     if papers_with_content:
         citation_rules = f"""

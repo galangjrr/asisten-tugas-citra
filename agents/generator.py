@@ -33,7 +33,7 @@ def detect_language(topic: str, custom_instructions: str = "") -> str:
 
 DIRECT_ANSWER_LABELS = {
     "terjemahan": "terjemahan teks",
-    "jawaban_singkat": "jawaban singkat, isian, atau hitungan",
+    "jawaban_singkat": "jawaban singkat, isian, benar salah, pemahaman bacaan, atau hitungan",
 }
 
 
@@ -485,7 +485,8 @@ async def generate_academic_draft(
         length_rules = f"""
     ATURAN JAWABAN LANGSUNG (MENGALAHKAN ATURAN FORMAT DAN PANJANG DI ATAS):
     - Jenis tugas: {DIRECT_ANSWER_LABELS[answer_type]}. Tulis langsung jawabannya dengan panjang yang dibutuhkan soal. Abaikan target jumlah kata dan aturan jumlah paragraf.
-    - {section_req if question_count else "Tulis jawaban dalam satu bagian tanpa heading."}
+    - {section_req if question_count else "Jika soal terdiri dari beberapa bagian dengan instruksi berbeda, buat satu section per bagian dengan heading singkat sesuai instruksinya, lalu jawab setiap butir di baris baru dengan nomor aslinya. Jika hanya satu bagian, tulis dalam satu section tanpa heading."}
+    - Jika lembar soal menyertakan teks bacaan, jawab HANYA berdasarkan informasi di bacaan itu, bukan pengetahuan umum. Soal benar salah dijawab dengan True atau False (atau Benar atau Salah) disertai alasan singkat dari bacaan. Cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan bacaan; pernyataan yang hanya sebagian benar atau bagian mana pun bertentangan dengan bacaan dijawab False. Soal gagasan utama dijawab dengan satu kalimat inti per paragraf.
     - Untuk terjemahan, terjemahkan lengkap setiap butir dan pertahankan bentuk asli teksnya, misalnya nama pembicara di setiap baris dialog. Tulis setiap giliran bicara di baris baru dengan karakter \\n di dalam 'content'.
     - DILARANG menambah esai pembuka, analisis, komentar tentang proses pengerjaan, atau penutup kecuali diminta soal.
     """

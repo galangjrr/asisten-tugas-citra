@@ -6,6 +6,8 @@ import asyncio
 from typing import Dict, Any, Optional
 import pypdf
 import docx
+from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
 from tools.gemini_client import generate_with_fallback
 from tools.ocr_vision import extract_text_from_image
 
@@ -18,24 +20,88 @@ def extract_course_code_from_text(text: str) -> Optional[str]:
     return None
 
 
+def _list_formats(doc) -> Dict[tuple, str]:
+    """Memetakan (numId, ilvl) ke format nomor list Word seperti decimal, lowerLetter, atau bullet."""
+    try:
+        numbering = doc.part.numbering_part.element
+    except Exception:
+        return {}
+
+    abstract_formats: Dict[tuple, str] = {}
+    for abstract in numbering.findall(qn("w:abstractNum")):
+        abstract_id = abstract.get(qn("w:abstractNumId"))
+        for lvl in abstract.findall(qn("w:lvl")):
+            fmt = lvl.find(qn("w:numFmt"))
+            abstract_formats[(abstract_id, lvl.get(qn("w:ilvl")))] = fmt.get(qn("w:val")) if fmt is not None else "decimal"
+
+    formats: Dict[tuple, str] = {}
+    for num in numbering.findall(qn("w:num")):
+        abstract_ref = num.find(qn("w:abstractNumId"))
+        if abstract_ref is None:
+            continue
+        for (abstract_id, ilvl), fmt in abstract_formats.items():
+            if abstract_id == abstract_ref.get(qn("w:val")):
+                formats[(num.get(qn("w:numId")), ilvl)] = fmt
+    return formats
+
+
+def _list_marker(fmt: str, n: int) -> str:
+    if fmt == "bullet":
+        return "•"
+    if fmt in ("lowerLetter", "upperLetter") and n <= 26:
+        return f"{chr((96 if fmt == 'lowerLetter' else 64) + n)}."
+    return f"{n}."
+
+
 def read_docx_file(file_bytes: bytes) -> str:
-    """Membaca seluruh teks dan tabel dari berkas dokumen Microsoft Word docx."""
+    """
+    Membaca teks dokumen Word sesuai urutan aslinya, termasuk isi tabel.
+    Nomor list otomatis Word dimunculkan lagi karena tidak tersimpan sebagai teks,
+    padahal nomor itu yang membedakan butir soal dari bacaan.
+    """
     doc = docx.Document(io.BytesIO(file_bytes))
-    paragraphs = []
-    
-    for p in doc.paragraphs:
-        t = p.text.strip()
-        if t:
-            paragraphs.append(t)
+    formats = _list_formats(doc)
+    counters: Dict[tuple, int] = {}
 
-    # Baca juga teks di dalam tabel jika dosen membuat soal bertabel
-    for table in doc.tables:
-        for row in table.rows:
-            row_texts = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-            if row_texts:
-                paragraphs.append(" | ".join(dict.fromkeys(row_texts)))
+    def paragraph_text(p_el) -> str:
+        text = Paragraph(p_el, doc).text.strip()
+        # ponytail: hanya penomoran langsung di paragraf, penomoran yang diwariskan dari style heading belum dibaca
+        num_pr = p_el.find(f"./{qn('w:pPr')}/{qn('w:numPr')}")
+        if not text or num_pr is None:
+            return text
+        num_id = num_pr.find(qn("w:numId"))
+        ilvl = num_pr.find(qn("w:ilvl"))
+        key = (num_id.get(qn("w:val")) if num_id is not None else "0", ilvl.get(qn("w:val")) if ilvl is not None else "0")
+        # numId 0 berarti penomoran sengaja dimatikan
+        if key[0] == "0":
+            return text
+        counters[key] = counters.get(key, 0) + 1
+        return f"{_list_marker(formats.get(key, 'decimal'), counters[key])} {text}"
 
-    return "\n\n".join(paragraphs)
+    def table_lines(tbl) -> list:
+        lines = []
+        for tr in tbl.iterchildren(qn("w:tr")):
+            cells = []
+            for tc in tr.iterchildren(qn("w:tc")):
+                cell = "\n".join(block_lines(tc)).strip()
+                if cell and cell not in cells:
+                    cells.append(cell)
+            if cells:
+                lines.append(" | ".join(cells))
+        return lines
+
+    def block_lines(parent) -> list:
+        lines = []
+        for child in parent.iterchildren():
+            if child.tag == qn("w:p"):
+                text = paragraph_text(child)
+                if text:
+                    lines.append(text)
+            elif child.tag == qn("w:tbl"):
+                lines.extend(table_lines(child))
+        return lines
+
+    return "\n\n".join(block_lines(doc.element.body))
 
 
 async def read_pdf_file(file_bytes: bytes) -> str:
@@ -124,9 +190,12 @@ def split_questions_and_guidelines(text: str) -> Dict[str, str]:
     questions = join(header_prose + [""] + question_lines)
     guidelines = join([ln for ln in buckets["guide"] if ln not in header_lines])
 
-    # Tanpa judul soal, batas soal dan petunjuk tidak bisa dipastikan, jadi teks dikembalikan utuh
+    # Tanpa judul soal, batas soal dan petunjuk blok tidak bisa dipastikan, jadi teks dikembalikan utuh.
+    # Pengecualiannya kriteria satu baris seperti "Indikator : ...", yang aman dipindah ke catatan dosen.
     if not found_question or len(questions) < 20:
-        return {"questions": text.strip(), "guidelines": ""}
+        inline_guides = [ln for ln in lines if GUIDELINE_HEADING.match(ln) and re.search(r':\s*\S', ln)]
+        kept = [ln for ln in lines if ln not in inline_guides]
+        return {"questions": join(kept), "guidelines": join(list(dict.fromkeys(inline_guides)))}
 
     return {"questions": questions, "guidelines": guidelines}
 
@@ -136,10 +205,13 @@ ANSWER_TYPES = {"uraian", "terjemahan", "jawaban_singkat", "esai", "makalah", "j
 
 def count_numbered_questions(topic: str) -> int:
     """Menghitung butir soal bernomor berurutan dari 1, misal '1. Translate...' atau 'Soal 2:'."""
-    numbers = {
+    numbers = [
         int(m.group(1))
         for m in re.finditer(r'(?im)^\s*(?:soal|pertanyaan|question)?\s*(\d{1,2})\s*[.):]\s+\S', topic)
-    }
+    ]
+    # Nomor yang mulai lagi dari 1 berarti soal terdiri dari beberapa bagian, jumlah section tidak bisa dikunci
+    if numbers.count(1) > 1:
+        return 0
     count = 0
     while count + 1 in numbers:
         count += 1
@@ -159,8 +231,14 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
     combined = f"{questions}\n{guidelines}"
     count = count_numbered_questions(questions)
 
+    is_reading = re.search(
+        r'(?i)\b(?:passage|reading text|read the (?:text|paragraph)|main idea|true \(t\)|bacaan|wacana|gagasan utama|teks berikut)',
+        questions,
+    )
     if re.search(r'(?i)\btranslat|\bterjemah', questions):
         answer_type = "terjemahan"
+    elif is_reading:
+        answer_type = "jawaban_singkat"
     elif re.search(r'(?i)\b(esai|essay)\b', questions):
         answer_type = "esai"
     elif re.search(r'(?i)\bmakalah\b|\bpaper\b|\bbab\s+i\b', questions):
@@ -170,7 +248,8 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
     else:
         answer_type = None
 
-    if answer_type == "terjemahan":
+    # Terjemahan dan soal bacaan dijawab dari teks yang sudah disediakan, bukan dari jurnal
+    if answer_type == "terjemahan" or is_reading:
         needs_citations = False
     elif re.search(r'(?i)sitasi|referensi|daftar\s+pustaka|rujukan|kutip|citation|references?\b|cite', combined):
         needs_citations = True
@@ -224,13 +303,13 @@ async def structure_assignment_with_ai(raw_text: str) -> Optional[Dict[str, Any]
 
     prompt = """Analisis lembar tugas kuliah ini (bisa berbahasa Indonesia atau Inggris).
 Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
-1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan.
+1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab, beserta SELURUH teks bacaan, kasus, atau dialog yang dibutuhkan untuk menjawabnya. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan.
 2. "guidelines": Seluruh capaian pembelajaran, indikator, petunjuk teknis, rubrik penilaian, kriteria dosen, ketentuan format, atau batasan kata yang harus dipatuhi saat menulis jawaban.
 3. "course_code": Kode mata kuliah resmi jika ada (contoh: EKMA4116, FSSI4206), atau null.
 4. "answer_spec": spesifikasi bentuk jawaban yang diminta dosen:
-   - "question_count": jumlah butir soal utama yang harus dijawab, atau null jika berupa satu topik esai tanpa nomor.
-   - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, atau jawaban pendek), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian per nomor soal), atau "uraian" (uraian analitis umum).
-   - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan atau hitungan; null jika tidak jelas.
+   - "question_count": jumlah butir soal utama yang harus dijawab, atau null jika berupa satu topik esai tanpa nomor atau jika soal terdiri dari beberapa bagian yang nomornya mulai lagi dari 1.
+   - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, benar salah, pemahaman bacaan, atau jawaban pendek per butir), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian per nomor soal), atau "uraian" (uraian analitis umum).
+   - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan, hitungan, atau menjawab dari teks bacaan yang sudah disediakan; null jika tidak jelas.
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
    - "word_limit": angka batas kata jika disebutkan (jika rentang seperti 250-300 kata, isi angka terbesar), atau null.
 

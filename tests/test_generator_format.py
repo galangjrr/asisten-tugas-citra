@@ -147,3 +147,19 @@ async def test_every_format_gets_per_item_length_rule(monkeypatch):
     assert "ATURAN MENJAWAB SETIAP BUTIR" in system
     assert "1 sampai 2 kalimat" in system
     assert "wajib bersumber dari teks itu" in system
+
+
+@pytest.mark.anyio
+async def test_depth_option_also_applies_to_short_items(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    topic = "1. Who built the tower?\n2. What are two official names of the tower?"
+
+    await gen.generate_academic_draft(topic, [], paragraph_depth="standar")
+    assert "cukup dijawab 1 sampai 2 kalimat" in captured["system"]
+
+    await gen.generate_academic_draft(topic, [], paragraph_depth="elaboratif")
+    system = captured["system"]
+    assert "dijawab 2 sampai 3 kalimat" in system
+    assert "kalimat pendukung dari teks soal" in system
+    # Aturan jumlah hal yang diminta berlaku di semua kedalaman
+    assert "kategori yang sama persis dengan yang ditanyakan" in system

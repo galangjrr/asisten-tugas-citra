@@ -484,10 +484,10 @@ async def generate_academic_draft(
     if is_direct_answer:
         length_rules = f"""
     ATURAN JAWABAN LANGSUNG (MENGALAHKAN ATURAN FORMAT DAN PANJANG DI ATAS):
-    - Jenis tugas: {DIRECT_ANSWER_LABELS[answer_type]}. Tulis langsung jawabannya dengan panjang yang dibutuhkan soal. Abaikan target jumlah kata dan aturan jumlah paragraf.
+    - Jenis tugas: {DIRECT_ANSWER_LABELS[answer_type]}. Tulis langsung jawabannya. Abaikan target jumlah kata total dan aturan jumlah paragraf; panjang tiap butir mengikuti ATURAN MENJAWAB SETIAP BUTIR di bawah.
     - {section_req if question_count else "Jika soal terdiri dari beberapa bagian dengan instruksi berbeda, buat satu section per bagian dengan heading singkat sesuai instruksinya, lalu jawab setiap butir di baris baru dengan nomor aslinya. Jika hanya satu bagian, tulis dalam satu section tanpa heading."}
     - Untuk terjemahan, terjemahkan lengkap setiap butir dan pertahankan bentuk asli teksnya, misalnya nama pembicara di setiap baris dialog. Tulis setiap giliran bicara di baris baru dengan karakter \\n di dalam 'content'.
-    - DILARANG menambah esai pembuka, analisis, komentar tentang proses pengerjaan, atau penutup kecuali diminta soal.
+    - DILARANG menambah esai pembuka, komentar tentang proses pengerjaan, atau penutup kecuali diminta soal.
     """
     else:
         length_rules = f"""
@@ -500,10 +500,20 @@ async def generate_academic_draft(
     if word_limit:
         length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
 
+    # Pilihan kedalaman pengguna juga berlaku untuk butir pendek, bukan hanya butir uraian
+    if paragraph_depth == "elaboratif":
+        factual_length = (
+            "dijawab 2 sampai 3 kalimat: jawaban inti, lalu kutipan atau parafrase kalimat pendukung dari teks soal "
+            "jika teks disediakan, atau penjelasan singkat alasannya jika tidak ada teks"
+        )
+    else:
+        factual_length = "cukup dijawab 1 sampai 2 kalimat"
+
     # Aturan umum untuk semua jenis soal, supaya perilaku ikut isi soal dan bukan daftar format tertentu
-    length_rules += """
+    length_rules += f"""
     ATURAN MENJAWAB SETIAP BUTIR (BERLAKU UNTUK SEMUA FORMAT):
-    - Panjang jawaban tiap butir mengikuti apa yang ditanyakan butir itu. Pertanyaan faktual (siapa, kapan, di mana, berapa, sebutkan), isian, pilihan, dan benar salah cukup dijawab 1 sampai 2 kalimat. Pertanyaan yang meminta penjelasan, analisis, perbandingan, evaluasi, atau argumen diuraikan sesuai aturan kedalaman.
+    - Panjang jawaban tiap butir mengikuti apa yang ditanyakan butir itu. Pertanyaan faktual (siapa, kapan, di mana, berapa, sebutkan), isian, pilihan, dan benar salah {factual_length}. Pertanyaan yang meminta penjelasan, analisis, perbandingan, evaluasi, atau argumen diuraikan sesuai aturan kedalaman.
+    - Jika butir meminta sejumlah hal (misal 'sebutkan dua', 'mention three', 'what are two'), jawaban WAJIB memuat tepat sejumlah itu dan menyebutnya satu per satu dengan jelas. Ambil hal yang di teks disebut langsung sebagai jawaban pertanyaan itu dan berasal dari kategori yang sama persis dengan yang ditanyakan. Jangan mengisi kekurangan dengan istilah dari kategori lain yang kebetulan mirip, misalnya nama bagian, benda, atau tempat lain yang disebut di dekatnya. Jika teks hanya menyebut lebih sedikit dari yang diminta, pakai bentuk lain yang disebut teks untuk hal yang sama, seperti nama singkatnya.
     - DILARANG menambah latar belakang, pengulangan, atau informasi yang tidak ditanyakan hanya untuk memperpanjang jawaban.
     - Jika lembar soal menyertakan teks bacaan, kasus, data, atau dialog, jawaban wajib bersumber dari teks itu dan tidak boleh bertentangan dengannya. Pengetahuan umum hanya boleh dipakai bila soal memintanya.
     - Untuk pernyataan benar salah, cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan teks. Pernyataan yang sebagian isinya bertentangan dengan teks dinilai salah, lalu beri alasan singkat dari teks.

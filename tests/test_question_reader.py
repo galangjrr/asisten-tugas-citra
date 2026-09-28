@@ -257,3 +257,22 @@ def test_guess_answer_spec_does_not_treat_generic_text_words_as_short_answer():
     essay = guess_answer_spec("Setelah membaca bacaan pada Modul 3, analisis dampak kebijakan fiskal. Gunakan minimal 3 referensi.")
     assert essay["needs_citations"] is True
     assert essay["answer_type"] != "jawaban_singkat"
+
+
+def test_strip_time_limit_lines_keeps_questions_that_mention_time():
+    from tools.question_reader import strip_time_limit_lines
+    sheet = "\n".join([
+        "LEMBAR SOAL TUGAS TUTORIAL I",
+        "Waktu\t:\t30 menit",
+        "Time allotted: 2 hours",
+        "Durasi 90 menit",
+        "1. Berapa waktu tempuh kereta jika jaraknya 120 km?",
+        "2. How many hours does the journey take?",
+    ])
+    cleaned = strip_time_limit_lines(sheet)
+    assert "30 menit" not in cleaned
+    assert "2 hours" not in cleaned
+    assert "90 menit" not in cleaned
+    # Soal yang kebetulan membahas waktu tetap utuh
+    assert "1. Berapa waktu tempuh kereta" in cleaned
+    assert "2. How many hours does the journey take?" in cleaned

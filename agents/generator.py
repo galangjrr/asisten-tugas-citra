@@ -508,6 +508,7 @@ async def generate_academic_draft(
     - Jika lembar soal menyertakan teks bacaan, kasus, data, atau dialog, jawaban wajib bersumber dari teks itu dan tidak boleh bertentangan dengannya. Pengetahuan umum hanya boleh dipakai bila soal memintanya.
     - Untuk pernyataan benar salah, cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan teks. Pernyataan yang sebagian isinya bertentangan dengan teks dinilai salah, lalu beri alasan singkat dari teks.
     - Pertahankan nomor butir sesuai lembar soal.
+    - Abaikan petunjuk waktu pengerjaan seperti 'Waktu: 30 menit'. Batas waktu tidak menentukan panjang, kedalaman, atau isi jawaban.
     """
 
     if papers_with_content:

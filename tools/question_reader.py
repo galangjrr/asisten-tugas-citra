@@ -173,6 +173,17 @@ SCORE_LINE = re.compile(r'(?i)^(?:total\s+)?(?:skor|score|nilai|bobot)\b[^a-z]*\
 # Baris metadata kop soal seperti "Program Studi : Sastra Inggris".
 META_LINE = re.compile(r'^[^:]{0,40}\s:\s|^:')
 
+# Baris waktu pengerjaan seperti "Waktu : 30 menit" atau "Time allotted: 2 hours".
+TIME_LIMIT_LINE = re.compile(
+    r'(?im)^[ \t]*(?:waktu(?:\s+pengerjaan)?|alokasi\s+waktu|durasi|lama\s+pengerjaan|time(?:\s+(?:allotted|allowed|limit))?|duration)'
+    r'[ \t]*[:：]?[ \t]*\d+[ \t]*(?:menit|jam|minutes?|mins?|hours?|hrs?)\b[^\n]*\n?'
+)
+
+
+def strip_time_limit_lines(text: str) -> str:
+    """Membuang petunjuk waktu pengerjaan. Batas waktu ujian tidak boleh memengaruhi panjang atau isi jawaban."""
+    return TIME_LIMIT_LINE.sub("", text)
+
 
 def split_questions_and_guidelines(text: str) -> Dict[str, str]:
     """Memilah lembar tugas per bagian: kop dibuang, petunjuk ke guidelines, butir soal ke questions."""
@@ -400,7 +411,7 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
             text = await read_pdf_file(file_bytes)
             file_type = "pdf"
 
-    clean_text = text.strip()
+    clean_text = strip_time_limit_lines(text).strip()
     detected_code = extract_course_code_from_text(clean_text)
 
     # Coba gunakan pemilah cerdas AI terlebih dahulu

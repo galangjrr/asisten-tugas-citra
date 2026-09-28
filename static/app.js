@@ -28,6 +28,69 @@ const questionFileBadge = document.getElementById("question-file-badge");
 const questionFileInfo = document.getElementById("question-file-info");
 const btnClearQuestionFile = document.getElementById("btn-clear-question-file");
 
+// Answer Spec Elements
+const answerSpecNote = document.getElementById("answer-spec-note");
+const specQuestionCount = document.getElementById("spec-question-count");
+const specAnswerType = document.getElementById("spec-answer-type");
+const specCitations = document.getElementById("spec-citations");
+const specLanguage = document.getElementById("spec-language");
+const specWordLimit = document.getElementById("spec-word-limit");
+const ANSWER_SPEC_DEFAULT_NOTE = "Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.";
+
+function applyAnswerSpec(spec, source) {
+  if (!spec) return;
+  specQuestionCount.value = spec.question_count || "";
+  specAnswerType.value = spec.answer_type || "";
+  // Hanya pindah ke tanpa rujukan jika dosen jelas tidak butuh sitasi
+  specCitations.value = spec.needs_citations === false ? "tidak" : "ya";
+  specLanguage.value = spec.answer_language || "";
+  specWordLimit.value = spec.word_limit || "";
+  answerSpecNote.textContent = source === "ai"
+    ? "Dideteksi AI dari lembar soal. Cek sekali lagi sebelum lanjut."
+    : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.";
+  updatePrimaryAction();
+}
+
+function resetAnswerSpec() {
+  specQuestionCount.value = "";
+  specAnswerType.value = "";
+  specCitations.value = "ya";
+  specLanguage.value = "";
+  specWordLimit.value = "";
+  answerSpecNote.textContent = ANSWER_SPEC_DEFAULT_NOTE;
+  updatePrimaryAction();
+}
+
+function readAnswerSpec() {
+  const count = parseInt(specQuestionCount.value, 10);
+  const wordLimit = parseInt(specWordLimit.value, 10);
+  return {
+    question_count: count >= 1 && count <= 50 ? count : null,
+    answer_type: specAnswerType.value || null,
+    needs_citations: specCitations.value === "ya",
+    answer_language: specLanguage.value || null,
+    word_limit: wordLimit >= 50 && wordLimit <= 10000 ? wordLimit : null
+  };
+}
+
+function wantsReferences() {
+  return specCitations.value === "ya";
+}
+
+// Tombol utama menyesuaikan pilihan rujukan agar tugas tanpa sitasi tidak lewat pencarian jurnal
+function updatePrimaryAction() {
+  const label = btnSearch.querySelector("span");
+  if (label) {
+    label.textContent = wantsReferences()
+      ? "Lanjut ke Langkah 2: Cari & Pilih Rujukan Ilmiah"
+      : "Tulis Jawaban Sekarang";
+  }
+  const skipButton = document.getElementById("btn-skip-references");
+  if (skipButton) skipButton.classList.toggle("hidden", !wantsReferences());
+}
+
+specCitations.addEventListener("change", updatePrimaryAction);
+
 async function handleQuestionFileUpload(file) {
   if (!file) return;
 
@@ -64,6 +127,8 @@ async function handleQuestionFileUpload(file) {
       if (data.detected_guidelines && inputInstructions) {
         inputInstructions.value = data.detected_guidelines;
       }
+
+      applyAnswerSpec(data.answer_spec, data.answer_spec_source);
 
       if (data.word_count_hint && selectLength) {
         if (data.word_count_hint <= 600) {
@@ -129,6 +194,7 @@ if (btnClearQuestionFile) {
   btnClearQuestionFile.addEventListener("click", () => {
     if (inputTopic) inputTopic.value = "";
     if (questionFileBadge) questionFileBadge.classList.add("hidden");
+    resetAnswerSpec();
     if (uploadQuestionFile) uploadQuestionFile.value = "";
   });
 }
@@ -382,6 +448,8 @@ async function performSearch(query) {
           <p class="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">Coba ketik kata kunci yang lebih ringkas di kotak pencarian atas, atau masukkan nomor DOI resmi jika sudah punya naskah tertentu.</p>
         </div>
       `;
+      updateSelectionState();
+      generateActions.classList.remove("hidden");
       return;
     }
 
@@ -423,6 +491,11 @@ async function performSearch(query) {
 formSearch.addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  if (!wantsReferences()) {
+    startWithoutReferences();
+    return;
+  }
+
   const step1UtCodeVal = inputStep1UtCode ? inputStep1UtCode.value.trim() : "";
   const step1UtContentVal = inputStep1UtContent ? inputStep1UtContent.value.trim() : "";
 
@@ -458,6 +531,27 @@ formSearch.addEventListener("submit", async (e) => {
 
   performSearch(inputTopic.value);
 });
+
+// Tugas tanpa sitasi seperti terjemahan langsung ditulis tanpa lewat pencarian jurnal
+const btnSkipReferences = document.getElementById("btn-skip-references");
+function startWithoutReferences() {
+  if (inputTopic.value.trim().length < 3) {
+    formSearch.reportValidity();
+    inputTopic.focus();
+    return;
+  }
+  selectedPaperIds.clear();
+  currentPapers = [];
+  papersList.innerHTML = "";
+  searchBackendInfo.classList.add("hidden");
+  updateSelectionState();
+  generateActions.classList.remove("hidden");
+  btnGenerate.click();
+}
+
+if (btnSkipReferences) {
+  btnSkipReferences.addEventListener("click", startWithoutReferences);
+}
 
 if (btnRefineSearch && inputRefineQuery) {
   btnRefineSearch.addEventListener("click", () => {
@@ -938,8 +1032,7 @@ function renderPapersList() {
 
 function updateSelectionState() {
   const count = selectedPaperIds.size;
-  selectedCountLabel.textContent = `${count} naskah dipilih`;
-  btnGenerate.disabled = count === 0;
+  selectedCountLabel.textContent = count === 0 ? "Tanpa rujukan" : `${count} naskah dipilih`;
 }
 
 btnBackStep1.addEventListener("click", () => {
@@ -966,7 +1059,6 @@ function setStepDone(stepEl) {
 
 // 3. Generate Draft
 btnGenerate.addEventListener("click", async () => {
-  if (selectedPaperIds.size === 0) return;
 
   setStep(3);
   generatingIndicator.classList.remove("hidden");
@@ -1016,7 +1108,8 @@ btnGenerate.addEventListener("click", async () => {
       paragraph_depth: selectDepth ? selectDepth.value : "standar",
       tone: selectTone.value,
       paper_ids: Array.from(selectedPaperIds),
-      custom_instructions: inputInstructions.value.trim()
+      custom_instructions: inputInstructions.value.trim(),
+      answer_spec: readAnswerSpec()
     };
 
     const res = await fetch("/api/generate", {
@@ -1062,7 +1155,11 @@ btnGenerate.addEventListener("click", async () => {
 function renderResult(data) {
   resultContainer.classList.remove("hidden");
   resultTitle.textContent = data.title;
-  resultStats.textContent = `Sekitar ${data.word_count} kata - Menggunakan seluruh ${data.references.length} naskah rujukan terverifikasi`;
+  resultStats.textContent = data.references.length
+    ? `Sekitar ${data.word_count} kata - Menggunakan seluruh ${data.references.length} naskah rujukan terverifikasi`
+    : `Sekitar ${data.word_count} kata - Tanpa rujukan`;
+  const evidenceContainer = document.getElementById("evidence-container");
+  if (evidenceContainer) evidenceContainer.classList.toggle("hidden", !(data.evidence && data.evidence.length));
 
   // Render Bukti Sitasi & Transparansi Naskah
   const evidenceList = document.getElementById("evidence-list");
@@ -1168,6 +1265,7 @@ btnDownloadPdf.addEventListener("click", () => {
 function resetToStep1() {
   inputTopic.value = "";
   inputInstructions.value = "";
+  resetAnswerSpec();
   selectedPaperIds.clear();
   currentTaskId = null;
   setStep(1);

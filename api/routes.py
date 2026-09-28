@@ -164,6 +164,8 @@ async def upload_question_file(file: UploadFile = File(...)):
         char_count=res.get("char_count", 0),
         detected_course_code=res.get("detected_course_code"),
         word_count_hint=res.get("word_count_hint"),
+        answer_spec=res.get("answer_spec"),
+        answer_spec_source=res.get("answer_spec_source"),
         message=f"Berhasil membaca {res.get('char_count', 0)} karakter dari berkas {filename}."
     )
 
@@ -200,6 +202,8 @@ async def parse_question_doc_base64(payload: ParseQuestionDocRequest):
         char_count=res.get("char_count", 0),
         detected_course_code=res.get("detected_course_code"),
         word_count_hint=res.get("word_count_hint"),
+        answer_spec=res.get("answer_spec"),
+        answer_spec_source=res.get("answer_spec_source"),
         message=f"Berhasil membaca {res.get('char_count', 0)} karakter dari berkas {payload.filename}."
     )
 
@@ -235,9 +239,6 @@ async def search_papers(payload: SearchRequest):
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_task(payload: GenerateRequest):
     """Mengunduh berkas naskah terpilih, mengekstrak isi teks, dan merangkai draf tugas."""
-    if not payload.paper_ids:
-        raise HTTPException(status_code=400, detail="Minimal pilih satu berkas jurnal rujukan.")
-
     selected_papers = []
     for pid in payload.paper_ids:
         p_data = CACHED_PAPERS.get(pid)
@@ -277,7 +278,7 @@ async def generate_task(payload: GenerateRequest):
         p_data_copy["pages_content"] = pages_content
         selected_papers.append(p_data_copy)
 
-    if not selected_papers:
+    if payload.paper_ids and not selected_papers:
         raise HTTPException(
             status_code=422,
             detail="Gagal memproses berkas naskah terpilih. Silakan pilih sumber jurnal lain."
@@ -292,7 +293,8 @@ async def generate_task(payload: GenerateRequest):
             target_words=payload.target_words,
             paragraph_depth=payload.paragraph_depth,
             tone=payload.tone,
-            custom_instructions=payload.custom_instructions or ""
+            custom_instructions=payload.custom_instructions or "",
+            answer_spec=payload.answer_spec.model_dump() if payload.answer_spec else None,
         )
     except Exception as e:
         print(f"Error pada generasi Gemini: {e}")

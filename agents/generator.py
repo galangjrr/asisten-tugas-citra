@@ -1,8 +1,9 @@
 import json
 import asyncio
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 from google.genai import types
-from tools.gemini_client import get_gemini_client, get_active_models
+from tools.gemini_client import generate_with_fallback
+from tools.question_reader import count_numbered_questions
 
 
 def detect_language(topic: str, custom_instructions: str = "") -> str:
@@ -30,6 +31,12 @@ def detect_language(topic: str, custom_instructions: str = "") -> str:
     return "id"
 
 
+DIRECT_ANSWER_LABELS = {
+    "terjemahan": "terjemahan teks",
+    "jawaban_singkat": "jawaban singkat, isian, atau hitungan",
+}
+
+
 async def generate_academic_draft(
     topic: str,
     papers_with_content: List[Dict[str, Any]],
@@ -37,12 +44,24 @@ async def generate_academic_draft(
     target_words: int = 1000,
     paragraph_depth: str = "standar",
     tone: str = "akademis formal",
-    custom_instructions: str = ""
+    custom_instructions: str = "",
+    answer_spec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh."""
-    client = get_gemini_client()
+    # Spesifikasi jawaban sudah dicek pengguna, jadi nilainya mengalahkan tebakan otomatis
+    spec = answer_spec or {}
+    answer_type = spec.get("answer_type")
+    is_direct_answer = answer_type in DIRECT_ANSWER_LABELS
+    word_limit = spec.get("word_limit")
+    if word_limit:
+        target_words = min(target_words, word_limit)
+    if format_type == "otomatis" and answer_type in ("esai", "makalah"):
+        format_type = answer_type
 
-    is_en = detect_language(topic, custom_instructions) == "en"
+    if spec.get("answer_language") in ("id", "en"):
+        is_en = spec["answer_language"] == "en"
+    else:
+        is_en = detect_language(topic, custom_instructions) == "en"
     estimated_pages = max(1, round(target_words / 280))
     tone_lower = (tone or "").lower()
     is_personal_letter = any(k in tone_lower for k in ["surat", "letter", "korespondensi"])
@@ -77,6 +96,18 @@ async def generate_academic_draft(
         words_per_sec = round(target_words / min_sections)
         paras_per_sec = "3 sampai 5 paragraf panjang, analitis, dan berbobot penuh"
         section_req = f"Hasilkan minimal {min_sections} bagian atau sub-bab naskah terperinci. Setiap bagian WAJIB terdiri dari minimal 3 sampai 5 paragraf panjang dan berbobot (sekitar {words_per_sec} kata per bagian). DILARANG MERINGKAS."
+
+    # Soal bernomor menentukan jumlah bagian, bukan target kata, agar 2 soal tidak dipecah jadi 4 nomor
+    question_count = spec.get("question_count") or count_numbered_questions(topic)
+    if question_count and (format_type in ("otomatis", "bernomor") or is_direct_answer):
+        format_type = "bernomor"
+        min_sections = question_count
+        words_per_sec = round(target_words / question_count)
+        section_req = (
+            f"Lembar soal memuat TEPAT {question_count} butir soal bernomor. Hasilkan TEPAT {question_count} bagian di array 'sections', "
+            f"satu bagian per butir soal dengan heading '1. ...' sampai '{question_count}. ...' mengikuti urutan soal. "
+            "DILARANG menambah bagian pendahuluan, penutup, kesimpulan, atau nomor lain di luar butir soal."
+        )
 
     if paragraph_depth == "ringkas":
         depth_instruction = "Panjang tiap paragraf berkisar 3 sampai 4 kalimat yang padat, lugas, dan to the point." if not is_en else "Each paragraph should be 3 to 4 concise and focused sentences."
@@ -239,8 +270,8 @@ async def generate_academic_draft(
             format_guideline = f"""
             FORMAT STRUCTURE: Numbered Assignment Answers (Question 1, 2, etc.)
             - Structure answers into numbered items: '1. [Clear Question/Topic 1]', '2. [Clear Question/Topic 2]', etc.
-            - Provide at least {min_sections} detailed points or sub-questions.
-            - Each numbered item must be thoroughly answered with {paras_per_sec} and citations.
+            - {section_req}
+            - Each numbered item must be thoroughly answered with {paras_per_sec}, with citations when references are provided.
             """
             json_example = """
             {
@@ -258,8 +289,8 @@ async def generate_academic_draft(
             format_guideline = f"""
             STRUKTUR FORMAT: Jawaban Tugas Bernomor (Soal 1, 2, dst)
             - Susun jawaban dalam butir-butir nomor terstruktur: '1. [Uraian Pertanyaan atau Topik Pertama]', '2. [Uraian Pertanyaan atau Topik Kedua]', dst.
-            - Hasilkan minimal {min_sections} butir nomor atau sub-pertanyaan terperinci.
-            - Setiap butir nomor wajib dijawab secara tuntas dengan {paras_per_sec} disertai sitasi naskah asli.
+            - {section_req}
+            - Setiap butir nomor wajib dijawab secara tuntas dengan {paras_per_sec}, disertai sitasi jika ada rujukan.
             """
             json_example = """
             {
@@ -450,6 +481,49 @@ async def generate_academic_draft(
           * Jika format bernomor dipilih, nomor 1, 2, dst hanya diberikan untuk menjawab pertanyaan atau kasus inti, BUKAN untuk nomor petunjuk teknis.
         """
 
+    if is_direct_answer:
+        length_rules = f"""
+    ATURAN JAWABAN LANGSUNG (MENGALAHKAN ATURAN FORMAT DAN PANJANG DI ATAS):
+    - Jenis tugas: {DIRECT_ANSWER_LABELS[answer_type]}. Tulis langsung jawabannya dengan panjang yang dibutuhkan soal. Abaikan target jumlah kata dan aturan jumlah paragraf.
+    - {section_req if question_count else "Tulis jawaban dalam satu bagian tanpa heading."}
+    - Untuk terjemahan, terjemahkan lengkap setiap butir dan pertahankan bentuk asli teksnya, misalnya nama pembicara di setiap baris dialog. Tulis setiap giliran bicara di baris baru dengan karakter \\n di dalam 'content'.
+    - DILARANG menambah esai pembuka, analisis, komentar tentang proses pengerjaan, atau penutup kecuali diminta soal.
+    """
+    else:
+        length_rules = f"""
+    ATURAN PANJANG NASKAH DAN KEDALAMAN (SANGAT KETAT):
+    - Target total panjang naskah: sekitar {target_words} kata (setara kurang lebih {estimated_pages} halaman A4 standar Times New Roman 12pt spasi 1.5).
+    - Aturan kedalaman: {depth_instruction}
+    - {section_req}
+    - Tulislah dengan ketebalan argumentasi yang tepat agar total panjang naskah mendekati target {target_words} kata.
+    """
+    if word_limit:
+        length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
+
+    if papers_with_content:
+        citation_rules = f"""
+    ATURAN SITASI KHUSUS MODUL BMP UT ATAU BAHAN AJAR KAMPUS:
+    - Jika terdapat sumber berlabel 'Buku Materi Pokok (BMP) UT / Diktat Bahan Ajar', perlakukan sumber ini sebagai fondasi konseptual utama tugas kuliah.
+    - Wajib kutip materi modul tersebut sesuai format baku akademik, contoh: (Kuswandi, 2023, Modul 3, hlm. 3.14) atau (Universitas Terbuka, 2023, Modul 2) atau menurut BMP Modul X.
+    - Hubungkan teori dari modul UT tersebut dengan data empiris dari naskah jurnal lainnya secara harmonis.
+
+    MANDAT SITASI SELURUH SUMBER TERVERIFIKASI (WAJIB 100%):
+    - Pengguna telah memilih {len(papers_with_content)} sumber naskah ilmiah berikut:
+{summary_sources_text}
+    - Kamu WAJIB menyitir, membahas, dan menghubungkan SELURUH {len(papers_with_content)} sumber di atas di dalam badan naskah! DILARANG KERAS mengabaikan sumber manapun. Setiap naskah minimal harus disitir setidaknya satu kali.
+    - Format sitasi di dalam teks: (NamaBelakangPenulis, Tahun, hlm. X) atau (NamaBelakangPenulis, Tahun).
+    - Setiap sitasi harus memiliki dasar bukti nyata dari teks sumber yang dilampirkan.
+    - Catat setiap bukti kutipan pada array 'evidence_log'.
+    """
+    else:
+        citation_rules = """
+    MODE TANPA RUJUKAN (MENGALAHKAN ATURAN FORMAT DAN PANJANG DI ATAS):
+    - Pengguna tidak memilih sumber rujukan. DILARANG menulis sitasi seperti (Nama, Tahun), daftar pustaka, atau mengarang sumber apa pun.
+    - Kerjakan soal sesuai jenisnya. Jika soal meminta terjemahan, tulis hasil terjemahan lengkap untuk tiap butir soal dan pertahankan bentuk aslinya, misalnya nama pembicara di setiap baris dialog. Buat satu section per butir soal, dan tulis setiap giliran bicara di baris baru dengan karakter \\n di dalam 'content'. Jangan tambahkan esai pembuka, analisis, komentar tentang proses terjemahan, atau penutup kecuali diminta soal.
+    - Jika soal meminta terjemahan, hitungan, atau jawaban singkat, abaikan target jumlah kata. Jangan menambah isi hanya demi mengejar panjang.
+    - Kosongkan array 'evidence_log'.
+    """
+
     system_instruction = f"""
     Kamu adalah mahasiswa berprestasi yang sedang menulis naskah tugas kuliah ilmiah berkualitas tinggi. Tugasmu menyusun tulisan yang berbobot, kritis, membumi, dan sepenuhnya bebas dari ciri khas tulisan AI.
 
@@ -461,28 +535,20 @@ async def generate_academic_draft(
 
     {distortion_rules}
 
-    ATURAN SITASI KHUSUS MODUL BMP UT ATAU BAHAN AJAR KAMPUS:
-    - Jika terdapat sumber berlabel 'Buku Materi Pokok (BMP) UT / Diktat Bahan Ajar', perlakukan sumber ini sebagai fondasi konseptual utama tugas kuliah.
-    - Wajib kutip materi modul tersebut sesuai format baku akademik, contoh: (Kuswandi, 2023, Modul 3, hlm. 3.14) atau (Universitas Terbuka, 2023, Modul 2) atau menurut BMP Modul X.
-    - Hubungkan teori dari modul UT tersebut dengan data empiris dari naskah jurnal lainnya secara harmonis.
+{length_rules}
 
-    ATURAN PANJANG NASKAH DAN KEDALAMAN (SANGAT KETAT):
-    - Target total panjang naskah: sekitar {target_words} kata (setara kurang lebih {estimated_pages} halaman A4 standar Times New Roman 12pt spasi 1.5).
-    - Aturan kedalaman: {depth_instruction}
-    - {section_req}
-    - Tulislah dengan ketebalan argumentasi yang tepat agar total panjang naskah mendekati target {target_words} kata.
-
-    MANDAT SITASI SELURUH SUMBER TERVERIFIKASI (WAJIB 100%):
-    - Pengguna telah memilih {len(papers_with_content)} sumber naskah ilmiah berikut:
-{summary_sources_text}
-    - Kamu WAJIB menyitir, membahas, dan menghubungkan SELURUH {len(papers_with_content)} sumber di atas di dalam badan naskah! DILARANG KERAS mengabaikan sumber manapun. Setiap naskah minimal harus disitir setidaknya satu kali.
-    - Format sitasi di dalam teks: (NamaBelakangPenulis, Tahun, hlm. X) atau (NamaBelakangPenulis, Tahun).
-    - Setiap sitasi harus memiliki dasar bukti nyata dari teks sumber yang dilampirkan.
-    - Catat setiap bukti kutipan pada array 'evidence_log'.
+{citation_rules}
 
     FORMAT KELUARAN (JSON MURNI):
     {json_example}
     """
+
+    if not papers_with_content:
+        sources_block = "No references selected. Answer directly without citations." if is_en else "Tidak ada rujukan dipilih. Jawab langsung tanpa sitasi."
+    elif is_en:
+        sources_block = f"LIST OF ALL VERIFIED REFERENCES (ALL MUST BE CITED):\n{summary_sources_text}\n\nSOURCE MATERIALS AND READING EXCERPTS:\n{sources_text}"
+    else:
+        sources_block = f"DAFTAR SELURUH SUMBER YANG WAJIB DISITASI:\n{summary_sources_text}\n\nBAHAN BACAAN SUMBER RESMI:\n{sources_text}"
 
     if is_en:
         user_prompt = f"""
@@ -495,11 +561,7 @@ async def generate_academic_draft(
         Tone: {tone}
         Additional Instructions: {custom_instructions if custom_instructions else 'Provide deep analysis, grounded reasoning, and coherent paragraph flow.'}
 
-        LIST OF ALL VERIFIED REFERENCES (ALL MUST BE CITED):
-        {summary_sources_text}
-
-        SOURCE MATERIALS AND READING EXCERPTS:
-        {sources_text}
+        {sources_block}
         """
     else:
         user_prompt = f"""
@@ -512,45 +574,22 @@ async def generate_academic_draft(
         Gaya Nada: {tone}
         Instruksi Tambahan: {custom_instructions if custom_instructions else 'Jawab dengan analisis mendalam, membumi, dan terhubung antar argumen.'}
 
-        DAFTAR SELURUH SUMBER YANG WAJIB DISITASI:
-        {summary_sources_text}
-
-        BAHAN BACAAN SUMBER RESMI:
-        {sources_text}
+        {sources_block}
         """
 
-    # Ambil rantai model aktif secara dinamis atau dari konfigurasi
-    candidate_models = await get_active_models("generation")
-
-    last_error = None
-    response = None
-
-    for model_name in candidate_models:
-        try:
-            print(f"Mencoba menyusun dengan model: {model_name} (Target: {target_words} kata)")
-            response = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_name,
-                    contents=user_prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.4,
-                        # 8192 memotong JSON untuk target 3000+ kata
-                        max_output_tokens=32768,
-                        response_mime_type="application/json",
-                    )
-                ),
-                timeout=75.0
-            )
-            if response and response.text:
-                print(f"Sukses mendapatkan respons dari model: {model_name}")
-                break
-        except Exception as e:
-            print(f"Model {model_name} sedang sibuk atau limit ({e}), beralih ke model cadangan berikutnya...")
-            last_error = e
-
-    if not response or not response.text:
-        raise RuntimeError(f"Seluruh model Gemini sedang mengalami lonjakan antrean: {last_error}")
+    response = await generate_with_fallback(
+        "generation",
+        user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.4,
+            # 8192 memotong JSON untuk target 3000+ kata
+            max_output_tokens=32768,
+            response_mime_type="application/json",
+        ),
+        timeout=75.0,
+        total_budget=240.0,
+    )
 
     language = "en" if is_en else "id"
     try:

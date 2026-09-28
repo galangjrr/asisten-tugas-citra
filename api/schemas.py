@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -33,6 +33,15 @@ class SearchResponse(BaseModel):
     papers: List[PaperItem]
 
 
+class AnswerSpec(BaseModel):
+    """Bentuk jawaban yang diminta dosen, hasil deteksi lembar soal yang bisa dikoreksi pengguna."""
+    question_count: Optional[int] = Field(None, ge=1, le=50)
+    answer_type: Optional[Literal["uraian", "terjemahan", "jawaban_singkat", "esai", "makalah", "jawaban_bernomor"]] = None
+    needs_citations: Optional[bool] = None
+    answer_language: Optional[Literal["id", "en"]] = None
+    word_limit: Optional[int] = Field(None, ge=50, le=10000)
+
+
 class GenerateRequest(BaseModel):
     topic: str = Field(..., min_length=3)
     format_type: str = Field(default="otomatis", description="otomatis, esai, makalah, mengalir, atau bernomor")
@@ -40,8 +49,10 @@ class GenerateRequest(BaseModel):
     target_words: int = Field(default=1000, ge=200, le=5000, description="Target jumlah kata total")
     paragraph_depth: str = Field(default="standar", description="ringkas atau elaboratif")
     tone: str = Field(default="akademis formal")
-    paper_ids: List[str] = Field(..., min_length=1)
+    # Kosong berarti tugas dikerjakan tanpa rujukan, misal soal terjemahan
+    paper_ids: List[str] = Field(default_factory=list)
     custom_instructions: Optional[str] = None
+    answer_spec: Optional[AnswerSpec] = None
 
 
 class EvidenceItem(BaseModel):
@@ -119,6 +130,8 @@ class ParseQuestionDocResponse(BaseModel):
     char_count: int = 0
     detected_course_code: Optional[str] = None
     word_count_hint: Optional[int] = None
+    answer_spec: Optional[AnswerSpec] = None
+    answer_spec_source: Optional[str] = None
     message: str = ""
 
 

@@ -6,7 +6,7 @@ import asyncio
 from typing import Dict, Any, Optional
 import pypdf
 import docx
-from tools.gemini_client import get_gemini_client, get_active_models
+from tools.gemini_client import generate_with_fallback
 from tools.ocr_vision import extract_text_from_image
 
 
@@ -67,32 +67,153 @@ async def read_pdf_file(file_bytes: bytes) -> str:
     return extracted
 
 
+# Judul bagian soal: "Soal:", "Soal 1:", "SOAL TUGAS TUTORIAL I", "Pertanyaan 2.", "Questions".
+# Baris metadata seperti "Butir Soal No. : 1 dan 2" sengaja tidak cocok.
+QUESTION_HEADING = re.compile(
+    r'(?i)^(?:soal|pertanyaan|butir\s+soal|studi\s+kasus|kasus|questions?|tasks?)'
+    r'(?:\s+(?:tugas|diskusi|latihan|ujian|tutorial|tuton|uas|uts)(?:\s+[\w.]+){0,3})?'
+    r'(?:\s*\d+)?\s*(?::|$|[.)]\s)'
+)
+
+# Judul bagian petunjuk, kriteria, rubrik, atau capaian yang jadi catatan dosen.
+GUIDELINE_HEADING = re.compile(
+    r'(?i)^(?:petunjuk|kriteria|rubrik|ketentuan|tata\s+cara|pedoman|perhatian|catatan|'
+    r'capaian\s+pembelajaran|indikator|tujuan|instruksi|instructions?|guidelines?|rubrics?|'
+    r'criteria|notes?|remember|purpose|learning\s+outcomes?|format\s+(?:penulisan|jawaban)|'
+    r'penilaian|scoring)\b[^:]{0,40}(?::|$)'
+)
+
+# Baris skor seperti "Total Score: 100" atau "Bobot 30%".
+SCORE_LINE = re.compile(r'(?i)^(?:total\s+)?(?:skor|score|nilai|bobot)\b[^a-z]*\d+\s*%?$')
+
+# Baris metadata kop soal seperti "Program Studi : Sastra Inggris".
+META_LINE = re.compile(r'^[^:]{0,40}\s:\s|^:')
+
+
 def split_questions_and_guidelines(text: str) -> Dict[str, str]:
-    """Memisahkan petunjuk teknis atau kriteria penilaian dari butir soal inti jika terdeteksi."""
-    soal_match = re.search(
-        r'(?i)(?:^|\n+)\s*(?:soal\s*(?:tugas|diskusi|latihan|ujian)?\s*[:\d\-]|pertanyaan\s*[:\d\-]|kasus\s*[:\d\-]|butir\s*soal|\bsoal\s*1\b|\bpertanyaan\s*1\b|\bsoal\s*:|\bpertanyaan\s*:|\bkasus\s*:)',
-        text
-    )
+    """Memilah lembar tugas per bagian: kop dibuang, petunjuk ke guidelines, butir soal ke questions."""
+    lines = [ln.strip() for ln in text.split("\n")]
+    buckets: Dict[str, list] = {"header": [], "guide": [], "question": []}
+    state = "header"
+    found_question = False
 
-    if soal_match:
-        split_idx = soal_match.start()
-        header_part = text[:split_idx].strip()
-        soal_part = text[split_idx:].strip()
+    for ln in lines:
+        if QUESTION_HEADING.match(ln):
+            state = "question"
+            found_question = True
+        elif GUIDELINE_HEADING.match(ln):
+            state = "guide"
+        elif SCORE_LINE.match(ln):
+            buckets["guide"].append(ln)
+            continue
+        buckets[state].append(ln)
 
-        # Periksa apakah bagian atas memuat petunjuk atau kriteria penilaian
-        has_guidelines = re.search(
-            r'(?i)(?:petunjuk|kriteria|rubrik|ketentuan|tata\s*cara|format|pedoman|perhatian|bobot)',
-            header_part
-        )
-        if has_guidelines and len(soal_part) >= 20:
-            return {
-                "questions": soal_part,
-                "guidelines": header_part
-            }
+    # Kop halaman yang berulang di tiap halaman PDF ikut terbuang dari soal
+    header_lines = {ln for ln in buckets["header"] if ln}
+    question_lines = [ln for ln in buckets["question"] if ln not in header_lines]
+
+    # Paragraf panjang di kop, misal narasi studi kasus, tetap dianggap bagian soal
+    header_prose = [
+        ln for ln in buckets["header"]
+        if len(ln) >= 60 and not META_LINE.search(ln)
+    ]
+
+    def join(parts: list) -> str:
+        return re.sub(r'\n{3,}', "\n\n", "\n".join(parts)).strip()
+
+    questions = join(header_prose + [""] + question_lines)
+    guidelines = join([ln for ln in buckets["guide"] if ln not in header_lines])
+
+    # Tanpa judul soal, batas soal dan petunjuk tidak bisa dipastikan, jadi teks dikembalikan utuh
+    if not found_question or len(questions) < 20:
+        return {"questions": text.strip(), "guidelines": ""}
+
+    return {"questions": questions, "guidelines": guidelines}
+
+
+ANSWER_TYPES = {"uraian", "terjemahan", "jawaban_singkat", "esai", "makalah", "jawaban_bernomor"}
+
+
+def count_numbered_questions(topic: str) -> int:
+    """Menghitung butir soal bernomor berurutan dari 1, misal '1. Translate...' atau 'Soal 2:'."""
+    numbers = {
+        int(m.group(1))
+        for m in re.finditer(r'(?im)^\s*(?:soal|pertanyaan|question)?\s*(\d{1,2})\s*[.):]\s+\S', topic)
+    }
+    count = 0
+    while count + 1 in numbers:
+        count += 1
+    return count
+
+
+def extract_word_limit(text: str) -> Optional[int]:
+    """Mencari batas kata seperti '300 words', 'maksimal 500 kata', atau '250-300 kata' (diambil angka terbesar)."""
+    match = re.search(r'(?i)\b(\d{2,5})(?:\s*[-–]\s*(\d{2,5}))?\s*(?:kata|words?)\b', text)
+    if not match:
+        return None
+    return int(match.group(2) or match.group(1))
+
+
+def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
+    """Menebak spesifikasi jawaban dengan pola teks, dipakai saat AI tidak tersedia."""
+    combined = f"{questions}\n{guidelines}"
+    count = count_numbered_questions(questions)
+
+    if re.search(r'(?i)\btranslat|\bterjemah', questions):
+        answer_type = "terjemahan"
+    elif re.search(r'(?i)\b(esai|essay)\b', questions):
+        answer_type = "esai"
+    elif re.search(r'(?i)\bmakalah\b|\bpaper\b|\bbab\s+i\b', questions):
+        answer_type = "makalah"
+    elif count:
+        answer_type = "jawaban_bernomor"
+    else:
+        answer_type = None
+
+    if answer_type == "terjemahan":
+        needs_citations = False
+    elif re.search(r'(?i)sitasi|referensi|daftar\s+pustaka|rujukan|kutip|citation|references?\b|cite', combined):
+        needs_citations = True
+    else:
+        needs_citations = None
+
+    language = None
+    if re.search(r'(?i)into\s+indonesian|ke\s+(?:dalam\s+)?bahasa\s+indonesia', questions):
+        language = "id"
+    elif re.search(r'(?i)into\s+english|ke\s+(?:dalam\s+)?bahasa\s+inggris', questions):
+        language = "en"
 
     return {
-        "questions": text.strip(),
-        "guidelines": ""
+        "question_count": count or None,
+        "answer_type": answer_type,
+        "needs_citations": needs_citations,
+        "answer_language": language,
+        "word_limit": extract_word_limit(combined),
+    }
+
+
+def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dict[str, Any]:
+    """Merapikan spesifikasi dari AI. Nilai yang tidak valid diganti tebakan pola, bukan dipercaya mentah."""
+    guess = guess_answer_spec(questions, guidelines)
+    if not isinstance(raw, dict):
+        return guess
+
+    def as_int(value: Any, low: int, high: int) -> Optional[int]:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return None
+        return number if low <= number <= high else None
+
+    answer_type = raw.get("answer_type")
+    language = raw.get("answer_language")
+    needs_citations = raw.get("needs_citations")
+    return {
+        "question_count": as_int(raw.get("question_count"), 1, 50) or guess["question_count"],
+        "answer_type": answer_type if answer_type in ANSWER_TYPES else guess["answer_type"],
+        "needs_citations": needs_citations if isinstance(needs_citations, bool) else guess["needs_citations"],
+        "answer_language": language if language in ("id", "en") else guess["answer_language"],
+        "word_limit": as_int(raw.get("word_limit"), 50, 10000) or guess["word_limit"],
     }
 
 
@@ -103,55 +224,57 @@ async def structure_assignment_with_ai(raw_text: str) -> Optional[Dict[str, Any]
 
     prompt = """Analisis lembar tugas kuliah ini (bisa berbahasa Indonesia atau Inggris).
 Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
-1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab. BUANG label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Pertahankan esensi tugas secara utuh dan jelas.
-2. "guidelines": Seluruh petunjuk teknis, rubrik penilaian, kriteria dosen, ketentuan format, atau batasan kata yang harus dipatuhi saat menulis jawaban.
+1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan.
+2. "guidelines": Seluruh capaian pembelajaran, indikator, petunjuk teknis, rubrik penilaian, kriteria dosen, ketentuan format, atau batasan kata yang harus dipatuhi saat menulis jawaban.
 3. "course_code": Kode mata kuliah resmi jika ada (contoh: EKMA4116, FSSI4206), atau null.
-4. "word_count_hint": Angka batas kata jika disebutkan (contoh: jika tertulis '300 words' isi 300), atau null jika tidak disebutkan.
+4. "answer_spec": spesifikasi bentuk jawaban yang diminta dosen:
+   - "question_count": jumlah butir soal utama yang harus dijawab, atau null jika berupa satu topik esai tanpa nomor.
+   - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, atau jawaban pendek), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian per nomor soal), atau "uraian" (uraian analitis umum).
+   - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan atau hitungan; null jika tidak jelas.
+   - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
+   - "word_limit": angka batas kata jika disebutkan (jika rentang seperti 250-300 kata, isi angka terbesar), atau null.
 
 Format Keluaran (JSON murni):
 {
   "question_topic": "...",
   "guidelines": "...",
   "course_code": null,
-  "word_count_hint": null
+  "answer_spec": {
+    "question_count": null,
+    "answer_type": "uraian",
+    "needs_citations": null,
+    "answer_language": null,
+    "word_limit": null
+  }
 }
 
 Dokumen Tugas:
-""" + raw_text[:3500]
+""" + raw_text[:12000]
 
     try:
-        client = get_gemini_client()
-    except Exception:
+        res = await generate_with_fallback(
+            "fast",
+            prompt,
+            config={"response_mime_type": "application/json"},
+            timeout=15.0,
+            total_budget=40.0,
+        )
+        parsed = json.loads(res.text)
+    except Exception as e:
+        print(f"Peringatan: pemilah AI lembar tugas gagal, beralih ke pemilah pola: {e}")
         return None
 
-    candidate_models = await get_active_models("fast")
+    if isinstance(parsed, list) and parsed:
+        parsed = parsed[0]
+    if not isinstance(parsed, dict):
+        return None
 
-    for model_name in candidate_models:
-        try:
-            res = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config={"response_mime_type": "application/json"}
-                ),
-                timeout=4.0
-            )
-            if res.text:
-                parsed = json.loads(res.text)
-                if isinstance(parsed, list) and len(parsed) > 0:
-                    parsed = parsed[0]
+    # Jika guidelines berupa list, jadikan teks per baris
+    g = parsed.get("guidelines")
+    if isinstance(g, list):
+        parsed["guidelines"] = "\n".join(str(item) for item in g)
 
-                # Jika guidelines berupa list, jadikan teks per baris
-                g = parsed.get("guidelines")
-                if isinstance(g, list):
-                    parsed["guidelines"] = "\n".join(str(item) for item in g)
-
-                return parsed
-        except Exception as e:
-            print(f"Peringatan: Model {model_name} gagal memilah lembar tugas: {e}")
-            continue
-
-    return None
+    return parsed
 
 
 async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str, Any]:
@@ -185,34 +308,42 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
     ai_res = await structure_assignment_with_ai(clean_text)
     if ai_res and ai_res.get("question_topic"):
         q_topic = str(ai_res.get("question_topic", "")).strip()
+        questions = q_topic if len(q_topic) >= 10 else clean_text
         g_lines = str(ai_res.get("guidelines", "")).strip()
         c_code = ai_res.get("course_code") or detected_code
-        w_hint = ai_res.get("word_count_hint")
+        spec = normalize_answer_spec(ai_res.get("answer_spec"), questions, g_lines)
 
         return {
             "success": True,
             "filename": filename,
             "file_type": file_type,
             "text": clean_text,
-            "questions": q_topic if len(q_topic) >= 10 else clean_text,
+            "questions": questions,
             "detected_guidelines": g_lines,
             "char_count": len(clean_text),
             "detected_course_code": c_code,
-            "word_count_hint": w_hint
+            "word_count_hint": spec["word_limit"],
+            "answer_spec": spec,
+            "answer_spec_source": "ai",
         }
 
     # Fallback ke pemisah pola aturan regex jika AI tidak tersedia
     split_res = split_questions_and_guidelines(clean_text)
+    questions = split_res.get("questions", clean_text)
+    guidelines = split_res.get("guidelines", "")
+    spec = guess_answer_spec(questions, guidelines)
 
     return {
         "success": bool(clean_text),
         "filename": filename,
         "file_type": file_type,
         "text": clean_text,
-        "questions": split_res.get("questions", clean_text),
-        "detected_guidelines": split_res.get("guidelines", ""),
+        "questions": questions,
+        "detected_guidelines": guidelines,
         "char_count": len(clean_text),
         "detected_course_code": detected_code,
-        "word_count_hint": None
+        "word_count_hint": spec["word_limit"],
+        "answer_spec": spec,
+        "answer_spec_source": "pola",
     }
 

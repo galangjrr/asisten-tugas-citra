@@ -90,7 +90,8 @@ def create_assignment_pdf(
 
         paragraphs = content.split("\n\n")
         for para in paragraphs:
-            para_clean = para.strip().replace("\n", " ")
+            # Baris tunggal dipertahankan agar dialog terjemahan tetap satu giliran per baris
+            para_clean = para.strip().replace("\n", "<br/>")
             if para_clean:
                 story.append(Paragraph(para_clean, body_style))
 
@@ -102,8 +103,9 @@ def create_assignment_pdf(
         is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
     ref_title_text = "REFERENCES" if is_en_doc else "DAFTAR PUSTAKA"
 
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(ref_title_text, heading_style))
+    if references:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(ref_title_text, heading_style))
 
     for ref in references:
         authors_str = ", ".join(ref.get("authors", ["Anonim"]))

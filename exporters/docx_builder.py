@@ -90,6 +90,10 @@ def create_assignment_docx(
         is_en_doc = any(w in sample_text.split() for w in ["the", "and", "is", "of", "to", "in", "that", "this", "urban", "living"])
     ref_title_text = "REFERENCES" if is_en_doc else "DAFTAR PUSTAKA"
 
+    if not references:
+        doc.save(file_path)
+        return file_path
+
     ref_heading = doc.add_paragraph()
     ref_heading.paragraph_format.space_before = Pt(20)
     ref_heading.paragraph_format.space_after = Pt(10)

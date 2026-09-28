@@ -89,3 +89,68 @@ Soal:
     assert res["detected_course_code"] == "EKMA4213"
 
 
+
+
+def test_split_ut_tutorial_sheet_with_metadata_header():
+    from tools.question_reader import split_questions_and_guidelines
+    sample_text = """FSSI4106 / English for Translation
+Tutorial Assignment I - Session 3
+Program Studi : Sastra Inggris
+Butir Soal No. : 1 dan 2
+Skor Maks : 100
+Capaian Pembelajaran
+Mahasiswa mampu menerjemahkan percakapan tertulis secara wajar.
+Petunjuk:
+• Terjemahkan setiap percakapan secara utuh ke dalam bahasa Indonesia.
+
+FSSI4106 / English for Translation
+Tutorial Assignment I - Session 3
+SOAL TUGAS TUTORIAL I
+1. Translate the following written conversation into Indonesian! (Score 50)
+Guest Good evening. I have a reservation.
+Total Score: 100"""
+    result = split_questions_and_guidelines(sample_text)
+    assert "Translate the following" in result["questions"]
+    assert "Guest Good evening" in result["questions"]
+    for noise in ("Program Studi", "Butir Soal No.", "Petunjuk", "Capaian", "English for Translation", "Total Score"):
+        assert noise not in result["questions"]
+    assert "Terjemahkan setiap percakapan" in result["guidelines"]
+    assert "Capaian Pembelajaran" in result["guidelines"]
+    assert "Total Score: 100" in result["guidelines"]
+    assert "English for Translation" not in result["guidelines"]
+
+
+def test_guess_answer_spec_for_translation_sheet():
+    from tools.question_reader import guess_answer_spec
+    questions = """1. Translate the following written conversation into Indonesian! (Score 50)
+Guest Good evening.
+2. Translate the following written conversation into Indonesian! (Score 50)
+Host Welcome."""
+    spec = guess_answer_spec(questions, "Petunjuk: Terjemahkan setiap percakapan secara utuh.")
+    assert spec == {
+        "question_count": 2,
+        "answer_type": "terjemahan",
+        "needs_citations": False,
+        "answer_language": "id",
+        "word_limit": None,
+    }
+
+
+def test_guess_answer_spec_for_essay_with_citations():
+    from tools.question_reader import guess_answer_spec
+    spec = guess_answer_spec("Write an essay about urban living.", "Use at least two references. Maximum 250-300 words.")
+    assert spec["answer_type"] == "esai"
+    assert spec["needs_citations"] is True
+    assert spec["word_limit"] == 300
+    assert spec["question_count"] is None
+
+
+def test_normalize_answer_spec_rejects_invalid_ai_values():
+    from tools.question_reader import normalize_answer_spec
+    raw = {"question_count": "999", "answer_type": "puisi", "needs_citations": "ya", "answer_language": "fr", "word_limit": 500}
+    spec = normalize_answer_spec(raw, "1. Jelaskan A\n2. Jelaskan B")
+    assert spec["question_count"] == 2
+    assert spec["answer_type"] == "jawaban_bernomor"
+    assert spec["needs_citations"] is None
+    assert spec["answer_language"] is None
+    assert spec["word_limit"] == 500

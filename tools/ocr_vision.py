@@ -2,7 +2,7 @@ import os
 import base64
 import asyncio
 from google.genai import types
-from tools.gemini_client import get_gemini_client, get_active_models
+from tools.gemini_client import generate_with_fallback
 
 
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
@@ -13,7 +13,6 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
     if not image_bytes or len(image_bytes) < 100:
         return ""
 
-    client = get_gemini_client()
     prompt = (
         "Kamu adalah sistem OCR akademis presisi tinggi. "
         "Tugasmu mengekstrak seluruh teks materi kuliah, paragraf pembahasan, "
@@ -23,30 +22,16 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan."
     )
 
-    candidate_models = await get_active_models("fast")
+    try:
+        response = await generate_with_fallback(
+            "fast",
+            [types.Part.from_bytes(data=image_bytes, mime_type=mime_type), prompt],
+            config=types.GenerateContentConfig(temperature=0.1),
+            timeout=15.0,
+            total_budget=40.0,
+        )
+    except Exception as e:
+        print(f"Vision OCR gagal: {e}")
+        return ""
 
-    for model_name in candidate_models:
-        try:
-            response = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_name,
-                    contents=[
-                        types.Part.from_bytes(
-                            data=image_bytes,
-                            mime_type=mime_type
-                        ),
-                        prompt
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=0.1
-                    )
-                ),
-                timeout=8.0
-            )
-            if response.text and response.text.strip():
-                return response.text.strip()
-        except Exception as e:
-            print(f"Vision OCR model {model_name} gagal: {e}")
-            continue
-
-    return ""
+    return response.text.strip()

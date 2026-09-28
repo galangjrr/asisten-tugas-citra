@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 import os
 import re
 import asyncio
-from tools.gemini_client import get_gemini_client, get_active_models
+from tools.gemini_client import generate_with_fallback
 
 
 def reconstruct_abstract(abstract_inverted_index: Optional[Dict[str, List[int]]]) -> str:
@@ -68,11 +68,6 @@ async def simplify_query_with_ai(original_query: str) -> str:
     if not os.getenv("GEMINI_API_KEY"):
         return original_query
 
-    try:
-        client = get_gemini_client()
-    except Exception:
-        return original_query
-
     prompt = f"""
 Tugas: Ekstrak 2 sampai 4 kata kunci pencarian jurnal akademis paling esensial dan spesifik dari teks tugas ini.
 ATURAN KRUSIAL:
@@ -86,24 +81,13 @@ HANYA keluarkan kata kunci tanpa tanda kutip atau penjelasan apapun.
 Teks: {original_query}
 """
 
-    candidate_models = await get_active_models("fast")
-    for model_name in candidate_models:
-        try:
-            res = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                ),
-                timeout=4.0
-            )
-            if res.text:
-                cleaned = res.text.strip().replace('"', '').replace('\n', ' ')
-                if len(cleaned) > 2:
-                    return cleaned
-        except Exception:
-            continue
+    try:
+        res = await generate_with_fallback("fast", prompt, timeout=6.0, total_budget=12.0)
+    except Exception:
+        return original_query
 
-    return original_query
+    cleaned = res.text.strip().replace('"', '').replace('\n', ' ')
+    return cleaned if len(cleaned) > 2 else original_query
 
 
 async def query_openalex_endpoint(search_text: str, limit: int = 30) -> List[Dict[str, Any]]:

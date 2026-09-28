@@ -276,3 +276,64 @@ def test_strip_time_limit_lines_keeps_questions_that_mention_time():
     # Soal yang kebetulan membahas waktu tetap utuh
     assert "1. Berapa waktu tempuh kereta" in cleaned
     assert "2. How many hours does the journey take?" in cleaned
+
+
+def _make_pdf(pages):
+    """PDF uji: item str jadi halaman teks biasa, item list jadi halaman gambar JPEG seperti hasil scan."""
+    from PIL import Image, ImageDraw
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    stream = io.BytesIO()
+    pdf = canvas.Canvas(stream, pagesize=A4)
+    width, height = A4
+    for page in pages:
+        if isinstance(page, str):
+            pdf.drawString(72, height - 72, page)
+        else:
+            image = Image.new("RGB", (1240, 1754), "white")
+            draw = ImageDraw.Draw(image)
+            for i, line in enumerate(page):
+                draw.text((100, 120 + i * 60), line, fill="black")
+            jpeg = io.BytesIO()
+            image.save(jpeg, format="JPEG")
+            jpeg.seek(0)
+            pdf.drawImage(ImageReader(jpeg), 0, 0, width=width, height=height)
+        pdf.showPage()
+    pdf.save()
+    return stream.getvalue()
+
+
+@pytest.mark.anyio
+async def test_read_pdf_ocr_runs_only_when_a_page_is_scanned(monkeypatch):
+    import tools.question_reader as qr
+    calls = []
+
+    async def fake_ocr(pdf_bytes):
+        calls.append(len(pdf_bytes))
+        return "Halaman teks Soal nomor 1 lengkap.\n\n2. Soal dari halaman hasil scan yang dibaca OCR dengan lengkap."
+
+    monkeypatch.setattr(qr, "extract_text_from_pdf", fake_ocr)
+
+    text_only = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler secara lengkap."])
+    assert "segmentasi pasar" in await qr.read_pdf_file(text_only)
+    assert calls == []
+
+    # Halaman kedua hasil scan, jadi seluruh PDF ditranskripsi walau halaman pertama berteks
+    mixed = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler.", ["2. Soal dari halaman scan"]])
+    result = await qr.read_pdf_file(mixed)
+    assert len(calls) == 1
+    assert "halaman hasil scan" in result
+
+
+@pytest.mark.anyio
+async def test_read_pdf_keeps_extracted_text_when_ocr_fails(monkeypatch):
+    import tools.question_reader as qr
+
+    async def failed_ocr(pdf_bytes):
+        return ""
+
+    monkeypatch.setattr(qr, "extract_text_from_pdf", failed_ocr)
+    mixed = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler.", ["2. Soal scan"]])
+    assert "segmentasi pasar" in await qr.read_pdf_file(mixed)

@@ -9,7 +9,7 @@ import docx
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 from tools.gemini_client import generate_with_fallback
-from tools.ocr_vision import extract_text_from_image
+from tools.ocr_vision import extract_text_from_pdf
 
 
 def extract_course_code_from_text(text: str) -> Optional[str]:
@@ -122,32 +122,41 @@ def read_docx_file(file_bytes: bytes) -> str:
     return "\n\n".join(block_lines(doc.element.body))
 
 
+def _is_scanned_page(page, text: str) -> bool:
+    """Halaman dianggap hasil scan bila hampir tanpa teks tetapi berisi gambar."""
+    if len(text.strip()) >= 30:
+        return False
+    try:
+        return len(page.images) > 0
+    except Exception:
+        # Gambar yang tidak bisa diurai pypdf tetap dianggap scan agar isinya tidak hilang
+        return True
+
+
 async def read_pdf_file(file_bytes: bytes) -> str:
-    """Membaca teks dari berkas PDF lembar tugas, dengan fallback vision OCR jika hasil scan."""
+    """
+    Membaca teks PDF lembar tugas. Jika ada halaman hasil scan, di halaman mana pun,
+    seluruh PDF ditranskripsi Gemini supaya urutan halaman teks dan halaman scan tetap utuh.
+    """
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
     page_texts = []
+    has_scanned_page = False
 
     for page in reader.pages:
-        t = page.extract_text() or ""
-        if t.strip():
-            page_texts.append(t.strip())
+        t = (page.extract_text() or "").strip()
+        if _is_scanned_page(page, t):
+            has_scanned_page = True
+        if t:
+            page_texts.append(t)
 
     extracted = "\n\n".join(page_texts)
+    if not has_scanned_page:
+        return extracted
 
-    # Jika teks hasil ekstraksi pypdf kosong atau terlalu pendek (indikasi PDF scan gambar)
-    if len(extracted.strip()) < 50 and len(reader.pages) > 0:
-        # Gunakan fallback ke Gemini Vision OCR untuk halaman pertama
-        try:
-            # Cari gambar di halaman pertama jika ada
-            first_page = reader.pages[0]
-            if len(first_page.images) > 0:
-                first_img = first_page.images[0]
-                ocr_result = await extract_text_from_image(first_img.data, mime_type="image/png")
-                if ocr_result:
-                    return ocr_result
-        except Exception:
-            pass
-
+    ocr_text = await extract_text_from_pdf(file_bytes)
+    # Transkripsi yang lebih pendek dari teks bawaan berarti OCR gagal sebagian, jadi teks bawaan dipakai
+    if len(ocr_text) > len(extracted):
+        return ocr_text
     return extracted
 
 

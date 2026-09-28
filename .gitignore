@@ -6,3 +6,4 @@ storage/*
 .pytest_cache/
 build/
 dist/
+graphify-out/

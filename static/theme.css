@@ -115,3 +115,33 @@
   border-color: var(--color-emerald-border);
   color: var(--color-emerald-text);
 }
+
+/* Scrollbar tipis ikut tema, biar jendela desktop ga ketempelan scrollbar abu bawaan Windows */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-canvas-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--primitive-stone-300);
+  border: 3px solid var(--color-canvas-bg);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primitive-stone-400);
+}
+
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background-color: var(--primitive-stone-700);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primitive-stone-600);
+}

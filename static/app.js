@@ -1185,7 +1185,20 @@ const btnToggleTheme = document.getElementById("btn-toggle-theme");
 const iconSun = document.getElementById("icon-sun");
 const iconMoon = document.getElementById("icon-moon");
 
+function syncDesktopTitlebar(isDark) {
+  if (window.pywebview && window.pywebview.api) {
+    window.pywebview.api.set_titlebar(isDark);
+  }
+}
+
+// Di mode desktop, API pywebview baru siap setelah halaman dimuat
+window.addEventListener("pywebviewready", () => {
+  syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
+  window.pywebview.api.fit_height(document.documentElement.scrollHeight);
+});
+
 function applyTheme(isDark) {
+  syncDesktopTitlebar(isDark);
   if (isDark) {
     document.documentElement.classList.add("dark");
     document.documentElement.setAttribute("data-theme", "dark");

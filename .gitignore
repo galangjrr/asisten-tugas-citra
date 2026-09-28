@@ -4,3 +4,5 @@ __pycache__/
 storage/*
 !storage/.gitkeep
 .pytest_cache/
+build/
+dist/

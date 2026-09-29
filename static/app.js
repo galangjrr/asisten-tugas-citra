@@ -556,7 +556,6 @@ const resultStats = document.getElementById("result-stats");
 const previewContent = document.getElementById("preview-content");
 const btnDownloadDocx = document.getElementById("btn-download-docx");
 const btnDownloadPdf = document.getElementById("btn-download-pdf");
-const btnRestart = document.getElementById("btn-restart");
 
 function showAlert(title, message, advice = "", type = "error") {
   const isErr = type === "error";
@@ -1547,51 +1546,244 @@ function renderResult(data) {
     evidenceList.innerHTML = evHtml;
   }
 
-  let previewHtml = `<h1 class="text-xl font-bold text-center tracking-tight uppercase mb-8 text-stone-900 dark:text-stone-100">${data.title}</h1>`;
-  if (data.identity_lines && data.identity_lines.length) {
-    previewHtml += `<div class="mb-8 text-stone-700 dark:text-stone-300 leading-relaxed">${data.identity_lines.map(line => `<div>${escapeHtml(line)}</div>`).join("")}</div>`;
-  }
-
-  data.sections.forEach(sec => {
-    const headingHtml = (sec.heading && sec.heading.trim())
-      ? `<h2 class="text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 mb-2">${sec.heading}</h2>`
-      : "";
-    previewHtml += `
-      <div class="mb-6">
-        ${headingHtml}
-        <div class="text-stone-700 dark:text-stone-300 whitespace-pre-line leading-relaxed">${sec.content}</div>
-      </div>
-    `;
-  });
-
-  // Tugas tanpa rujukan tidak perlu judul daftar pustaka kosong
-  if (!data.references.length) {
-    previewContent.innerHTML = previewHtml;
-    return;
-  }
-
-  const sampleText = (data.title + " " + (data.sections[0] ? data.sections[0].content : "")).toLowerCase();
-  const isEnDoc = ["the", "and", "is", "of", "to", "in", "urban", "living"].some(w => sampleText.includes(w));
-  const refHeader = isEnDoc ? "REFERENCES" : "DAFTAR PUSTAKA";
-
-  previewHtml += `
-    <div class="mt-8 pt-6 border-t border-stone-200 dark:border-stone-800">
-      <h2 class="text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 mb-3">${refHeader}</h2>
-      <ul class="space-y-2 text-xs text-stone-600 dark:text-stone-400">
-  `;
-
-  data.references.forEach(ref => {
-    const authors = ref.authors.join(", ");
-    previewHtml += `
-      <li class="pl-4 -indent-4">
-        ${authors} (${ref.year || "n.d."}). <em>${ref.title}</em>. ${ref.venue || "Publikasi Ilmiah"}. ${ref.doi || ""}
-      </li>
-    `;
-  });
-
-  previewHtml += `</ul></div>`;
-  previewContent.innerHTML = previewHtml;
+  currentDoc = {
+    title: data.title,
+    sections: data.sections,
+    references: data.references,
+    identityLines: data.identity_lines || [],
+    wordCount: data.word_count
+  };
+  renderDocument();
 }
+
+// Naskah aktif di Tahap 3. Edit dan tulis ulang per bagian memperbarui state ini lalu digambar ulang.
+let currentDoc = null;
+let docBusy = false;
+
+const TOOL_BTN = "font-sans text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 hover:border-stone-400 dark:hover:border-stone-500 bg-white dark:bg-stone-900 transition disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200";
+const PRIMARY_BTN = "font-sans text-xs font-semibold px-3.5 py-2 rounded-lg bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-200 transition disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200";
+const FIELD = "w-full font-sans px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200";
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function button(label, className, onClick, ariaLabel) {
+  const node = el("button", className, label);
+  node.type = "button";
+  if (ariaLabel) node.setAttribute("aria-label", ariaLabel);
+  node.disabled = docBusy;
+  node.addEventListener("click", onClick);
+  return node;
+}
+
+function renderStats() {
+  const refs = currentDoc.references.length;
+  resultStats.textContent = refs
+    ? `Sekitar ${currentDoc.wordCount} kata - Menggunakan seluruh ${refs} naskah rujukan terverifikasi`
+    : `Sekitar ${currentDoc.wordCount} kata - Tanpa rujukan`;
+}
+
+function renderDocument() {
+  resultTitle.textContent = currentDoc.title;
+  renderStats();
+  previewContent.replaceChildren(buildTitleBlock());
+
+  if (currentDoc.identityLines.length) {
+    const identity = el("div", "mb-8 text-stone-700 dark:text-stone-300 leading-relaxed");
+    currentDoc.identityLines.forEach((line) => identity.append(el("div", "", line)));
+    previewContent.append(identity);
+  }
+  currentDoc.sections.forEach((sec, index) => previewContent.append(buildSectionBlock(sec, index)));
+  if (currentDoc.references.length) previewContent.append(buildReferencesBlock());
+}
+
+function buildTitleBlock() {
+  const wrap = el("div", "mb-8 space-y-2 text-center");
+  const heading = el("h1", "text-xl font-bold tracking-tight uppercase text-stone-900 dark:text-stone-100", currentDoc.title);
+  const edit = button("Ubah Judul", TOOL_BTN, () => {
+    const input = el("input", `${FIELD} text-center font-bold`);
+    input.value = currentDoc.title;
+    input.maxLength = 300;
+    input.setAttribute("aria-label", "Judul naskah");
+    const save = async () => {
+      const title = input.value.trim();
+      if (!title) return input.focus();
+      await saveDocument({ title, sections: currentDoc.sections }, wrap);
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") save();
+      if (e.key === "Escape") renderDocument();
+    });
+    const actions = el("div", "flex justify-center gap-2");
+    actions.append(button("Batal", TOOL_BTN, renderDocument), button("Simpan", PRIMARY_BTN, save));
+    wrap.replaceChildren(input, actions);
+    input.focus();
+  }, "Ubah judul naskah");
+  wrap.append(heading, edit);
+  return wrap;
+}
+
+function buildSectionBlock(sec, index) {
+  const article = el("article", "mb-6 -mx-3 px-3 py-2 rounded-xl border border-transparent hover:border-stone-200 dark:hover:border-stone-800 focus-within:border-stone-300 dark:focus-within:border-stone-700 transition");
+  const head = el("div", "flex items-start justify-between gap-3 mb-2");
+  const label = sec.heading && sec.heading.trim() ? sec.heading : `Bagian ${index + 1}`;
+  head.append(el("h2", "text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100", sec.heading || ""));
+
+  const tools = el("div", "flex shrink-0 gap-1.5");
+  tools.append(
+    button("Edit", TOOL_BTN, () => openSectionEditor(article, index), `Edit ${label}`),
+    button("Tulis Ulang", TOOL_BTN, () => openRewriteForm(article, index), `Tulis ulang ${label}`)
+  );
+  head.append(tools);
+
+  const body = el("div", "section-body text-stone-700 dark:text-stone-300 whitespace-pre-line leading-relaxed", sec.content);
+  article.append(head, body);
+  return article;
+}
+
+function showSectionError(container, message) {
+  container.querySelectorAll(".section-error").forEach((node) => node.remove());
+  const error = el("p", "section-error font-sans mt-2 text-xs font-medium text-rose-700 dark:text-rose-400", message);
+  error.setAttribute("role", "alert");
+  container.append(error);
+}
+
+function openSectionEditor(article, index) {
+  const sec = currentDoc.sections[index];
+  const headingInput = el("input", `${FIELD} font-bold`);
+  headingInput.value = sec.heading || "";
+  headingInput.maxLength = 500;
+  headingInput.setAttribute("aria-label", "Judul bagian");
+  const contentInput = el("textarea", `${FIELD} leading-relaxed resize-y`);
+  contentInput.value = sec.content;
+  contentInput.rows = Math.min(24, Math.max(6, Math.ceil(sec.content.length / 90) + sec.content.split("\n").length));
+  contentInput.setAttribute("aria-label", "Isi bagian");
+  const meta = el("span", "font-sans text-[11px] text-stone-500 dark:text-stone-400 tabular-nums");
+  const updateMeta = () => { meta.textContent = `${countWords(contentInput.value)} kata`; };
+  contentInput.addEventListener("input", updateMeta);
+  updateMeta();
+
+  const save = async () => {
+    if (!contentInput.value.trim()) {
+      showSectionError(article, "Isi bagian tidak boleh kosong.");
+      return contentInput.focus();
+    }
+    const sections = currentDoc.sections.map((s, i) => i === index ? { heading: headingInput.value.trim(), content: contentInput.value.trim() } : s);
+    await saveDocument({ title: currentDoc.title, sections }, article);
+  };
+  contentInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save();
+    if (e.key === "Escape") renderDocument();
+  });
+
+  const actions = el("div", "flex items-center justify-between gap-2");
+  const buttons = el("div", "flex gap-2");
+  buttons.append(button("Batal", TOOL_BTN, renderDocument), button("Simpan Bagian", PRIMARY_BTN, save));
+  actions.append(meta, buttons);
+  const form = el("div", "space-y-2");
+  form.append(headingInput, contentInput, actions);
+  article.replaceChildren(form);
+  contentInput.focus();
+}
+
+function openRewriteForm(article, index) {
+  if (article.querySelector(".rewrite-form")) return;
+  const form = el("div", "rewrite-form font-sans mt-3 p-3 rounded-lg bg-stone-50 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-2");
+  const input = el("input", FIELD);
+  input.maxLength = 500;
+  input.placeholder = "Arahan opsional, misal: lebih santai, persingkat, tambah contoh";
+  input.setAttribute("aria-label", "Arahan tulis ulang");
+  const run = () => rewriteSection(article, index, input.value.trim());
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") run();
+    if (e.key === "Escape") form.remove();
+  });
+  const actions = el("div", "flex justify-end gap-2");
+  actions.append(button("Batal", TOOL_BTN, () => form.remove()), button("Tulis Ulang Bagian Ini", PRIMARY_BTN, run));
+  form.append(input, actions);
+  article.append(form);
+  input.focus();
+}
+
+function setDocBusy(busy) {
+  docBusy = busy;
+  previewContent.setAttribute("aria-busy", busy ? "true" : "false");
+  previewContent.querySelectorAll("button, input, textarea").forEach((node) => { node.disabled = busy; });
+  btnRegenerateAll.disabled = busy;
+}
+
+async function applyTaskUpdate(url, method, payload) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Isian tidak valid.");
+  Object.assign(currentDoc, { title: data.title, sections: data.sections, wordCount: data.word_count });
+}
+
+async function saveDocument(doc, container) {
+  setDocBusy(true);
+  try {
+    await applyTaskUpdate(`/api/tasks/${currentTaskId}`, "PUT", doc);
+    setDocBusy(false);
+    renderDocument();
+  } catch (err) {
+    setDocBusy(false);
+    showSectionError(container, `Gagal menyimpan: ${err.message}`);
+  }
+}
+
+async function rewriteSection(article, index, instruction) {
+  const body = article.querySelector(".section-body");
+  const original = body.textContent;
+  // Skeleton selama Gemini menulis ulang bagian ini
+  body.replaceChildren(...[100, 92, 96, 70].map((w) => {
+    const bar = el("div", "h-3 my-2 rounded bg-stone-200 dark:bg-stone-800 animate-pulse");
+    bar.style.width = `${w}%`;
+    return bar;
+  }));
+  const status = el("p", "font-sans text-xs text-stone-500 dark:text-stone-400", "Gemini sedang menulis ulang bagian ini...");
+  status.setAttribute("role", "status");
+  body.append(status);
+  setDocBusy(true);
+  try {
+    await applyTaskUpdate(`/api/tasks/${currentTaskId}/sections/${index}/rewrite`, "POST", { instruction });
+    setDocBusy(false);
+    renderDocument();
+  } catch (err) {
+    setDocBusy(false);
+    body.textContent = original;
+    showSectionError(article, err.message || "Gagal menghubungi server.");
+  } finally {
+    checkSystemHealth();
+  }
+}
+
+function buildReferencesBlock() {
+  const sampleText = (currentDoc.title + " " + (currentDoc.sections[0] ? currentDoc.sections[0].content : "")).toLowerCase();
+  const isEnDoc = ["the", "and", "is", "of", "to", "in", "urban", "living"].some(w => sampleText.includes(w));
+  const block = el("div", "mt-8 pt-6 border-t border-stone-200 dark:border-stone-800");
+  block.append(el("h2", "text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 mb-3", isEnDoc ? "REFERENCES" : "DAFTAR PUSTAKA"));
+  const list = el("ul", "space-y-2 text-xs text-stone-600 dark:text-stone-400");
+  currentDoc.references.forEach((ref) => {
+    list.append(el("li", "pl-4 -indent-4", `${ref.authors.join(", ")} (${ref.year || "n.d."}). ${ref.title}. ${ref.venue || "Publikasi Ilmiah"}. ${ref.doi || ""}`));
+  });
+  block.append(list);
+  return block;
+}
+
+// Tulis ulang seluruh naskah memakai soal dan pengaturan yang sama dari Tahap 1 dan 2
+const btnRegenerateAll = document.getElementById("btn-regenerate-all");
+btnRegenerateAll.addEventListener("click", () => {
+  if (!window.confirm("Seluruh naskah, termasuk editan kamu, akan diganti tulisan baru. Lanjutkan?")) return;
+  btnGenerate.click();
+});
 
 
 // 4. Downloads & Restart
@@ -1615,7 +1807,6 @@ function resetToStep1() {
   setStep(1);
 }
 
-btnRestart.addEventListener("click", resetToStep1);
 
 const btnTopRestart = document.getElementById("btn-top-restart");
 if (btnTopRestart) {

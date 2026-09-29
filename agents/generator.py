@@ -723,3 +723,87 @@ async def generate_academic_draft(
         "language": language,
     }
 
+
+
+async def rewrite_section(
+    topic: str,
+    sections: List[Dict[str, str]],
+    index: int,
+    language: str = "id",
+    instruction: str = "",
+    word_limit: Optional[int] = None,
+    papers: Optional[List[Dict[str, Any]]] = None,
+    guidelines: str = "",
+    student_name: str = "",
+) -> Dict[str, str]:
+    """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
+    if not 0 <= index < len(sections):
+        raise ValueError("Nomor bagian di luar jangkauan.")
+
+    is_en = language == "en"
+    target = sections[index]
+    draft = "\n\n".join(
+        f"[BAGIAN {i + 1}{' (YANG DITULIS ULANG)' if i == index else ''}]\n{s.get('heading', '')}\n{s.get('content', '')}"
+        for i, s in enumerate(sections)
+    )
+    if papers:
+        ref_lines = "\n".join(
+            f"- {', '.join(p.get('authors') or ['Anonim'])} ({p.get('year') or 'n.d.'}). {p.get('title', '')}"
+            for p in papers
+        )
+        citation_rule = f"Pertahankan sitasi yang ada. Sitasi hanya boleh merujuk daftar ini:\n{ref_lines}"
+    else:
+        citation_rule = "Tugas ini tanpa rujukan. DILARANG menulis sitasi atau mengarang sumber."
+    limit_rule = f"Bagian ini maksimal {word_limit} kata." if word_limit else "Panjang kurang lebih sama dengan versi sekarang kecuali arahan meminta lain."
+    signer_rule = (
+        f"Jika bagian ini butuh nama penulis, pakai nama '{student_name}'."
+        if student_name else "DILARANG mengarang nama penulis."
+    )
+
+    system_instruction = f"""
+    Kamu mahasiswa yang merevisi SATU bagian jawaban tugasnya sendiri. Tulis ulang hanya bagian yang ditandai, dengan suara mahasiswa yang alami dan bebas klise AI.
+    - Bahasa keluaran: {'ENGLISH' if is_en else 'BAHASA INDONESIA'}.
+    - Jawaban tetap harus menjawab butir soal yang sama sesuai lembar soal dan petunjuk dosen. Jika soal merujuk blok '[Gambar: ...]', jangan mengarang detail di luar deskripsi itu.
+    - {limit_rule}
+    - {citation_rule}
+    - {signer_rule}
+    - Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading.
+    - DILARANG memakai em dash, en dash, atau LaTeX. Pisahkan paragraf dengan \n\n.
+    FORMAT KELUARAN (JSON MURNI): {{"content": "..."}}
+    """
+    user_prompt = f"""
+    LEMBAR SOAL:
+    {topic}
+
+    PETUNJUK DOSEN:
+    {guidelines or '-'}
+
+    NASKAH SEKARANG:
+    {draft}
+
+    ARAHAN REVISI DARI MAHASISWA: {instruction.strip() or 'Tulis ulang dengan kalimat yang lebih baik dan tetap setia pada soal.'}
+    """
+
+    response = await generate_with_fallback(
+        "generation",
+        user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.7,
+            max_output_tokens=8192,
+            response_mime_type="application/json",
+            thinking_config=types.ThinkingConfig(thinking_level="high") if REASONING_HINT.search(topic) else None,
+        ),
+        timeout=90.0,
+        total_budget=180.0,
+    )
+    try:
+        parsed = json.loads(response.text)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, list) and parsed:
+        parsed = parsed[0]
+    if not isinstance(parsed, dict) or not str(parsed.get("content") or "").strip():
+        raise RuntimeError("Gemini tidak mengembalikan bagian yang bisa dipakai.")
+    # Heading dipertahankan apa adanya supaya nomor butir tidak hilang. Pengguna bisa mengubahnya lewat Edit.
+    return {"heading": target.get("heading", ""), "content": clean_output_text(str(parsed["content"]))}

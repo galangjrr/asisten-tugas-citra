@@ -150,3 +150,24 @@ class ParseQuestionDocResponse(BaseModel):
 
 
 
+
+
+class SectionEdit(BaseModel):
+    heading: str = Field(default="", max_length=500)
+    content: str = Field(..., min_length=1, max_length=50000)
+
+
+class TaskEditRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300)
+    sections: List[SectionEdit] = Field(..., min_length=1, max_length=60)
+
+
+class SectionRewriteRequest(BaseModel):
+    # Arahan opsional dari pengguna, misal "lebih santai" atau "persingkat"
+    instruction: str = Field(default="", max_length=500)
+
+
+class TaskUpdateResponse(BaseModel):
+    title: str
+    sections: List[dict]
+    word_count: int

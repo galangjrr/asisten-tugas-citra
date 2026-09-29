@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, List
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
@@ -10,7 +10,8 @@ from api.schemas import (
     HealthResponse, SearchRequest, SearchResponse, GenerateRequest, GenerateResponse,
     PaperItem, ManualModuleRequest, UTCourseLookupResponse,
     ExtractScreenshotRequest, ExtractScreenshotResponse,
-    ParseQuestionDocRequest, ParseQuestionDocResponse
+    ParseQuestionDocRequest, ParseQuestionDocResponse,
+    TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse
 )
 from tools.academic_search import search_openalex_papers
 from tools.pdf_downloader import download_paper_pdf
@@ -19,7 +20,7 @@ from tools.ut_catalog import lookup_ut_course
 from tools.ocr_vision import extract_text_from_image
 from tools.question_reader import parse_question_document
 from tools.gemini_client import get_ai_status
-from agents.generator import generate_academic_draft
+from agents.generator import generate_academic_draft, rewrite_section
 from exporters.docx_builder import create_assignment_docx
 from exporters.pdf_builder import create_assignment_pdf
 
@@ -52,6 +53,73 @@ async def check_health():
 def safe_filename_part(text: str) -> str:
     """Membuang karakter yang tidak sah di nama berkas Windows maupun header unduhan."""
     return " ".join("".join(c for c in text if c.isalnum() or c in (" ", "-", ".")).split()).strip(" .")
+
+
+def count_words(sections: List[Dict[str, Any]]) -> int:
+    return sum(len(s.get("content", "").split()) for s in sections)
+
+
+def build_task_files(task_id: str, task: Dict[str, Any]) -> None:
+    """Merakit ulang docx dan pdf dari isi task. Dipanggil saat generate, edit, dan tulis ulang bagian."""
+    # Nama unduhan mengikuti format kumpul tugas: judul_mata kuliah_nama_NIM. Berkas di disk tetap unik per task_id.
+    name_parts = [task["title"], task["course_name"], task["student_name"], task["student_id"]]
+    task["download_base"] = "_".join(p for p in (safe_filename_part(x) for x in name_parts) if p)[:180] or "Tugas"
+    common = dict(
+        title=task["title"],
+        sections=task["sections"],
+        references=task["references"],
+        language=task["language"],
+        identity_lines=task["identity_lines"],
+    )
+    task["docx_path"] = create_assignment_docx(output_filename=f"{task_id}.docx", **common)
+    task["pdf_path"] = create_assignment_pdf(output_filename=f"{task_id}.pdf", **common)
+
+
+def get_task_or_404(task_id: str) -> Dict[str, Any]:
+    task = TASKS_DB.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Naskah tidak ditemukan. Aplikasi mungkin sudah dibuka ulang, silakan tulis ulang tugasnya.")
+    return task
+
+
+@router.put("/tasks/{task_id}", response_model=TaskUpdateResponse)
+async def update_task(task_id: str, payload: TaskEditRequest):
+    """Menyimpan hasil edit manual judul dan isi naskah, lalu merakit ulang berkas unduhan."""
+    task = get_task_or_404(task_id)
+    task["title"] = payload.title.strip()
+    task["sections"] = [{"heading": s.heading.strip(), "content": s.content.strip()} for s in payload.sections]
+    build_task_files(task_id, task)
+    return TaskUpdateResponse(title=task["title"], sections=task["sections"], word_count=count_words(task["sections"]))
+
+
+@router.post("/tasks/{task_id}/sections/{index}/rewrite", response_model=TaskUpdateResponse)
+async def rewrite_task_section(task_id: str, index: int, payload: SectionRewriteRequest):
+    """Menulis ulang satu bagian naskah dengan Gemini tanpa mengubah bagian lain."""
+    task = get_task_or_404(task_id)
+    if not 0 <= index < len(task["sections"]):
+        raise HTTPException(status_code=400, detail="Nomor bagian tidak valid.")
+
+    limits = task["answer_spec"].get("item_word_limits") or []
+    item_limit = limits[index] if index < len(limits) else (limits[0] if len(limits) == 1 else None)
+    try:
+        new_section = await rewrite_section(
+            topic=task["topic"],
+            sections=task["sections"],
+            index=index,
+            language=task["language"],
+            instruction=payload.instruction,
+            word_limit=item_limit,
+            papers=task["references"],
+            guidelines=task["guidelines"],
+            student_name=task["student_name"],
+        )
+    except Exception as e:
+        print(f"Error tulis ulang bagian: {e}")
+        raise HTTPException(status_code=503, detail="Gemini sedang sibuk atau kena limit. Tunggu status kembali hijau lalu coba lagi.")
+
+    task["sections"][index] = new_section
+    build_task_files(task_id, task)
+    return TaskUpdateResponse(title=task["title"], sections=task["sections"], word_count=count_words(task["sections"]))
 
 
 @router.post("/manual-module", response_model=PaperItem)
@@ -320,37 +388,29 @@ async def generate_task(payload: GenerateRequest):
     title = draft_result.get("title", payload.topic)
     sections = draft_result.get("sections", [])
 
-    # Nama unduhan mengikuti format kumpul tugas: judul_mata kuliah_nama_NIM. Berkas di disk tetap unik per task_id.
-    name_parts = [title, payload.course_name, payload.student_name, payload.student_id]
-    download_base = "_".join(p for p in (safe_filename_part(x) for x in name_parts) if p)[:180] or "Tugas"
-    docx_name = f"{task_id}.docx"
-    pdf_name = f"{task_id}.pdf"
-
-    is_en = draft_result.get("language") == "en"
+    language = draft_result.get("language")
+    is_en = language == "en"
     identity_labels = ("Name", "Student ID", "Course") if is_en else ("Nama", "NIM", "Mata Kuliah")
     identity_values = (payload.student_name, payload.student_id, payload.course_name)
     identity_lines = [f"{label}: {value.strip()}" for label, value in zip(identity_labels, identity_values) if value.strip()]
 
-    docx_path = create_assignment_docx(
-        title=title,
-        sections=sections,
-        references=selected_papers,
-        output_filename=docx_name,
-        language=draft_result.get("language"),
-        identity_lines=identity_lines,
-    )
-
-    pdf_path = create_assignment_pdf(
-        title=title,
-        sections=sections,
-        references=selected_papers,
-        output_filename=pdf_name,
-        language=draft_result.get("language"),
-        identity_lines=identity_lines,
-    )
-
-    # Hitung total kata
-    total_words = sum(len(s.get("content", "").split()) for s in sections)
+    # Data lengkap disimpan supaya naskah bisa diedit dan ditulis ulang per bagian tanpa generate dari nol
+    task = {
+        "title": title,
+        "sections": sections,
+        "references": selected_papers,
+        "language": language,
+        "identity_lines": identity_lines,
+        "topic": payload.topic,
+        "guidelines": payload.custom_instructions or "",
+        "answer_spec": payload.answer_spec.model_dump() if payload.answer_spec else {},
+        "course_name": payload.course_name,
+        "student_name": payload.student_name,
+        "student_id": payload.student_id,
+    }
+    build_task_files(task_id, task)
+    TASKS_DB[task_id] = task
+    total_words = count_words(sections)
 
     # Susun bukti sitasi transparan (evidence)
     evidence_list = []
@@ -395,15 +455,6 @@ async def generate_task(payload: GenerateRequest):
             "citation_count": citation_count,
             "snippets": snippets
         })
-
-    TASKS_DB[task_id] = {
-        "title": title,
-        "sections": sections,
-        "references": selected_papers,
-        "docx_path": docx_path,
-        "pdf_path": pdf_path,
-        "download_base": download_base,
-    }
 
     return GenerateResponse(
         success=True,

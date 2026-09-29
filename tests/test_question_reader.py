@@ -515,3 +515,17 @@ def test_cut_figure_box_expands_to_whole_vector_graph():
     assert xmin <= left_vertex - 5 and xmax >= right_label
     # Pilihan jawaban berada di y 400 pt ke bawah, jadi batas bawah potongan harus di atasnya
     assert ymax < (height - 400 + 10) / height * 1000
+
+
+def test_minimum_word_count_is_not_an_upper_limit():
+    from tools.question_reader import extract_word_limit, normalize_answer_spec
+    assert extract_word_limit("Write at least 200 words.") is None
+    assert extract_word_limit("Write at least 200 words. Letter (200-250 words)") == 250
+    assert extract_word_limit("minimal 300 kata") is None
+
+    # Soal 1 cuma punya batas minimal, soal 2 punya rentang
+    spec = normalize_answer_spec({"question_count": 2, "item_word_limits": [None, 250]}, "Describe the shop.\nWrite a letter.")
+    assert spec["item_word_limits"] == [None, 250]
+    assert spec["word_limit"] is None
+    spec = normalize_answer_spec({"question_count": 2, "word_limit": 250, "item_word_limits": [None, 250]}, "Describe.\nWrite (200-250 words).")
+    assert spec["word_limit"] is None

@@ -520,12 +520,18 @@ ITEM_SCOPE = r'(?:per|untuk\s+(?:setiap|tiap|masing-masing)|setiap|tiap|masing-m
 ITEM_WORD_LIMIT = re.compile(rf'(?i){WORD_LIMIT}\s*{ITEM_SCOPE}|{ITEM_SCOPE}\D{{0,30}}?{WORD_LIMIT}')
 
 
+# 'at least 200 words' itu batas bawah. Kalau dibaca sebagai batas atas, jawaban malah dipangkas di bawah minimal dosen.
+MIN_WORDS_PREFIX = re.compile(r'(?i)(?:at\s+least|minimum|min\.?|minimal|paling\s+sedikit|sekurang-kurangnya|lebih\s+dari|more\s+than)\s*$')
+
+
 def extract_word_limit(text: str) -> Optional[int]:
-    """Mencari batas kata seperti '300 words', 'maksimal 500 kata', atau '250-300 kata' (diambil angka terbesar)."""
-    match = re.search(rf'(?i){WORD_LIMIT}', text)
-    if not match:
-        return None
-    return int(match.group(2) or match.group(1))
+    """Mencari batas kata seperti '300 words', 'maksimal 500 kata', atau '250-300 kata' (diambil angka terbesar).
+    Angka minimal tanpa rentang seperti 'at least 200 words' dilewati karena bukan batas atas."""
+    for match in re.finditer(rf'(?i){WORD_LIMIT}', text):
+        if not match.group(2) and MIN_WORDS_PREFIX.search(text[max(0, match.start() - 25):match.start()]):
+            continue
+        return int(match.group(2) or match.group(1))
+    return None
 
 
 def extract_item_word_limit(text: str) -> Optional[int]:
@@ -544,7 +550,11 @@ def resolve_word_limits(total: Optional[int], items: Optional[list], question_co
     """
     if items and len(items) == 1 and question_count:
         items = items * question_count
-    if items and not total and (len(items) > 1 or question_count == 1):
+    # Butir bernilai None tidak punya batas atas, jadi batas total ikut tidak berlaku.
+    # Model sering mengisi total dari rentang satu soal, misal 250 dari '200-250 words' soal 2.
+    if items and not all(items):
+        return None, items
+    if items and not total and all(items) and (len(items) > 1 or question_count == 1):
         total = sum(items)
     return total, items or None
 
@@ -622,16 +632,19 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
     needs_citations = raw.get("needs_citations")
     question_count = as_int(raw.get("question_count"), 1, 50) or guess["question_count"]
     raw_items = raw.get("item_word_limits")
-    items = [as_int(v, 10, 5000) for v in raw_items] if isinstance(raw_items, list) and raw_items else []
+    raw_items = raw_items if isinstance(raw_items, list) and any(v is not None for v in raw_items) else []
+    # None berarti butir itu tanpa batas atas, misal dosen hanya menulis batas minimal
+    items = [None if v is None else as_int(v, 10, 5000) for v in raw_items]
     # Satu angka tidak valid membuat seluruh daftar diragukan, jadi dipakai tebakan pola
-    items = items if items and all(items) and len(items) <= 50 else guess["item_word_limits"]
+    valid = items and len(items) <= 50 and all(n is not None for v, n in zip(raw_items, items) if v is not None)
+    items = items if valid else guess["item_word_limits"]
     total, items = resolve_word_limits(as_int(raw.get("word_limit"), 50, 10000), items, question_count)
     return {
         "question_count": question_count,
         "answer_type": answer_type or guess["answer_type"],
         "needs_citations": needs_citations if isinstance(needs_citations, bool) else guess["needs_citations"],
         "answer_language": language if language in ("id", "en") else guess["answer_language"],
-        "word_limit": total or guess["word_limit"],
+        "word_limit": total if items else (total or guess["word_limit"]),
         "item_word_limits": items,
     }
 
@@ -651,8 +664,8 @@ Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
    - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, benar salah, pemahaman bacaan, gagasan utama, atau jawaban pendek per butir, MESKIPUN soalnya bernomor), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian atau analisis panjang per nomor soal yang butuh beberapa paragraf), atau "uraian" (uraian analitis umum). Pilih "jawaban_singkat" bila jawaban tiap butir cukup satu sampai dua kalimat atau cukup diambil dari teks bacaan.
    - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan, hitungan, atau menjawab dari teks bacaan yang sudah disediakan; null jika tidak jelas.
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
-   - "word_limit": batas kata untuk SELURUH jawaban jika tertulis sebagai batas total (jika rentang seperti 250-300 kata, isi angka terbesar), atau null. Jika dosen hanya menulis batas per soal, isi null.
-   - "item_word_limits": daftar batas kata per butir soal sesuai urutan nomor, jika dosen menulis batas per soal. Contoh 'maksimal 150 kata per soal' untuk 3 soal menjadi [150, 150, 150], sedangkan 'Soal 1 (200 kata), Soal 2 (300 kata)' menjadi [200, 300]. Isi null jika tidak ada batas per soal.
+   - "word_limit": batas atas kata untuk SELURUH jawaban jika tertulis sebagai batas total (jika rentang seperti 250-300 kata, isi angka terbesar), atau null. Batas minimal seperti 'at least 300 words' bukan batas atas, isi null. Jika dosen hanya menulis batas per soal, isi null.
+   - "item_word_limits": daftar batas kata per butir soal sesuai urutan nomor, jika dosen menulis batas per soal. Contoh 'maksimal 150 kata per soal' untuk 3 soal menjadi [150, 150, 150], sedangkan 'Soal 1 (200 kata), Soal 2 (300 kata)' menjadi [200, 300]. Batas minimal seperti 'at least 200 words' atau 'minimal 200 kata' BUKAN batas, jadi butir itu diisi null, misal 'Soal 1 at least 200 words, Soal 2 200-250 words' menjadi [null, 250]. Rentang seperti 200-250 memakai angka terbesar. Isi null untuk seluruh daftar jika tidak ada batas atas per soal.
 
 Format Keluaran (JSON murni):
 {

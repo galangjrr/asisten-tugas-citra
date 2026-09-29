@@ -528,10 +528,10 @@ async def generate_academic_draft(
     if word_limit:
         length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
     item_limits = spec.get("item_word_limits") or []
-    if len(item_limits) == 1:
+    if len(item_limits) == 1 and item_limits[0]:
         length_rules += f"    - Batas kata per butir dari dosen: setiap butir maksimal {item_limits[0]} kata. DILARANG melebihi batas ini di butir mana pun.\n"
-    elif item_limits:
-        per_item = ", ".join(f"butir {i} maksimal {n} kata" for i, n in enumerate(item_limits, 1))
+    elif any(item_limits):
+        per_item = ", ".join(f"butir {i} maksimal {n} kata" for i, n in enumerate(item_limits, 1) if n)
         length_rules += f"    - Batas kata per butir dari dosen: {per_item}. DILARANG melebihi batas butir masing-masing, dan jangan memindahkan sisa kata ke butir lain.\n"
 
     # Pilihan kedalaman pengguna juga berlaku untuk butir pendek, bukan hanya butir uraian

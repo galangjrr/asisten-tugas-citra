@@ -80,8 +80,10 @@ function computeWordLimits() {
   const limit = readInt(specWordLimit);
 
   if (detectedItemLimits && limit === null) {
-    const total = detectedItemLimits.reduce((sum, n) => sum + n, 0);
-    return { total: total <= 10000 ? total : null, items: detectedItemLimits, error: null };
+    // Butir tanpa batas atas bikin total tidak bisa dihitung
+    const bounded = detectedItemLimits.every((n) => n);
+    const total = detectedItemLimits.reduce((sum, n) => sum + (n || 0), 0);
+    return { total: bounded && total <= 10000 ? total : null, items: detectedItemLimits, error: null };
   }
   if (limit === null) return { total: null, items: null, error: null };
 
@@ -112,8 +114,8 @@ function renderWordSummary() {
   if (error) {
     text = error;
   } else if (detectedItemLimits && !specWordLimit.value) {
-    const parts = detectedItemLimits.map((n, i) => `soal ${i + 1}: ${formatNumber(n)}`).join(", ");
-    text = `Batas dari dosen berbeda tiap soal, ${parts} kata. Total ${formatNumber(total || 0)} kata.`;
+    const parts = detectedItemLimits.map((n, i) => `soal ${i + 1}: ${n ? `maksimal ${formatNumber(n)} kata` : "tanpa batas atas"}`).join(", ");
+    text = `Batas dari dosen berbeda tiap soal, ${parts}.${total ? ` Total ${formatNumber(total)} kata.` : ""}`;
   } else if (items && items.length > 1) {
     text = `${items.length} soal × ${formatNumber(items[0])} kata = ${formatNumber(total || items[0] * items.length)} kata total. Tiap soal dijaga tidak lewat ${formatNumber(items[0])} kata.`;
   } else if (items) {
@@ -133,8 +135,9 @@ function renderWordSummary() {
 function updateSpecVisibility() {
   const type = specAnswerType.value;
   const isDirect = DIRECT_ANSWER_TYPES.includes(type);
-  const { total, items } = renderWordSummary();
-  const hasLecturerLimit = Boolean(total || items);
+  const { total } = renderWordSummary();
+  // Target panjang tetap bisa dipilih selama batas total dosen belum pasti, misal ada soal yang hanya punya batas minimal
+  const hasLecturerLimit = Boolean(total);
 
   const hideFormat = FORMAT_DECIDED_TYPES.includes(type);
   formatWrapper.classList.toggle("hidden", hideFormat);
@@ -155,7 +158,7 @@ function applyAnswerSpec(spec, source) {
   specCitations.value = spec.needs_citations === false ? "tidak" : "ya";
   specLanguage.value = spec.answer_language || "";
 
-  const items = Array.isArray(spec.item_word_limits) && spec.item_word_limits.length ? spec.item_word_limits : null;
+  const items = Array.isArray(spec.item_word_limits) && spec.item_word_limits.some((n) => n) ? spec.item_word_limits : null;
   detectedItemLimits = null;
   specWordLimit.placeholder = "Tidak ada";
   if (items && items.every((n) => n === items[0])) {
@@ -264,7 +267,6 @@ function countWords(text) {
 
 function renderQuestionPreview(text) {
   questionPreviewBody.replaceChildren();
-  let items = 0;
   let figures = 0;
 
   text.split(FIGURE_BLOCK).forEach((part, index) => {
@@ -288,7 +290,6 @@ function renderQuestionPreview(text) {
       const option = line.match(OPTION_LINE);
       const row = document.createElement("p");
       if (item) {
-        items += 1;
         row.className = "flex gap-2 pt-2 first:pt-0";
         const number = document.createElement("span");
         number.className = "w-6 shrink-0 font-bold text-stone-900 dark:text-stone-100 tabular-nums";
@@ -312,8 +313,8 @@ function renderQuestionPreview(text) {
     });
   });
 
+  // Jumlah nomor tidak ditampilkan di sini karena daftar syarat di dalam soal ikut bernomor. Jumlah soal asli ada di panel pengaturan.
   const meta = [`${formatNumber(countWords(text))} kata`];
-  if (items) meta.unshift(`${items} nomor soal`);
   if (figures) meta.push(`${figures} gambar terbaca`);
   questionPreviewMeta.textContent = meta.join(" · ");
 }

@@ -203,3 +203,45 @@ async def test_item_word_limits_reach_the_prompt(monkeypatch):
     await gen.generate_academic_draft("1. Jelaskan A.\n2. Jelaskan B.", [], target_words=1000, answer_spec=spec)
     assert "butir 1 maksimal 200 kata, butir 2 maksimal 300 kata" in captured["system"]
     assert "maksimal 500 kata untuk seluruh jawaban" in captured["system"]
+
+
+@pytest.mark.anyio
+async def test_multi_question_essay_keeps_item_numbers(monkeypatch):
+    import agents.generator as gen
+    captured = {}
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        captured["system"] = config.system_instruction
+        # Model mengosongkan heading seperti format esai
+        return type("Res", (), {"text": '{"title": "T", "sections": [{"heading": "", "content": "a"}, {"heading": "", "content": "b"}]}'})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    topic = "Describe the coffee shop in the picture.\n\nWrite a letter to the editor about the park."
+    result = await gen.generate_academic_draft(topic, [], target_words=950, answer_spec={"answer_type": "esai", "question_count": 2})
+
+    assert "TEPAT 2 bagian" in captured["system"]
+    assert [s["heading"] for s in result["sections"]] == ["1.", "2."]
+
+
+@pytest.mark.anyio
+async def test_item_over_word_limit_is_trimmed(monkeypatch):
+    import agents.generator as gen
+    long_letter = " ".join(["word"] * 300)
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        return type("Res", (), {"text": '{"title": "T", "sections": [{"heading": "1. A", "content": "free length"}, {"heading": "2. B", "content": "%s"}]}' % long_letter})()
+
+    trimmed = {}
+
+    async def fake_rewrite(topic, sections, index, **kwargs):
+        trimmed["index"], trimmed["limit"] = index, kwargs["word_limit"]
+        return {"heading": sections[index]["heading"], "content": "short letter"}
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    monkeypatch.setattr(gen, "rewrite_section", fake_rewrite)
+    spec = {"question_count": 2, "item_word_limits": [None, 250]}
+    result = await gen.generate_academic_draft("1. Describe it.\n2. Write a letter.", [], answer_spec=spec)
+
+    assert trimmed == {"index": 1, "limit": 250}
+    assert result["sections"][1]["content"] == "short letter"
+    assert result["sections"][0]["content"] == "free length"

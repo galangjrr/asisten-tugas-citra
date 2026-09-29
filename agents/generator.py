@@ -127,7 +127,8 @@ async def generate_academic_draft(
 
     # Soal bernomor menentukan jumlah bagian, bukan target kata, agar 2 soal tidak dipecah jadi 4 nomor
     question_count = spec.get("question_count") or count_numbered_questions(topic)
-    if question_count and (format_type in ("otomatis", "bernomor") or is_direct_answer):
+    # Lebih dari satu soal selalu dijawab per nomor, termasuk jika tiap soal berbentuk esai, supaya judul butir tidak dikosongkan format esai
+    if question_count and (format_type in ("otomatis", "bernomor") or is_direct_answer or question_count > 1):
         format_type = "bernomor"
         min_sections = question_count
         words_per_sec = round(target_words / question_count)
@@ -716,6 +717,26 @@ async def generate_academic_draft(
         for sec in parsed.get("sections") or []
         if isinstance(sec, dict)
     ]
+    # Jaring pengaman: model kadang tetap mengosongkan heading, padahal tiap butir wajib bernomor sesuai lembar soal
+    if format_type == "bernomor" and len(sections) == question_count:
+        for number, sec in enumerate(sections, 1):
+            if not re.match(rf"\s*{number}\s*[.)]", sec["heading"]):
+                sec["heading"] = f"{number}. {sec['heading']}".strip()
+
+    # Model sering tetap melewati batas kata dosen per butir, jadi butir yang kelewatan dipangkas ulang sekali
+    limits_per_section = item_limits * len(sections) if len(item_limits) == 1 else item_limits
+    if len(sections) == len(limits_per_section):
+        for index, limit in enumerate(limits_per_section):
+            if not limit or len(sections[index]["content"].split()) <= limit:
+                continue
+            try:
+                sections[index] = await rewrite_section(
+                    topic, sections, index, language=language,
+                    instruction=f"Persingkat bagian ini jadi sekitar {round(limit * 0.9)} kata tanpa membuang poin yang diminta soal.",
+                    word_limit=limit, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
+                )
+            except Exception as e:
+                print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
     return {
         "title": clean_output_text(str(parsed.get("title") or topic.title())),
         "sections": sections,

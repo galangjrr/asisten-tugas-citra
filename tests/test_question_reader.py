@@ -483,3 +483,35 @@ def test_item_word_limit_is_totalled_per_question():
     # Tanpa batas di soal, keduanya kosong sehingga pengaturan panjang di form yang dipakai
     spec = guess_answer_spec(questions, "")
     assert spec["word_limit"] is None and spec["item_word_limits"] is None
+
+
+def test_cut_figure_box_expands_to_whole_vector_graph():
+    import math
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    import tools.question_reader as qr
+
+    stream = io.BytesIO()
+    c = canvas.Canvas(stream, pagesize=A4)
+    c.drawString(60, 760, "1. Diketahui graf di bawah ini. Tentukan derajat tiap simpul.")
+    pos = {v: (300 + 110 * math.cos(math.radians(90 - i * 60)), 560 + 110 * math.sin(math.radians(90 - i * 60))) for i, v in enumerate("ABCDEF")}
+    for edge in ["A-B", "A-C", "A-D", "B-C", "B-E", "C-E", "D-E", "D-F", "E-F", "B-F"]:
+        a, b = edge.split("-")
+        c.line(*pos[a], *pos[b])
+    for v, (x, y) in pos.items():
+        c.circle(x, y, 6, fill=1)
+        c.drawString(x + 10, y + 6, v)
+    # Deretan pilihan pendek di bawah graf tidak boleh ikut masuk potongan
+    for i, option in enumerate(["a. 10", "b. 12", "c. 14", "d. 16"]):
+        c.drawString(290, 400 - i * 14, option)
+    c.save()
+
+    [(image, (drawings, labels))] = qr._render_pages(stream.getvalue())
+    # Kotak dari Gemini yang hanya menangkap separuh kanan graf, seperti yang terjadi di uji nyata
+    ymin, xmin, ymax, xmax = qr._expand_to_objects((183, 484, 481, 701), drawings, labels)
+    width, height = A4
+    left_vertex = min(x for x, _ in pos.values()) / width * 1000
+    right_label = (max(x for x, _ in pos.values()) + 17) / width * 1000
+    assert xmin <= left_vertex - 5 and xmax >= right_label
+    # Pilihan jawaban berada di y 400 pt ke bawah, jadi batas bawah potongan harus di atasnya
+    assert ymax < (height - 400 + 10) / height * 1000

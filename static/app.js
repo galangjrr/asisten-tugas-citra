@@ -1562,8 +1562,38 @@ function syncDesktopTitlebar(isDark) {
   }
 }
 
+function setMaximizedIcon(isMaximized) {
+  document.getElementById("icon-window-maximize").classList.toggle("hidden", isMaximized);
+  document.getElementById("icon-window-restore").classList.toggle("hidden", !isMaximized);
+  const btn = document.getElementById("btn-window-maximize");
+  const label = isMaximized ? "Kembalikan ukuran jendela" : "Besarkan jendela";
+  btn.setAttribute("aria-label", label);
+  btn.title = isMaximized ? "Kembalikan" : "Besarkan";
+}
+
+async function toggleMaximize() {
+  setMaximizedIcon(await window.pywebview.api.toggle_maximize());
+}
+
+// Jendela desktop tanpa bingkai: header aplikasi jadi title bar, tombol jendela dipasang di ujung kanan
+function enableDesktopChrome() {
+  const api = window.pywebview.api;
+  const inner = document.getElementById("app-header-inner");
+  inner.classList.remove("max-w-5xl", "mx-auto");
+  inner.classList.add("pr-0");
+  document.getElementById("window-controls").classList.replace("hidden", "flex");
+  document.querySelectorAll(".desktop-drag").forEach((el) => {
+    el.classList.add("pywebview-drag-region");
+    el.addEventListener("dblclick", toggleMaximize);
+  });
+  document.getElementById("btn-window-minimize").addEventListener("click", () => api.minimize());
+  document.getElementById("btn-window-maximize").addEventListener("click", toggleMaximize);
+  document.getElementById("btn-window-close").addEventListener("click", () => api.close());
+}
+
 // Di mode desktop, API pywebview baru siap setelah halaman dimuat
 window.addEventListener("pywebviewready", () => {
+  enableDesktopChrome();
   syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
   window.pywebview.api.fit_height(document.documentElement.scrollHeight);
 });

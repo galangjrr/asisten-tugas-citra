@@ -11,6 +11,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from tools.gemini_client import generate_with_fallback
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from pypdf.generic import ContentStream
 from tools.ocr_vision import FIGURE_MARKER, MIN_QUESTION_IMAGE_BYTES, describe_image, extract_text_from_pdf, locate_figures
 
@@ -297,14 +298,75 @@ async def read_pdf_file(file_bytes: bytes) -> str:
 
 # ponytail: lembar soal biasanya beberapa halaman, PDF lebih panjang dibaca dari halaman penuh saja agar panggilan tidak membengkak
 MAX_FIGURE_PAGES = 20
+# Label seperti huruf simpul graf adalah objek teks kecil. Paragraf soal lebih besar dari ini dan tidak ikut digabung.
+MAX_LABEL_POINTS = 40
+
+
+def _object_boxes(page) -> tuple:
+    """
+    Kotak garis, gambar, dan label kecil di halaman, skala 0 sampai 1000 dari kiri atas seperti kotak dari Gemini.
+    Objek selebar hampir satu halaman, misal hasil scan atau bingkai halaman, dilewati.
+    Mengembalikan (garis dan gambar, label teks kecil).
+    """
+    width, height = page.get_size()
+    kinds = (pdfium_c.FPDF_PAGEOBJ_PATH, pdfium_c.FPDF_PAGEOBJ_IMAGE, pdfium_c.FPDF_PAGEOBJ_TEXT)
+    drawings, labels = [], []
+    for obj in page.get_objects(filter=kinds):
+        try:
+            left, bottom, right, top = obj.get_bounds()
+        except Exception:
+            continue
+        w, h = right - left, top - bottom
+        if w * h > 0.5 * width * height:
+            continue
+        box = ((height - top) / height * 1000, left / width * 1000, (height - bottom) / height * 1000, right / width * 1000)
+        if obj.type != pdfium_c.FPDF_PAGEOBJ_TEXT:
+            drawings.append(box)
+        elif w <= MAX_LABEL_POINTS and h <= MAX_LABEL_POINTS:
+            labels.append(box)
+    return drawings, labels
+
+
+def _touches(a: tuple, b: tuple, gap: float) -> bool:
+    return b[1] <= a[3] + gap and b[3] >= a[1] - gap and b[0] <= a[2] + gap and b[2] >= a[0] - gap
+
+
+def _union(a: tuple, b: tuple) -> tuple:
+    return min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])
+
+
+def _expand_to_objects(box: tuple, drawings: list, labels: list, gap: float = 12) -> tuple:
+    """
+    Kotak dari Gemini sering memotong sebagian gambar. Kotak dilebarkan sampai mencakup semua garis dan label
+    yang menyambung dengannya, karena posisi objek di PDF itu pasti. PDF hasil scan tidak punya objek ini, jadi kotaknya tetap.
+    Hanya garis dan gambar yang boleh memperluas berantai. Label teks cuma ditambahkan sekali di akhir,
+    supaya deretan teks pendek seperti pilihan jawaban tidak ikut tersambung sampai sehalaman.
+    """
+    remaining = list(drawings)
+    grown = True
+    while grown:
+        grown = False
+        for obj in list(remaining):
+            if _touches(box, obj, gap):
+                box = _union(box, obj)
+                remaining.remove(obj)
+                grown = True
+    for label in [lb for lb in labels if _touches(box, lb, gap)]:
+        box = _union(box, label)
+    return box
 
 
 def _render_pages(file_bytes: bytes, scale: float = 2.5) -> list:
+    """Render tiap halaman beserta kotak objeknya."""
     pdf = pdfium.PdfDocument(file_bytes)
     try:
         if len(pdf) > MAX_FIGURE_PAGES:
             return []
-        return [pdf[i].render(scale=scale).to_pil() for i in range(len(pdf))]
+        pages = []
+        for i in range(len(pdf)):
+            page = pdf[i]
+            pages.append((page.render(scale=scale).to_pil(), _object_boxes(page)))
+        return pages
     finally:
         pdf.close()
 
@@ -322,15 +384,16 @@ async def _crop_pdf_figures(file_bytes: bytes) -> list:
     except Exception as e:
         print(f"Render halaman PDF gagal: {e}")
         return []
-    boxes_per_page = await asyncio.gather(*(locate_figures(_png(page)) for page in pages))
+    boxes_per_page = await asyncio.gather(*(locate_figures(_png(image)) for image, _ in pages))
     crops = []
-    for page, boxes in zip(pages, boxes_per_page):
-        w, h = page.size
-        for ymin, xmin, ymax, xmax in boxes:
+    for (image, objects), boxes in zip(pages, boxes_per_page):
+        w, h = image.size
+        for box in boxes:
+            ymin, xmin, ymax, xmax = _expand_to_objects(box, *objects)
             pad = 8
-            crop = page.crop((
-                max(0, (xmin - pad) * w // 1000), max(0, (ymin - pad) * h // 1000),
-                min(w, (xmax + pad) * w // 1000), min(h, (ymax + pad) * h // 1000),
+            crop = image.crop((
+                int(max(0, (xmin - pad) * w / 1000)), int(max(0, (ymin - pad) * h / 1000)),
+                int(min(w, (xmax + pad) * w / 1000)), int(min(h, (ymax + pad) * h / 1000)),
             ))
             crops.append((_png(crop), "image/png"))
     return crops

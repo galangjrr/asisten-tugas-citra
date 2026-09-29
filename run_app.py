@@ -11,16 +11,15 @@ import webview
 
 APP_TITLE = "Asisten Tugas Citra"
 HOST = "127.0.0.1"
-# Lebar konten header max-w-5xl 1024px + scrollbar 10px + frame jendela 16px
+# Lebar konten max-w-5xl 1024px + scrollbar 10px + ruang tepi. Jendela tanpa bingkai, jadi tidak ada frame yang dihitung.
 WINDOW_WIDTH = 1050
-# Tinggi title bar + frame bawah, hasil ukur outer 820 vs innerHeight 781
-WINDOW_CHROME_HEIGHT = 39
 
-# Warna title bar disamain dengan header UI: bg-white dan dark:bg-stone-900
-TITLEBAR_THEMES = {
-    False: {"caption": "#ffffff", "text": "#1c1917"},
-    True: {"caption": "#1c1917", "text": "#f5f5f4"},
-}
+# Garis tepi jendela disamakan dengan border header UI: stone-200 dan dark stone-800
+WINDOW_BORDER = {False: "#e7e5e4", True: "#292524"}
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMWA_BORDER_COLOR = 34
+DWMWCP_ROUND = 2
 
 
 def hex_to_colorref(hex_color: str) -> ctypes.c_uint:
@@ -28,35 +27,80 @@ def hex_to_colorref(hex_color: str) -> ctypes.c_uint:
     return ctypes.c_uint(r | (g << 8) | (b << 16))
 
 
+class MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.wintypes.DWORD),
+        ("rcMonitor", ctypes.wintypes.RECT),
+        ("rcWork", ctypes.wintypes.RECT),
+        ("dwFlags", ctypes.wintypes.DWORD),
+    ]
+
+
+def work_area(hwnd: int) -> tuple:
+    """Area kerja monitor tempat jendela berada, di luar taskbar, dalam piksel logis (left, top, width, height)."""
+    user32 = ctypes.windll.user32
+    user32.MonitorFromWindow.restype = ctypes.c_void_p
+    user32.MonitorFromWindow.argtypes = [ctypes.c_void_p, ctypes.wintypes.DWORD]
+    monitor = user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+    info = MONITORINFO()
+    info.cbSize = ctypes.sizeof(MONITORINFO)
+    user32.GetMonitorInfoW(ctypes.c_void_p(monitor), ctypes.byref(info))
+    scale = user32.GetDpiForWindow(hwnd) / 96
+    r = info.rcWork
+    return int(r.left / scale), int(r.top / scale), int((r.right - r.left) / scale), int((r.bottom - r.top) / scale)
+
+
 class DesktopApi:
     """Dipanggil dari JS lewat window.pywebview.api saat tema berganti."""
 
     def __init__(self):
         self._window = None
+        self._maximized = False
+        self._restore_bounds = None
 
     def set_titlebar(self, is_dark: bool):
+        """Jendela tanpa bingkai tetap dapat sudut bulat dan garis tepi tipis ala Windows 11 sesuai tema."""
         if not sys.platform.startswith("win") or not self._window or not self._window.native:
             return
         hwnd = self._window.native.Handle.ToInt32()
         dwm = ctypes.windll.dwmapi
-        theme = TITLEBAR_THEMES[bool(is_dark)]
-        # 20 dark mode, 35 warna caption, 36 warna teks, 34 warna border. Caption dan teks cuma jalan di Windows 11
-        dwm.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(ctypes.c_int(int(bool(is_dark)))), 4)
-        dwm.DwmSetWindowAttribute(hwnd, 35, ctypes.byref(hex_to_colorref(theme["caption"])), 4)
-        dwm.DwmSetWindowAttribute(hwnd, 36, ctypes.byref(hex_to_colorref(theme["text"])), 4)
-        dwm.DwmSetWindowAttribute(hwnd, 34, ctypes.byref(hex_to_colorref(theme["caption"])), 4)
+        # Atribut sudut dan warna tepi hanya berlaku di Windows 11, di Windows 10 diabaikan tanpa error
+        dwm.DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ctypes.byref(ctypes.c_int(int(bool(is_dark)))), 4)
+        dwm.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(ctypes.c_int(DWMWCP_ROUND)), 4)
+        dwm.DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ctypes.byref(hex_to_colorref(WINDOW_BORDER[bool(is_dark)])), 4)
+
+    def minimize(self):
+        self._window.minimize()
+
+    def toggle_maximize(self) -> bool:
+        """
+        Besarkan ke area kerja monitor secara manual. Maximize bawaan jendela tanpa bingkai menutupi taskbar.
+        Mengembalikan status baru supaya ikon tombol di UI bisa ikut berganti.
+        """
+        w = self._window
+        if self._maximized:
+            x, y, width, height = self._restore_bounds
+            w.resize(width, height)
+            w.move(x, y)
+        else:
+            self._restore_bounds = (w.x, w.y, w.width, w.height)
+            left, top, width, height = work_area(w.native.Handle.ToInt32())
+            w.move(left, top)
+            w.resize(width, height)
+        self._maximized = not self._maximized
+        return self._maximized
+
+    def close(self):
+        self._window.destroy()
 
     def fit_height(self, content_height: int):
         """Tinggi jendela ngikutin tinggi halaman, mentok di tinggi layar di luar taskbar."""
         if not sys.platform.startswith("win") or not self._window or not self._window.native:
             return
-        work_area = ctypes.wintypes.RECT()
-        ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(work_area), 0)  # SPI_GETWORKAREA
-        scale = ctypes.windll.user32.GetDpiForWindow(self._window.native.Handle.ToInt32()) / 96
-        max_height = int((work_area.bottom - work_area.top) / scale)
-        height = min(int(content_height) + WINDOW_CHROME_HEIGHT, max_height)
+        _, top, _, max_height = work_area(self._window.native.Handle.ToInt32())
+        height = min(int(content_height), max_height)
         self._window.resize(WINDOW_WIDTH, height)
-        self._window.move(self._window.x, int(work_area.top / scale) + (max_height - height) // 2)
+        self._window.move(self._window.x, top + (max_height - height) // 2)
 
 
 def find_free_port() -> int:
@@ -106,6 +150,12 @@ def main():
         min_size=(900, 600),
         background_color="#0c0a09",
         text_select=True,
+        # Header aplikasi jadi title bar. Geser hanya lewat area .pywebview-drag-region, bukan seluruh halaman.
+        # ponytail: jendela tanpa bingkai tidak bisa ditarik dari tepinya, ukuran diatur fit_height dan tombol besarkan.
+        # Kalau perlu tarik tepi, tangani WM_NCHITTEST di jendela WinForms.
+        frameless=True,
+        easy_drag=False,
+        shadow=True,
     )
     webview.start()
 

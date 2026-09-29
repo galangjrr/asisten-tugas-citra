@@ -174,3 +174,33 @@
 #question-preview-body {
   font-feature-settings: "calt" 0, "liga" 0;
 }
+
+/* Tombol jendela versi desktop, ukuran dan warna mengikuti tombol bawaan Windows 11 */
+.window-btn {
+  width: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.window-btn svg {
+  width: 10px;
+  height: 10px;
+}
+.window-btn:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+.window-btn:active {
+  background: var(--color-border-subtle);
+}
+.window-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.window-btn-close:hover,
+.window-btn-close:active {
+  background: #c42b1c;
+  color: #ffffff;
+}

@@ -72,6 +72,8 @@ async def generate_academic_draft(
     tone: str = "akademis formal",
     custom_instructions: str = "",
     answer_spec: Optional[Dict[str, Any]] = None,
+    student_name: str = "",
+    course_name: str = "",
 ) -> Dict[str, Any]:
     """Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh."""
     # Spesifikasi jawaban sudah dicek pengguna, jadi nilainya mengalahkan tebakan otomatis
@@ -301,7 +303,7 @@ async def generate_academic_draft(
             """
             json_example = """
             {
-              "title": "Numbered Assignment Answers",
+              "title": "Assignment 1: Descriptive and Persuasive Writing",
               "sections": [
                 {"heading": "1. Analysis of Core Underlying Factors", "content": "Paragraph 1...\\n\\nParagraph 2..."},
                 {"heading": "2. Evaluation of Practical Implications", "content": "Paragraph 1...\\n\\nParagraph 2..."}
@@ -320,7 +322,7 @@ async def generate_academic_draft(
             """
             json_example = """
             {
-              "title": "Jawaban Tugas Kuliah",
+              "title": "Tugas 1 Pengantar Ilmu Ekonomi",
               "sections": [
                 {"heading": "1. Analisis Faktor Penyebab Utama", "content": "Paragraf 1...\\n\\nParagraf 2..."},
                 {"heading": "2. Evaluasi Dampak dan Implementasi", "content": "Paragraf 1...\\n\\nParagraf 2..."}
@@ -423,7 +425,7 @@ async def generate_academic_draft(
             student_voice_rules = """
         RULES FOR PERSONAL LETTER / CORRESPONDENCE TONE:
         1. Adopt the voice of an articulate student or thinker writing a thoughtful, warm, and engaging letter to a friend, colleague, or mentor.
-        2. Open with a natural personal greeting appropriate to the letter format (e.g. 'Dear Alex,', 'Dear Friend,').
+        2. Open with a natural personal greeting appropriate to the letter format (e.g. 'Dear Friend,', 'Dear Editor,').
         3. Discuss and reflect on the topic conversationally using first-person perspective ('I have been reflecting on...', 'In my view...'), while naturally interweaving the scholarly findings and citations as insights from your reading.
         4. Close with a warm, natural sign-off (e.g. 'Warm regards,', 'Sincerely,') rather than robotic boilerplate.
         5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster'.
@@ -585,6 +587,19 @@ async def generate_academic_draft(
     - Kosongkan array 'evidence_log'.
     """
 
+    # Judul dan nama penulis diambil dari data nyata, bukan karangan model
+    course_line = f"Mata kuliah tugas ini: {course_name}. " if course_name else ""
+    if student_name:
+        signer_rule = f"Jika naskah butuh nama penulis, misalnya tanda tangan di akhir surat, pakai nama '{student_name}'."
+    else:
+        signer_rule = "DILARANG mengarang nama penulis. Jika naskah butuh tanda tangan, tulis salam penutupnya saja tanpa nama."
+    identity_rules = f"""
+    ATURAN JUDUL DAN NAMA PENULIS:
+    - {course_line}Isi 'title' dengan nama tugas sesuai lembar soal, misalnya 'Tugas 1 Bahasa Inggris Niaga', atau topik utama soal jika lembar soal tidak menyebut nama tugas. DILARANG judul generik seperti 'Numbered Assignment Answers', 'Jawaban Tugas Kuliah', atau 'Academic Discussion'.
+    - {signer_rule}
+    - Identitas mahasiswa (nama, NIM, mata kuliah) sudah dicetak otomatis di bawah judul. DILARANG menulisnya lagi di isi naskah.
+    """
+
     system_instruction = f"""
     Kamu adalah mahasiswa berprestasi yang sedang menulis naskah tugas kuliah ilmiah berkualitas tinggi. Tugasmu menyusun tulisan yang berbobot, kritis, membumi, dan sepenuhnya bebas dari ciri khas tulisan AI.
 
@@ -595,6 +610,8 @@ async def generate_academic_draft(
     {student_voice_rules}
 
     {distortion_rules}
+
+    {identity_rules}
 
     ATURAN TANDA BACA:
     - Pakai tanda baca yang lazim diketik mahasiswa Indonesia: titik, koma, titik dua, tanda tanya, tanda kurung, dan tanda hubung biasa (-).

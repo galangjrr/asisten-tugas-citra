@@ -17,6 +17,27 @@ const inputCustomWords = document.getElementById("input-custom-words");
 const selectDepth = document.getElementById("select-depth");
 const selectTone = document.getElementById("select-tone");
 const inputInstructions = document.getElementById("input-instructions");
+const inputStudentName = document.getElementById("input-student-name");
+const inputStudentId = document.getElementById("input-student-id");
+const inputCourseName = document.getElementById("input-course-name");
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Nama dan NIM jarang berubah, jadi diingat di browser. Mata kuliah beda tiap tugas.
+[[inputStudentName, "atc-student-name"], [inputStudentId, "atc-student-id"]].forEach(([el, key]) => {
+  try {
+    el.value = localStorage.getItem(key) || "";
+  } catch (err) {}
+  el.addEventListener("change", () => {
+    try {
+      localStorage.setItem(key, el.value.trim());
+    } catch (err) {}
+  });
+});
 const btnSearch = document.getElementById("btn-search");
 
 // Question File Upload Elements
@@ -622,28 +643,62 @@ function setStep(stepNum) {
 }
 
 // 1. Health Check
+// Status dicek ulang berkala. Saat jeda, hitung mundur jalan tiap detik lalu dicek lagi begitu habis.
+const HEALTH_POLL_MS = 20000;
+let healthTimer = null;
+
+function renderStatusBadge(dotClass, label, model, hint) {
+  const modelHtml = model
+    ? `<span class="hidden sm:inline text-stone-500 dark:text-stone-400 font-mono text-[11px]">${escapeHtml(model)}</span>`
+    : "";
+  apiStatusBadge.innerHTML = `
+    <span class="w-2 h-2 rounded-full ${dotClass}"></span>
+    <span class="text-stone-700 dark:text-stone-200 font-semibold tabular-nums">${label}</span>
+    ${modelHtml}
+  `;
+  apiStatusBadge.title = hint;
+}
+
+function startCooldownCountdown(seconds, model) {
+  let left = seconds;
+  const tick = () => {
+    if (left <= 0) {
+      checkSystemHealth();
+      return;
+    }
+    renderStatusBadge(
+      "bg-sky-500 animate-pulse",
+      `Gemini Jeda ${left} dtk`,
+      model,
+      "Google sedang membatasi atau menolak permintaan. Tunggu hitungan selesai sebelum menulis naskah."
+    );
+    left -= 1;
+    healthTimer = setTimeout(tick, 1000);
+  };
+  tick();
+}
+
 async function checkSystemHealth() {
+  clearTimeout(healthTimer);
   try {
     const res = await fetch("/api/health");
     if (!res.ok) throw new Error("Server tidak merespons");
     const data = await res.json();
-    if (data.gemini_configured) {
-      apiStatusBadge.innerHTML = `
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        <span class="text-stone-700 dark:text-stone-200 font-semibold">Gemini Siap</span>
-      `;
+    if (data.ai_state === "cooldown") {
+      startCooldownCountdown(data.retry_in || 30, data.active_model);
+      return;
+    }
+    if (data.ai_state === "ready") {
+      renderStatusBadge("bg-emerald-500", "Gemini Siap", data.active_model, `Model aktif otomatis: ${data.active_model}`);
+    } else if (data.ai_state === "unavailable") {
+      renderStatusBadge("bg-rose-500", "Model Tidak Tersedia", null, "Semua model Gemini menolak akun ini. Cek kuota atau API key di Google AI Studio.");
     } else {
-      apiStatusBadge.innerHTML = `
-        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-        <span class="text-stone-700 dark:text-stone-200 font-semibold">API Key Belum Disetel</span>
-      `;
+      renderStatusBadge("bg-amber-500", "API Key Belum Disetel", null, "Isi GEMINI_API_KEY di berkas .env lalu buka ulang aplikasi.");
     }
   } catch (err) {
-    apiStatusBadge.innerHTML = `
-      <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-      <span class="text-stone-700 dark:text-stone-200 font-semibold">Server Offline</span>
-    `;
+    renderStatusBadge("bg-rose-500", "Server Offline", null, "Server lokal tidak merespons.");
   }
+  healthTimer = setTimeout(checkSystemHealth, HEALTH_POLL_MS);
 }
 
 // Search Refinement & Manual DOI Elements
@@ -944,7 +999,8 @@ function attachUtLookup(inputEl, spinnerEl, resultEl, onSelectTitle) {
       if (data.found && data.course) {
         resultEl.classList.remove("hidden");
         const course = data.course;
-        
+
+        if (data.exact && !inputCourseName.value.trim()) inputCourseName.value = course.nama;
         if (data.exact) {
           resultEl.innerHTML = `
             <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -1381,7 +1437,10 @@ btnGenerate.addEventListener("click", async () => {
       tone: selectTone.value,
       paper_ids: Array.from(selectedPaperIds),
       custom_instructions: inputInstructions.value.trim(),
-      answer_spec: readAnswerSpec()
+      answer_spec: readAnswerSpec(),
+      student_name: inputStudentName.value.trim(),
+      student_id: inputStudentId.value.trim(),
+      course_name: inputCourseName.value.trim()
     };
 
     const res = await fetch("/api/generate", {
@@ -1393,6 +1452,7 @@ btnGenerate.addEventListener("click", async () => {
     clearTimeout(t1);
     clearTimeout(t2);
     clearTimeout(t3);
+    checkSystemHealth();
 
     const data = await res.json();
     generatingIndicator.classList.add("hidden");
@@ -1414,6 +1474,7 @@ btnGenerate.addEventListener("click", async () => {
     clearTimeout(t1);
     clearTimeout(t2);
     clearTimeout(t3);
+    checkSystemHealth();
     generatingIndicator.classList.add("hidden");
     setStep(2);
     showAlert(
@@ -1486,6 +1547,9 @@ function renderResult(data) {
   }
 
   let previewHtml = `<h1 class="text-xl font-bold text-center tracking-tight uppercase mb-8 text-stone-900 dark:text-stone-100">${data.title}</h1>`;
+  if (data.identity_lines && data.identity_lines.length) {
+    previewHtml += `<div class="mb-8 text-stone-700 dark:text-stone-300 leading-relaxed">${data.identity_lines.map(line => `<div>${escapeHtml(line)}</div>`).join("")}</div>`;
+  }
 
   data.sections.forEach(sec => {
     const headingHtml = (sec.heading && sec.heading.trim())
@@ -1498,6 +1562,12 @@ function renderResult(data) {
       </div>
     `;
   });
+
+  // Tugas tanpa rujukan tidak perlu judul daftar pustaka kosong
+  if (!data.references.length) {
+    previewContent.innerHTML = previewHtml;
+    return;
+  }
 
   const sampleText = (data.title + " " + (data.sections[0] ? data.sections[0].content : "")).toLowerCase();
   const isEnDoc = ["the", "and", "is", "of", "to", "in", "urban", "living"].some(w => sampleText.includes(w));

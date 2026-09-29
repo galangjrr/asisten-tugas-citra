@@ -26,7 +26,8 @@ def create_assignment_docx(
     sections: List[Dict[str, Any]],
     references: List[Dict[str, Any]],
     output_filename: str = "Tugas_Kuliah.docx",
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    identity_lines: Optional[List[str]] = None
 ) -> str:
     """Merakit naskah tugas lengkap menjadi berkas Word docx format A4 rapi."""
     os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -52,6 +53,14 @@ def create_assignment_docx(
     title_run.font.name = "Times New Roman"
     title_run.font.size = Pt(14)
     title_p.paragraph_format.space_after = Pt(24)
+
+    # Identitas mahasiswa di bawah judul
+    for idx, line in enumerate(identity_lines or []):
+        id_p = doc.add_paragraph()
+        id_p.paragraph_format.space_after = Pt(18 if idx == len(identity_lines) - 1 else 0)
+        id_run = id_p.add_run(line)
+        id_run.font.name = "Times New Roman"
+        id_run.font.size = Pt(12)
 
     # Subbab dan Isi Naskah
     for section in sections:

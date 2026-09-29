@@ -119,3 +119,30 @@ async def test_generate_with_fallback_skips_dead_and_retries_busy(monkeypatch):
     calls.clear()
     await gc.generate_with_fallback("fast", "halo")
     assert calls == ["busy-model"]
+
+
+@pytest.mark.anyio
+async def test_ai_status_follows_cooldown(monkeypatch):
+    import time
+    import tools.gemini_client as gc
+    monkeypatch.setenv("GEMINI_GENERATION_MODELS", "model-a, model-b")
+    monkeypatch.setattr(gc, "_dead_models", {"model-a"})
+    monkeypatch.setattr(gc, "_cooldown_until", {})
+    monkeypatch.setattr(gc, "_busy_until", 0.0)
+
+    status = await gc.get_ai_status()
+    assert status == {"state": "ready", "model": "model-b", "retry_in": None}
+
+    # Model tersisa kena rate limit, status ikut jeda sesuai waktu dari Google
+    gc._cooldown_until["model-b"] = time.time() + 42
+    status = await gc.get_ai_status()
+    assert status["state"] == "cooldown" and status["model"] == "model-b" and 41 <= status["retry_in"] <= 42
+
+    gc._dead_models.add("model-b")
+    assert (await gc.get_ai_status())["state"] == "unavailable"
+
+
+def test_download_name_is_filesystem_safe():
+    from api.routes import safe_filename_part
+    assert safe_filename_part('Tugas 1: Writing / "Draft"?') == "Tugas 1 Writing Draft"
+    assert safe_filename_part("  Budi   Santoso. ") == "Budi Santoso"

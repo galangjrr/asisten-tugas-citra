@@ -5,6 +5,7 @@ from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from xml.sax.saxutils import escape
 
 
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
@@ -15,7 +16,8 @@ def create_assignment_pdf(
     sections: List[Dict[str, Any]],
     references: List[Dict[str, Any]],
     output_filename: str = "Tugas_Kuliah.pdf",
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    identity_lines: Optional[List[str]] = None
 ) -> str:
     """Merakit naskah tugas lengkap menjadi berkas PDF format A4 rapi."""
     os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -79,6 +81,13 @@ def create_assignment_pdf(
     # Judul
     story.append(Paragraph(title.upper(), title_style))
     story.append(Spacer(1, 15))
+
+    # Identitas mahasiswa di bawah judul. Di-escape karena ReportLab membaca teks sebagai markup.
+    if identity_lines:
+        identity_style = ParagraphStyle(name="Identity", fontName="Times-Roman", fontSize=12, leading=16)
+        for line in identity_lines:
+            story.append(Paragraph(escape(line), identity_style))
+        story.append(Spacer(1, 15))
 
     # Bab dan Subbab
     for section in sections:

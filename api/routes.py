@@ -18,6 +18,7 @@ from tools.pdf_parser import extract_text_with_pages
 from tools.ut_catalog import lookup_ut_course
 from tools.ocr_vision import extract_text_from_image
 from tools.question_reader import parse_question_document
+from tools.gemini_client import get_ai_status
 from agents.generator import generate_academic_draft
 from exporters.docx_builder import create_assignment_docx
 from exporters.pdf_builder import create_assignment_pdf
@@ -36,11 +37,21 @@ CACHED_PAPERS: Dict[str, Dict[str, Any]] = {}
 async def check_health():
     """Memeriksa kesiapan sistem dan konfigurasi API key."""
     api_key = os.getenv("GEMINI_API_KEY", "")
+    configured = bool(api_key and len(api_key) > 10)
+    ai = await get_ai_status() if configured else {"state": "no_key", "model": None, "retry_in": None}
     return HealthResponse(
         status="ready",
-        gemini_configured=bool(api_key and len(api_key) > 10),
-        version="1.0.0"
+        gemini_configured=configured,
+        version="1.0.0",
+        ai_state=ai["state"],
+        active_model=ai["model"],
+        retry_in=ai["retry_in"],
     )
+
+
+def safe_filename_part(text: str) -> str:
+    """Membuang karakter yang tidak sah di nama berkas Windows maupun header unduhan."""
+    return " ".join("".join(c for c in text if c.isalnum() or c in (" ", "-", ".")).split()).strip(" .")
 
 
 @router.post("/manual-module", response_model=PaperItem)
@@ -295,6 +306,8 @@ async def generate_task(payload: GenerateRequest):
             tone=payload.tone,
             custom_instructions=payload.custom_instructions or "",
             answer_spec=payload.answer_spec.model_dump() if payload.answer_spec else None,
+            student_name=payload.student_name.strip(),
+            course_name=payload.course_name.strip(),
         )
     except Exception as e:
         print(f"Error pada generasi Gemini: {e}")
@@ -307,17 +320,24 @@ async def generate_task(payload: GenerateRequest):
     title = draft_result.get("title", payload.topic)
     sections = draft_result.get("sections", [])
 
-    # Susun berkas docx dan pdf
-    safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip()
-    docx_name = f"Tugas_{safe_title}_{task_id}.docx"
-    pdf_name = f"Tugas_{safe_title}_{task_id}.pdf"
+    # Nama unduhan mengikuti format kumpul tugas: judul_mata kuliah_nama_NIM. Berkas di disk tetap unik per task_id.
+    name_parts = [title, payload.course_name, payload.student_name, payload.student_id]
+    download_base = "_".join(p for p in (safe_filename_part(x) for x in name_parts) if p)[:180] or "Tugas"
+    docx_name = f"{task_id}.docx"
+    pdf_name = f"{task_id}.pdf"
+
+    is_en = draft_result.get("language") == "en"
+    identity_labels = ("Name", "Student ID", "Course") if is_en else ("Nama", "NIM", "Mata Kuliah")
+    identity_values = (payload.student_name, payload.student_id, payload.course_name)
+    identity_lines = [f"{label}: {value.strip()}" for label, value in zip(identity_labels, identity_values) if value.strip()]
 
     docx_path = create_assignment_docx(
         title=title,
         sections=sections,
         references=selected_papers,
         output_filename=docx_name,
-        language=draft_result.get("language")
+        language=draft_result.get("language"),
+        identity_lines=identity_lines,
     )
 
     pdf_path = create_assignment_pdf(
@@ -325,7 +345,8 @@ async def generate_task(payload: GenerateRequest):
         sections=sections,
         references=selected_papers,
         output_filename=pdf_name,
-        language=draft_result.get("language")
+        language=draft_result.get("language"),
+        identity_lines=identity_lines,
     )
 
     # Hitung total kata
@@ -381,6 +402,7 @@ async def generate_task(payload: GenerateRequest):
         "references": selected_papers,
         "docx_path": docx_path,
         "pdf_path": pdf_path,
+        "download_base": download_base,
     }
 
     return GenerateResponse(
@@ -390,7 +412,8 @@ async def generate_task(payload: GenerateRequest):
         word_count=total_words,
         sections=sections,
         references=selected_papers,
-        evidence=evidence_list
+        evidence=evidence_list,
+        identity_lines=identity_lines,
     )
 
 
@@ -414,5 +437,5 @@ async def download_file(file_type: str, task_id: str):
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Berkas fisik tidak ditemukan di server.")
 
-    filename = os.path.basename(file_path)
+    filename = f"{task.get('download_base', 'Tugas')}.{file_type}"
     return FileResponse(path=file_path, filename=filename, media_type=media_type)

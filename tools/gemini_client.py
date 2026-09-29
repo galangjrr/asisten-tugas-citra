@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import time
 import asyncio
 from typing import Any, Dict, List, Optional
@@ -35,6 +36,10 @@ _dead_models: set = set()
 # Model yang kena rate limit biasa, dilewati sampai waktu jeda habis
 _cooldown_until: Dict[str, float] = {}
 TRANSIENT_RETRY_DELAY: float = 2.0
+# Semua model gagal di panggilan terakhir, misal server penuh atau timeout, dan Google tidak memberi waktu jeda.
+# ponytail: 30 detik ini tebakan, bukan angka dari server. Ganti kalau error 503 mulai membawa info retry.
+BUSY_COOLDOWN_SECONDS: float = 30.0
+_busy_until: float = 0.0
 
 
 def get_gemini_client() -> genai.Client:
@@ -150,6 +155,24 @@ def classify_model_error(error: Exception) -> str:
     return "transient"
 
 
+async def get_ai_status() -> Dict[str, Any]:
+    """Status nyata rantai model generasi: model yang akan dipakai berikutnya dan sisa waktu jeda jika ada."""
+    models = await get_active_models("generation")
+    now = time.time()
+    alive = [m for m in models if m not in _dead_models]
+    if not alive:
+        return {"state": "unavailable", "model": None, "retry_in": None}
+    ready = [m for m in alive if _cooldown_until.get(m, 0) <= now]
+    if ready and _busy_until <= now:
+        return {"state": "ready", "model": ready[0], "retry_in": None}
+    if ready:
+        model, resume_at = ready[0], _busy_until
+    else:
+        model = min(alive, key=lambda m: _cooldown_until[m])
+        resume_at = _cooldown_until[model]
+    return {"state": "cooldown", "model": model, "retry_in": max(1, math.ceil(resume_at - now))}
+
+
 def _retry_after_seconds(error: Exception, default: float = 60.0) -> float:
     match = re.search(r"retry in ([\d.]+)s", str(error))
     return float(match.group(1)) if match else default
@@ -167,6 +190,7 @@ async def generate_with_fallback(
     Model mati diingat dan dilewati, model yang kena limit dijeda, dan model yang sedang penuh dicoba ulang satu kali.
     Mengembalikan respons pertama yang berisi teks, atau melempar RuntimeError berisi error terakhir.
     """
+    global _busy_until
     client = get_gemini_client()
     models = await get_active_models(category)
     deadline = time.monotonic() + total_budget
@@ -179,6 +203,7 @@ async def generate_with_fallback(
                 continue
             remaining = deadline - time.monotonic()
             if remaining <= 1:
+                _busy_until = time.time() + BUSY_COOLDOWN_SECONDS
                 raise RuntimeError(f"Batas waktu seluruh model Gemini habis: {last_error}")
             try:
                 response = await asyncio.wait_for(
@@ -186,6 +211,7 @@ async def generate_with_fallback(
                     timeout=min(timeout, remaining),
                 )
                 if response and response.text and response.text.strip():
+                    _busy_until = 0.0
                     return response
                 last_error = RuntimeError(f"{model_name} mengembalikan respons kosong")
                 retry_models.append(model_name)
@@ -206,4 +232,5 @@ async def generate_with_fallback(
         await asyncio.sleep(TRANSIENT_RETRY_DELAY)
         models = retry_models
 
+    _busy_until = time.time() + BUSY_COOLDOWN_SECONDS
     raise RuntimeError(f"Seluruh model Gemini sedang tidak tersedia: {last_error}")

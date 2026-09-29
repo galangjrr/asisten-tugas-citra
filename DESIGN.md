@@ -46,6 +46,7 @@
 - `--primitive-amber-400`: `#fbbf24`
 - `--primitive-amber-700`: `#b45309`
 - `--primitive-amber-950`: `#451a03`
+- `--primitive-sky-500`: `#0ea5e9` (status Gemini jeda atau cooldown)
 
 ---
 

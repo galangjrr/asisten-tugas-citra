@@ -6,6 +6,10 @@ class HealthResponse(BaseModel):
     status: str
     gemini_configured: bool
     version: str = "1.0.0"
+    # ready, cooldown, unavailable, atau no_key
+    ai_state: str = "no_key"
+    active_model: Optional[str] = None
+    retry_in: Optional[int] = None
 
 
 class PaperItem(BaseModel):
@@ -55,6 +59,10 @@ class GenerateRequest(BaseModel):
     paper_ids: List[str] = Field(default_factory=list)
     custom_instructions: Optional[str] = None
     answer_spec: Optional[AnswerSpec] = None
+    # Identitas mahasiswa untuk kop naskah, tanda tangan, dan nama berkas
+    student_name: str = Field(default="", max_length=100)
+    student_id: str = Field(default="", max_length=30)
+    course_name: str = Field(default="", max_length=150)
 
 
 class EvidenceItem(BaseModel):
@@ -77,6 +85,7 @@ class GenerateResponse(BaseModel):
     sections: List[dict]
     references: List[dict]
     evidence: Optional[List[EvidenceItem]] = None
+    identity_lines: List[str] = []
 
 
 class ManualModuleRequest(BaseModel):

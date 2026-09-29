@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -40,6 +40,8 @@ class AnswerSpec(BaseModel):
     needs_citations: Optional[bool] = None
     answer_language: Optional[Literal["id", "en"]] = None
     word_limit: Optional[int] = Field(None, ge=50, le=10000)
+    # Batas kata tiap butir sesuai urutan soal. word_limit berisi totalnya.
+    item_word_limits: Optional[List[Annotated[int, Field(ge=10, le=5000)]]] = Field(None, max_length=50)
 
 
 class GenerateRequest(BaseModel):

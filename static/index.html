@@ -102,170 +102,184 @@
         <div class="p-5 rounded-2xl bg-stone-50/80 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <label for="input-topic" class="block text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">
-                1. Soal atau Topik Tugas Kuliah <span class="text-rose-600">*</span>
-              </label>
-              <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Tempel teks soal di sini, atau langsung unggah berkas lembar tugas kamu.</p>
+              <h3 id="question-heading" class="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">
+                1. Soal atau Topik Tugas Kuliah <span class="text-rose-600" aria-hidden="true">*</span>
+              </h3>
+              <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Unggah lembar soal atau tempel teksnya. Soal dirapikan otomatis per nomor.</p>
             </div>
             <div class="flex items-center gap-2">
               <input type="file" id="upload-question-file" accept=".docx,.pdf,.txt" class="hidden">
-              <button 
-                type="button" 
-                id="btn-upload-question-file"
-                class="text-xs font-semibold text-stone-800 dark:text-stone-200 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 border border-stone-300 dark:border-stone-700 px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-2"
-              >
-                <svg class="w-4 h-4 text-stone-700 dark:text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                <span>Unggah Lembar Soal (PDF / Word)</span>
+              <button type="button" id="btn-edit-question" class="hidden text-xs font-semibold text-stone-800 dark:text-stone-200 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 active:translate-y-px border border-stone-300 dark:border-stone-700 px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 14.5 8 16l1.5-4.5z"/></svg>
+                <span>Edit Soal</span>
+              </button>
+              <button type="button" id="btn-upload-question-file" class="text-xs font-semibold text-stone-800 dark:text-stone-200 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 active:translate-y-px border border-stone-300 dark:border-stone-700 px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">
+                <svg class="w-4 h-4 text-stone-700 dark:text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <span>Unggah Lembar Soal</span>
               </button>
             </div>
           </div>
 
-          <div id="question-file-status" class="hidden text-xs text-stone-800 dark:text-stone-200 font-medium p-3 bg-stone-200/70 dark:bg-stone-800/80 rounded-xl flex items-center justify-between gap-2 border border-stone-300 dark:border-stone-700 animate-pulse">
-            <div class="flex items-center gap-2">
-              <span class="w-3.5 h-3.5 border-2 border-stone-600 dark:border-stone-400 border-t-stone-900 dark:border-t-stone-100 rounded-full animate-spin block"></span>
-              <span id="question-file-status-text">Mengekstrak teks lembar soal...</span>
+          <!-- Sumber data soal. Disembunyikan karena penyuntingan lewat modal. -->
+          <textarea id="input-topic" class="hidden" aria-labelledby="question-heading"></textarea>
+
+          <!-- Status kosong -->
+          <div id="question-empty" class="rounded-xl border-2 border-dashed border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-5 py-8 text-center transition">
+            <p class="text-sm font-semibold text-stone-800 dark:text-stone-200">Belum ada soal</p>
+            <p class="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-md mx-auto">Tarik berkas PDF atau Word ke sini, atau tempel teks soal lewat editor.</p>
+            <button type="button" id="btn-open-question-editor" class="mt-4 text-xs font-semibold px-4 py-2 rounded-xl bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-200 active:translate-y-px transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">
+              Tempel atau Ketik Soal
+            </button>
+          </div>
+
+          <!-- Status memuat -->
+          <div id="question-file-status" class="hidden rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5 space-y-3" role="status" aria-live="polite">
+            <p id="question-file-status-text" class="text-xs font-medium text-stone-600 dark:text-stone-300">Membaca lembar soal...</p>
+            <div class="space-y-2 animate-pulse" aria-hidden="true">
+              <div class="h-3 w-3/4 rounded bg-stone-200 dark:bg-stone-800"></div>
+              <div class="h-3 w-1/2 rounded bg-stone-200 dark:bg-stone-800 ml-5"></div>
+              <div class="h-3 w-1/2 rounded bg-stone-200 dark:bg-stone-800 ml-5"></div>
+              <div class="h-20 w-full rounded-lg bg-stone-100 dark:bg-stone-800/60"></div>
+              <div class="h-3 w-2/3 rounded bg-stone-200 dark:bg-stone-800"></div>
             </div>
           </div>
 
-          <textarea 
-            id="input-topic" 
-            required 
-            rows="4"
-            placeholder="Tempel soal tugas atau topik kuliah di sini. Contoh: 'Write a short essay explaining your personal preference between living in an urban area or a metropolitan area' atau 'Jelaskan peran tata kelola sektor publik menurut modul 3'..." 
-            class="w-full px-4 py-3 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm leading-relaxed transition bg-white dark:bg-stone-900"
-          ></textarea>
+          <!-- Status sukses: pratinjau soal yang sudah dirapikan -->
+          <div id="question-preview" class="hidden rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+            <div id="question-preview-body" class="px-5 py-4 max-h-[26rem] overflow-y-auto text-sm leading-relaxed text-stone-800 dark:text-stone-200 space-y-1.5"></div>
+            <div class="px-5 py-2.5 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+              <span id="question-preview-meta"></span>
+              <button type="button" id="btn-edit-question-inline" class="font-semibold text-stone-800 dark:text-stone-200 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200 rounded">Edit teks soal</button>
+            </div>
+          </div>
 
           <div id="question-file-badge" class="hidden p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-start justify-between text-xs text-emerald-950 dark:text-emerald-200">
             <div class="flex items-start space-x-2">
-              <span class="w-4 h-4 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">✓</span>
-              <span id="question-file-info">Teks lembar soal berhasil dimuat. Pertanyaan tugas dan ketentuan dosen telah dipisahkan secara otomatis.</span>
+              <span class="w-4 h-4 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5" aria-hidden="true">✓</span>
+              <span id="question-file-info">Teks lembar soal berhasil dimuat.</span>
             </div>
             <button type="button" id="btn-clear-question-file" class="font-semibold text-rose-600 dark:text-rose-400 hover:underline ml-2 shrink-0">Hapus</button>
           </div>
-          <fieldset id="answer-spec-panel" class="pt-3 border-t border-stone-200 dark:border-stone-800">
-            <legend class="sr-only">Bentuk jawaban yang diminta</legend>
-            <p class="text-xs font-bold text-stone-800 dark:text-stone-200" aria-hidden="true">Bentuk Jawaban yang Diminta</p>
-            <p id="answer-spec-note" class="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5" aria-live="polite">Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.</p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-              <div>
-                <label for="spec-question-count" class="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">Jumlah Soal</label>
-                <input type="number" id="spec-question-count" min="1" max="50" placeholder="Otomatis" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-              </div>
-              <div>
-                <label for="spec-answer-type" class="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">Jenis Jawaban</label>
+        </div>
+
+        <!-- KARTU 2: Atur Jawaban -->
+        <fieldset id="answer-spec-panel" class="p-5 rounded-2xl bg-stone-50/80 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-5">
+          <legend class="sr-only">Pengaturan jawaban</legend>
+          <div class="!mt-0">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">2. Atur Jawaban</h3>
+            <p id="answer-spec-note" class="text-xs text-stone-500 dark:text-stone-400 mt-0.5" aria-live="polite">Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.</p>
+          </div>
+
+          <!-- a. Bentuk jawaban -->
+          <div class="space-y-2">
+            <p class="text-[11px] font-bold text-stone-500 dark:text-stone-400">a. Bentuk jawaban</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div class="col-span-2">
+                <label for="spec-answer-type" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Jenis Jawaban</label>
                 <select id="spec-answer-type" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                  <option value="">Otomatis</option>
-                  <option value="uraian">Uraian atau analisis</option>
-                  <option value="jawaban_bernomor">Jawaban per nomor</option>
+                  <option value="">Otomatis sesuai soal</option>
+                  <option value="jawaban_bernomor">Uraian per nomor soal</option>
+                  <option value="jawaban_singkat">Jawaban singkat atau hitungan</option>
+                  <option value="uraian">Uraian atau analisis bebas</option>
                   <option value="esai">Esai mengalir</option>
                   <option value="makalah">Makalah berbab</option>
                   <option value="terjemahan">Terjemahan</option>
-                  <option value="jawaban_singkat">Jawaban singkat atau hitungan</option>
                 </select>
               </div>
               <div>
-                <label for="spec-citations" class="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">Rujukan dan Sitasi</label>
+                <label for="spec-question-count" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Jumlah Soal</label>
+                <input type="number" id="spec-question-count" min="1" max="50" placeholder="Otomatis" inputmode="numeric" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium tabular-nums">
+              </div>
+              <div>
+                <label for="spec-language" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Bahasa</label>
+                <select id="spec-language" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="">Otomatis</option>
+                  <option value="id">Indonesia</option>
+                  <option value="en">Inggris</option>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label for="spec-citations" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Rujukan dan Sitasi</label>
                 <select id="spec-citations" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
                   <option value="ya">Pakai rujukan jurnal</option>
                   <option value="tidak">Tanpa rujukan</option>
                 </select>
               </div>
+              <div id="format-wrapper" class="col-span-2">
+                <label for="select-format" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Susunan Naskah</label>
+                <select id="select-format" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="otomatis" selected>Otomatis sesuai soal</option>
+                  <option value="bernomor">Bernomor 1, 2, dst</option>
+                  <option value="mengalir">Diskusi dengan sub-bahasan</option>
+                  <option value="esai">Esai tanpa heading</option>
+                  <option value="makalah">Makalah Bab I, II, III</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- b. Panjang jawaban -->
+          <div class="space-y-2 pt-4 border-t border-stone-200 dark:border-stone-800">
+            <p class="text-[11px] font-bold text-stone-500 dark:text-stone-400">b. Panjang jawaban</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label for="spec-language" class="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">Bahasa Jawaban</label>
-                <select id="spec-language" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                  <option value="">Otomatis</option>
-                  <option value="id">Bahasa Indonesia</option>
-                  <option value="en">Bahasa Inggris</option>
+                <label for="spec-word-limit" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Batas Kata Dosen</label>
+                <input type="number" id="spec-word-limit" min="10" max="10000" step="10" placeholder="Tidak ada" inputmode="numeric" aria-describedby="spec-word-summary" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium tabular-nums">
+              </div>
+              <div>
+                <label for="spec-word-scope" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Berlaku Untuk</label>
+                <select id="spec-word-scope" aria-describedby="spec-word-summary" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="total">Total jawaban</option>
+                  <option value="per_soal">Per soal</option>
+                </select>
+              </div>
+              <div id="length-target-wrapper" class="col-span-2">
+                <label for="select-length" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Target Panjang</label>
+                <select id="select-length" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="ringkas">Ringkas, sekitar 400 kata</option>
+                  <option value="sedang" selected>Sedang, sekitar 950 kata</option>
+                  <option value="panjang">Panjang, sekitar 1.800 kata</option>
+                  <option value="kustom">Tentukan sendiri</option>
+                </select>
+              </div>
+            </div>
+            <div id="custom-words-wrapper" class="hidden max-w-[12rem]">
+              <label for="input-custom-words" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Jumlah Kata Target</label>
+              <input type="number" id="input-custom-words" min="200" max="5000" step="50" value="1200" inputmode="numeric" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium tabular-nums">
+            </div>
+            <p id="spec-word-summary" class="text-xs text-stone-600 dark:text-stone-400 tabular-nums" aria-live="polite"></p>
+          </div>
+
+          <!-- c. Gaya tulisan -->
+          <div class="space-y-2 pt-4 border-t border-stone-200 dark:border-stone-800">
+            <p class="text-[11px] font-bold text-stone-500 dark:text-stone-400">c. Gaya tulisan</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div id="tone-wrapper">
+                <label for="select-tone" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Nada Tulisan</label>
+                <select id="select-tone" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="akademis formal">Akademis formal dan lugas</option>
+                  <option value="analisis kritis">Analisis kritis dan komparatif</option>
+                  <option value="opini reflektif">Opini reflektif dengan pengalaman nyata</option>
+                  <option value="surat personal">Surat pribadi atau korespondensi</option>
+                  <option value="eksploratif">Eksploratif dan teoretis</option>
                 </select>
               </div>
               <div>
-                <label for="spec-word-limit" class="block text-[11px] font-bold text-stone-700 dark:text-stone-300 mb-1">Batas Kata Dosen</label>
-                <input type="number" id="spec-word-limit" min="50" max="10000" step="10" placeholder="Tidak ada" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                <label for="select-depth" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Kedalaman Penjelasan</label>
+                <select id="select-depth" class="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
+                  <option value="standar">Standar, seimbang</option>
+                  <option value="ringkas">Padat dan to the point</option>
+                  <option value="elaboratif">Mendalam dengan alasan dan bukti</option>
+                </select>
               </div>
             </div>
-          </fieldset>
-        </div>
-
-        <!-- KARTU 2: Format & Target Naskah (Praktis & Otomatis) -->
-        <div class="p-5 rounded-2xl bg-stone-50/80 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-4">
-          <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">2. Format dan Target Panjang Naskah</h3>
-            <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Sistem otomatis menyesuaikan struktur naskah apakah esai, jawaban bernomor, atau bab makalah formal.</p>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-1.5">
-              <label for="select-format" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Bentuk Format Naskah</label>
-              <select id="select-format" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                <option value="otomatis" selected>Otomatis Sesuai Konteks Soal (Rekomendasi)</option>
-                <option value="esai">Esai Murni (Paragraf Mengalir Alami Tanpa Heading Nomor)</option>
-                <option value="bernomor">Jawaban Tugas Bernomor (Nomor 1, 2, dst)</option>
-                <option value="makalah">Makalah Ilmiah Formal (Bab I, II, III)</option>
-                <option value="mengalir">Diskusi Tematik (Dengan Sub-bahasan)</option>
-              </select>
-              <p class="text-[11px] text-stone-500 dark:text-stone-400">Pilih 'Otomatis' agar aku mendeteksi struktur yang paling tepat dari soal kamu.</p>
-            </div>
-
-            <div class="space-y-1.5">
-              <label for="select-length" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Target Panjang Naskah</label>
-              <select id="select-length" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                <option value="sedang">Sedang (Sekitar 800 - 1.000 kata, ~3 Halaman A4)</option>
-                <option value="ringkas">Ringkas (Sekitar 300 - 500 kata, ~1-2 Halaman A4)</option>
-                <option value="panjang">Panjang & Mendalam (Sekitar 1.800 kata, ~5-6 Halaman A4)</option>
-                <option value="kustom">Kustom (Tentukan Jumlah Kata Manual)</option>
-              </select>
-              <div id="custom-words-wrapper" class="hidden pt-1">
-                <label for="input-custom-words" class="block text-xs font-semibold text-stone-600 dark:text-stone-400 mb-1">Jumlah Kata</label>
-                <input 
-                  type="number" 
-                  id="input-custom-words" 
-                  min="200" 
-                  max="5000" 
-                  step="50" 
-                  value="1200" 
-                  class="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 text-sm bg-white dark:bg-stone-900"
-                >
-              </div>
-              <p class="text-[11px] text-stone-500 dark:text-stone-400">Jika kamu mengunggah soal dengan batas kata, opsi ini otomatis disetel.</p>
+            <div>
+              <label for="input-instructions" class="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">Catatan atau Rubrik Dosen <span class="font-normal text-stone-500 dark:text-stone-400">opsional</span></label>
+              <textarea id="input-instructions" rows="3" placeholder="Contoh: fokus pada studi kasus 5 tahun terakhir, atau bahas menurut modul 3" class="w-full px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm leading-relaxed transition bg-white dark:bg-stone-900 resize-y"></textarea>
+              <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1">Petunjuk dan rubrik dari lembar soal otomatis masuk ke sini.</p>
             </div>
           </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-            <div class="space-y-1.5">
-              <label for="select-tone" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Gaya Nada Tulisan</label>
-              <select id="select-tone" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                <option value="akademis formal">Akademis Formal dan Lugas</option>
-                <option value="opini reflektif">Opini Reflektif & Pengalaman Nyata (Menurut saya, studi kasus riil)</option>
-                <option value="surat personal">Surat Pribadi & Korespondensi (Dear friend, cerita santai mengalir)</option>
-                <option value="analisis kritis">Analisis Kritis dan Komparatif</option>
-                <option value="eksploratif">Eksploratif dan Teoretis</option>
-              </select>
-            </div>
-
-            <div class="space-y-1.5">
-              <label for="select-depth" class="block text-xs font-bold text-stone-700 dark:text-stone-300">Kedalaman Tiap Paragraf</label>
-              <select id="select-depth" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm bg-white dark:bg-stone-900 font-medium">
-                <option value="standar">Standar Seimbang (4-6 kalimat terstruktur)</option>
-                <option value="ringkas">Padat & Ringkas (3-4 kalimat to the point)</option>
-                <option value="elaboratif">Elaborasi Mendalam (5-7 kalimat kaya bukti sitasi)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="pt-1">
-            <label for="input-instructions" class="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-              Catatan Khusus atau Rubrik Dosen (Opsional)
-            </label>
-            <textarea
-              id="input-instructions"
-              rows="4"
-              placeholder="Contoh: Fokus pada studi kasus 5 tahun terakhir, atau bahas perbandingan menurut modul 3..."
-              class="w-full px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200 text-sm leading-relaxed transition bg-white dark:bg-stone-900 resize-y"
-            ></textarea>
-            <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1">Rubrik penilaian atau petunjuk teknis yang terdeteksi dari berkas soal otomatis disematkan di sini.</p>
-          </div>
-        </div>
-
+        </fieldset>
         <!-- KARTU 3: Rujukan Khusus Mahasiswa UT (Opsional) -->
         <div class="p-5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-900/60 space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-1">
@@ -603,6 +617,36 @@
     Asisten Tugas Citra - Bebas Halusinasi, Berbasis Naskah Asli, Format A4 Standar
   </footer>
 
+  <!-- Modal editor soal. Dialog bawaan browser menangani Esc, fokus, dan latar gelap. -->
+  <dialog id="dialog-question" aria-labelledby="dialog-question-title" class="question-dialog p-0 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-2xl">
+    <form method="dialog" class="flex flex-col h-full">
+      <div class="flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b border-stone-200 dark:border-stone-800">
+        <div>
+          <h2 id="dialog-question-title" class="text-base font-bold tracking-tight">Edit Teks Soal</h2>
+          <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Tulis satu nomor soal per baris. Pilihan a, b, c ditulis di baris sendiri. Format dirapikan saat disimpan.</p>
+        </div>
+        <button type="button" id="btn-dialog-close" aria-label="Tutup editor" class="w-9 h-9 shrink-0 rounded-xl text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <label for="dialog-question-text" class="sr-only">Teks soal</label>
+      <textarea
+        id="dialog-question-text"
+        spellcheck="false"
+        placeholder="1. Jelaskan konsep segmentasi pasar menurut Kotler.&#10;2. Hitung nilai x jika 2x + 3 = 11.&#10;   a. 3&#10;   b. 4"
+        class="flex-1 w-full px-5 sm:px-6 py-4 bg-stone-50 dark:bg-stone-950 text-[15px] leading-7 text-stone-900 dark:text-stone-100 resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-stone-900 dark:focus:ring-stone-200"
+      ></textarea>
+      <div class="flex items-center justify-between gap-3 px-5 sm:px-6 py-3 border-t border-stone-200 dark:border-stone-800">
+        <p id="dialog-question-meta" class="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums" aria-live="polite"></p>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btn-dialog-cancel" class="text-xs font-semibold px-4 py-2 rounded-xl text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">Batal</button>
+          <button type="button" id="btn-dialog-save" class="text-xs font-semibold px-4 py-2 rounded-xl bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-200 active:translate-y-px transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200">
+            Simpan Soal <span class="hidden sm:inline font-normal opacity-70">Ctrl+Enter</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </dialog>
   <script src="/static/app.js"></script>
 </body>
 </html>

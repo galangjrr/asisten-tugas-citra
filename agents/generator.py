@@ -1,4 +1,5 @@
 import json
+import re
 import asyncio
 from typing import Any, Dict, List, Optional
 from google.genai import types
@@ -29,6 +30,31 @@ def detect_language(topic: str, custom_instructions: str = "") -> str:
     if en_matches > id_matches:
         return "en"
     return "id"
+
+
+# Tanda soal hitungan atau logika: operasi angka, simbol matematika, atau istilah matematika.
+# Tanda hubung di antara angka sengaja tidak dihitung karena rentang tahun dan halaman seperti 2020-2021 sering muncul di esai.
+REASONING_HINT = re.compile(
+    r"\d\s*[+x×*/:÷^=]\s*\(?\d|\d\s*-\s*\(|[=√∑∫≤≥χπ]|\b(?:matriks|graf|persamaan|turunan|integral|limit|peluang|probabilitas|"
+    r"boolean|k-map|logaritma|vektor|himpunan|kombinasi|permutasi|matrix|graph|equation|derivative|probability)\b",
+    re.I,
+)
+IMAGE_BLOCK = re.compile(r"\[Gambar:[^\]]*\]\s*")
+SUPERSCRIPT = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+
+
+def clean_output_text(text: str) -> str:
+    """Merapikan keluaran model supaya terbaca seperti ketikan mahasiswa di Word.
+    Em dash, en dash, dan elipsis satu karakter diganti tanda baca umum.
+    Notasi linear seperti x^2 dan sqrt(100) diubah ke x² dan √100."""
+    text = re.sub(r"(?<=\d)[ \t]*[—–][ \t]*(?=\d)", "-", text)
+    text = re.sub(r"^([ \t]*)[—–][ \t]*", r"\1- ", text, flags=re.M)
+    text = re.sub(r"[ \t]*[—–][ \t]*", ", ", text)
+    text = re.sub(r",\s*([.,;:?!])", r"\1", text)
+    text = re.sub(r"\^\(?(-?\d+)\)?", lambda m: m.group(1).translate(SUPERSCRIPT), text)
+    text = re.sub(r"\bsqrt\((\w+)\)", r"√\1", text)
+    text = re.sub(r"\bsqrt\(", "√(", text)
+    return text.replace("…", "...")
 
 
 DIRECT_ANSWER_LABELS = {
@@ -499,6 +525,12 @@ async def generate_academic_draft(
     """
     if word_limit:
         length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
+    item_limits = spec.get("item_word_limits") or []
+    if len(item_limits) == 1:
+        length_rules += f"    - Batas kata per butir dari dosen: setiap butir maksimal {item_limits[0]} kata. DILARANG melebihi batas ini di butir mana pun.\n"
+    elif item_limits:
+        per_item = ", ".join(f"butir {i} maksimal {n} kata" for i, n in enumerate(item_limits, 1))
+        length_rules += f"    - Batas kata per butir dari dosen: {per_item}. DILARANG melebihi batas butir masing-masing, dan jangan memindahkan sisa kata ke butir lain.\n"
 
     # Pilihan kedalaman pengguna juga berlaku untuk butir pendek, bukan hanya butir uraian
     if paragraph_depth == "elaboratif":
@@ -518,6 +550,14 @@ async def generate_academic_draft(
     - Jika lembar soal menyertakan teks bacaan, kasus, data, atau dialog, jawaban wajib bersumber dari teks itu dan tidak boleh bertentangan dengannya. Pengetahuan umum hanya boleh dipakai bila soal memintanya.
     - Untuk pernyataan benar salah, cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan teks. Pernyataan yang sebagian isinya bertentangan dengan teks dinilai salah, lalu beri alasan singkat dari teks.
     - Pertahankan nomor butir sesuai lembar soal.
+    - Soal matematika, logika, statistika, atau hitungan wajib menampilkan langkah pengerjaan baris per baris dengan karakter \\n, mulai dari yang diketahui, rumus atau metode yang dipakai, substitusi, sampai hasil akhir beserta satuannya. Aturan ini MENGALAHKAN aturan gaya paragraf dan batas 1 sampai 2 kalimat.
+    - Matriks, tabel kebenaran, peta Karnaugh, dan tabel hasil wajib ditulis lengkap, satu baris per baris dengan pemisah ' | ' dan baris judul kolom. DILARANG hanya menceritakan isinya dalam paragraf.
+    - Sebelum menulis hasil akhir, cek silang dengan cara lain, misalnya substitusi balik, minterm dan maxterm yang saling melengkapi sampai 2^n, atau jumlah derajat sama dengan dua kali jumlah sisi.
+    - Jika deskripsi gambar mencantumkan 'sisi tidak pasti', kerjakan dengan daftar sisi yang pasti lalu tulis satu kalimat asumsi tentang sisi yang tidak pasti itu.
+    - Tulis rumus dengan notasi teks yang terbaca langsung di Word, misalnya x², (x+1)/2, √16, ∑, ≤, dan ×. DILARANG memakai LaTeX seperti \\frac, \\sqrt, atau tanda $.
+    - Blok '[Gambar: ...]' di soal adalah deskripsi gambar yang dilampirkan dosen. Jawaban yang merujuk gambar wajib sesuai deskripsi itu. DILARANG mengarang objek, suasana, atau detail yang tidak disebut di deskripsi.
+    - Jika angka, label, atau keterangan di gambar berbeda dengan teks soal, kerjakan hitungan utama dengan data teks soal, lalu tutup dengan satu kalimat catatan terpisah yang menyebut perbedaannya dan hasil jika memakai data gambar. Jangan mencampur kedua data di baris yang sama.
+    - Baca setiap angka dan simbol di soal persis seperti tertulis. DILARANG menafsirkan ulang angka sebagai salah ketik, misalnya membaca 142 sebagai 14², kecuali gambar dan teks jelas bertentangan.
     - Abaikan petunjuk waktu pengerjaan seperti 'Waktu: 30 menit'. Batas waktu tidak menentukan panjang, kedalaman, atau isi jawaban.
     """
 
@@ -556,6 +596,10 @@ async def generate_academic_draft(
 
     {distortion_rules}
 
+    ATURAN TANDA BACA:
+    - Pakai tanda baca yang lazim diketik mahasiswa Indonesia: titik, koma, titik dua, tanda tanya, tanda kurung, dan tanda hubung biasa (-).
+    - DILARANG memakai em dash (—), en dash (–), atau elipsis satu karakter (…). Ganti dengan koma, titik, atau pecah menjadi kalimat baru.
+
 {length_rules}
 
 {citation_rules}
@@ -571,16 +615,28 @@ async def generate_academic_draft(
     else:
         sources_block = f"DAFTAR SELURUH SUMBER YANG WAJIB DISITASI:\n{summary_sources_text}\n\nBAHAN BACAAN SUMBER RESMI:\n{sources_text}"
 
+    # Jawaban langsung tidak boleh didorong target kata dan analisis mendalam, karena model akan menggembungkan jawaban singkat
+    if is_direct_answer:
+        length_line_en = "Target Length: follow the direct answer rules, no word target"
+        length_line_id = "Target Panjang: ikuti aturan jawaban langsung, tanpa target jumlah kata"
+        default_extra_en = "Answer each item directly and concisely."
+        default_extra_id = "Jawab setiap butir secara langsung dan ringkas."
+    else:
+        length_line_en = f"Target Length: approximately {target_words} words (estimated {estimated_pages} pages)"
+        length_line_id = f"Target Panjang: sekitar {target_words} kata (estimasi {estimated_pages} halaman A4)"
+        default_extra_en = "Provide deep analysis, grounded reasoning, and coherent paragraph flow."
+        default_extra_id = "Jawab dengan analisis mendalam, membumi, dan terhubung antar argumen."
+
     if is_en:
         user_prompt = f"""
         Write a complete and rigorous university assignment response based on the following assignment topic and verified reference materials.
 
         Assignment Topic / Prompt: {topic}
         Format Structure: {format_type}
-        Target Length: approximately {target_words} words (estimated {estimated_pages} pages)
+        {length_line_en}
         Paragraph Depth: {depth_instruction}
         Tone: {tone}
-        Additional Instructions: {custom_instructions if custom_instructions else 'Provide deep analysis, grounded reasoning, and coherent paragraph flow.'}
+        Additional Instructions: {custom_instructions or default_extra_en}
 
         {sources_block}
         """
@@ -590,14 +646,16 @@ async def generate_academic_draft(
 
         Topik atau Pertanyaan Tugas: {topic}
         Bentuk Format: {format_type}
-        Target Panjang: sekitar {target_words} kata (estimasi {estimated_pages} halaman A4)
+        {length_line_id}
         Kedalaman Paragraf: {depth_instruction}
         Gaya Nada: {tone}
-        Instruksi Tambahan: {custom_instructions if custom_instructions else 'Jawab dengan analisis mendalam, membumi, dan terhubung antar argumen.'}
+        Instruksi Tambahan: {custom_instructions or default_extra_id}
 
         {sources_block}
         """
 
+    # Soal hitungan dan logika sering salah tanpa mode berpikir. Esai dan makalah tidak butuh dan jadi jauh lebih lambat.
+    needs_reasoning = is_direct_answer or (answer_type not in ("esai", "makalah") and bool(REASONING_HINT.search(topic)))
     response = await generate_with_fallback(
         "generation",
         user_prompt,
@@ -607,9 +665,10 @@ async def generate_academic_draft(
             # 8192 memotong JSON untuk target 3000+ kata
             max_output_tokens=32768,
             response_mime_type="application/json",
+            thinking_config=types.ThinkingConfig(thinking_level="high") if needs_reasoning else None,
         ),
-        timeout=75.0,
-        total_budget=240.0,
+        timeout=150.0 if needs_reasoning else 75.0,
+        total_budget=300.0 if needs_reasoning else 240.0,
     )
 
     language = "en" if is_en else "id"
@@ -624,7 +683,7 @@ async def generate_academic_draft(
         return {
             "title": topic.title(),
             "sections": [
-                {"heading": "" if format_type in ("esai", "otomatis") else ("Main Analysis" if is_en else "Analisis Utama"), "content": response.text}
+                {"heading": "" if format_type in ("esai", "otomatis") else ("Main Analysis" if is_en else "Analisis Utama"), "content": clean_output_text(response.text)}
             ],
             "evidence_log": [],
             "language": language,
@@ -632,12 +691,16 @@ async def generate_academic_draft(
 
     # Rapikan keluaran model agar exporter tidak crash oleh nilai null atau tipe salah
     sections = [
-        {"heading": str(sec.get("heading") or ""), "content": str(sec.get("content") or "")}
+        {
+            # Deskripsi gambar hanya bahan baca model, tidak perlu ikut di judul butir
+            "heading": clean_output_text(IMAGE_BLOCK.sub("", str(sec.get("heading") or ""))),
+            "content": clean_output_text(str(sec.get("content") or "")),
+        }
         for sec in parsed.get("sections") or []
         if isinstance(sec, dict)
     ]
     return {
-        "title": str(parsed.get("title") or topic.title()),
+        "title": clean_output_text(str(parsed.get("title") or topic.title())),
         "sections": sections,
         "evidence_log": parsed.get("evidence_log") or [],
         "language": language,

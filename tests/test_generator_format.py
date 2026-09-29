@@ -1,6 +1,7 @@
 import os
 import pytest
-from agents.generator import detect_language
+from google.genai import types
+from agents.generator import clean_output_text, detect_language
 from exporters.docx_builder import create_assignment_docx
 from exporters.pdf_builder import create_assignment_pdf
 from docx import Document
@@ -16,6 +17,15 @@ def test_detect_language():
 
     mixed_prompt = "Write an essay about urban development in Jakarta"
     assert detect_language(mixed_prompt) == "en"
+
+
+def test_clean_output_text():
+    assert clean_output_text("Audit publik — terutama di daerah — masih lemah.") == "Audit publik, terutama di daerah, masih lemah."
+    assert clean_output_text("Periode 2010–2020 dan hlm. 3—5") == "Periode 2010-2020 dan hlm. 3-5"
+    assert clean_output_text("— poin satu\n– poin dua") == "- poin satu\n- poin dua"
+    assert clean_output_text("Hasilnya menurun —.") == "Hasilnya menurun."
+    assert clean_output_text("dan seterusnya…") == "dan seterusnya..."
+    assert clean_output_text("142 - sqrt(10)^2 = 132 cm^2, x^(-1), sqrt(2x+1)") == "142 - √10² = 132 cm², x⁻¹, √(2x+1)"
 
 
 def test_docx_essay_format_and_references():
@@ -106,6 +116,8 @@ def _capture_prompts(monkeypatch):
 
     async def fake_generate(category, contents, config=None, **kwargs):
         captured["system"] = config.system_instruction
+        captured["user"] = contents
+        captured["thinking"] = config.thinking_config
         return type("Res", (), {"text": '{"title": "T", "sections": [{"heading": "1. A", "content": "x"}]}'})()
 
     monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
@@ -125,6 +137,9 @@ async def test_translation_spec_forces_direct_answer_in_target_language(monkeypa
     # Soal berbahasa Inggris tapi jawaban terjemahan wajib berbahasa Indonesia
     assert "KEPATUHAN BAHASA WAJIB" in system
     assert "ATURAN PANJANG NASKAH" not in system
+    # Target kata dari pengaturan umum tidak boleh bocor ke prompt jawaban langsung
+    assert "950 kata" not in captured["user"]
+    assert "analisis mendalam" not in captured["user"]
 
 
 @pytest.mark.anyio
@@ -163,3 +178,28 @@ async def test_depth_option_also_applies_to_short_items(monkeypatch):
     assert "kalimat pendukung dari teks soal" in system
     # Aturan jumlah hal yang diminta berlaku di semua kedalaman
     assert "kategori yang sama persis dengan yang ditanyakan" in system
+
+
+@pytest.mark.anyio
+async def test_high_thinking_only_for_reasoning_questions(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    uraian = {"answer_type": "uraian", "needs_citations": False}
+
+    await gen.generate_academic_draft("1. Diketahui f(x,y,z) = x'y'z + xy' + z'. Sederhanakan dengan K-Map.", [], answer_spec=uraian)
+    assert captured["thinking"].thinking_level == types.ThinkingLevel.HIGH
+
+    await gen.generate_academic_draft("Jelaskan peran audit sektor publik tahun 2020-2021.", [], answer_spec=uraian)
+    assert captured["thinking"] is None
+
+    # Esai tetap cepat walau menyebut angka atau istilah matematika
+    await gen.generate_academic_draft("Tulis esai tentang manfaat matriks dalam ekonomi.", [], answer_spec={"answer_type": "esai"})
+    assert captured["thinking"] is None
+
+
+@pytest.mark.anyio
+async def test_item_word_limits_reach_the_prompt(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    spec = {"answer_type": "jawaban_bernomor", "question_count": 2, "word_limit": 500, "item_word_limits": [200, 300]}
+    await gen.generate_academic_draft("1. Jelaskan A.\n2. Jelaskan B.", [], target_words=1000, answer_spec=spec)
+    assert "butir 1 maksimal 200 kata, butir 2 maksimal 300 kata" in captured["system"]
+    assert "maksimal 500 kata untuk seluruh jawaban" in captured["system"]

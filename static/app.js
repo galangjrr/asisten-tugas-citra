@@ -35,7 +35,96 @@ const specAnswerType = document.getElementById("spec-answer-type");
 const specCitations = document.getElementById("spec-citations");
 const specLanguage = document.getElementById("spec-language");
 const specWordLimit = document.getElementById("spec-word-limit");
+const specWordScope = document.getElementById("spec-word-scope");
+const specWordSummary = document.getElementById("spec-word-summary");
+const formatWrapper = document.getElementById("format-wrapper");
+const toneWrapper = document.getElementById("tone-wrapper");
+const lengthTargetWrapper = document.getElementById("length-target-wrapper");
 const ANSWER_SPEC_DEFAULT_NOTE = "Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.";
+const DIRECT_ANSWER_TYPES = ["terjemahan", "jawaban_singkat"];
+// Jenis jawaban ini sudah menentukan susunan naskah, jadi pilihan susunan disembunyikan
+const FORMAT_DECIDED_TYPES = ["esai", "makalah", "terjemahan", "jawaban_singkat", "jawaban_bernomor"];
+
+// Batas per soal yang berbeda tiap nomor dari lembar soal, misal soal 1 maksimal 200 dan soal 2 maksimal 300
+let detectedItemLimits = null;
+
+function readInt(input) {
+  const n = parseInt(input.value, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function computeWordLimits() {
+  const count = readInt(specQuestionCount);
+  const validCount = count >= 1 && count <= 50 ? count : null;
+  const limit = readInt(specWordLimit);
+
+  if (detectedItemLimits && limit === null) {
+    const total = detectedItemLimits.reduce((sum, n) => sum + n, 0);
+    return { total: total <= 10000 ? total : null, items: detectedItemLimits, error: null };
+  }
+  if (limit === null) return { total: null, items: null, error: null };
+
+  if (specWordScope.value === "total") {
+    if (limit < 50 || limit > 10000) return { total: null, items: null, error: "Batas total harus 50 sampai 10.000 kata." };
+    return { total: limit, items: null, error: null };
+  }
+  if (limit < 10 || limit > 5000) return { total: null, items: null, error: "Batas per soal harus 10 sampai 5.000 kata." };
+  if (!validCount) return { total: null, items: [limit], error: null };
+  const total = limit * validCount;
+  return { total: total <= 10000 ? total : null, items: Array(validCount).fill(limit), error: null };
+}
+
+function formatNumber(n) {
+  return n.toLocaleString("id-ID");
+}
+
+function renderWordSummary() {
+  const { total, items, error } = computeWordLimits();
+  const isDirect = DIRECT_ANSWER_TYPES.includes(specAnswerType.value);
+  const invalid = Boolean(error);
+  specWordLimit.setAttribute("aria-invalid", invalid ? "true" : "false");
+  specWordLimit.classList.toggle("border-rose-500", invalid);
+  specWordSummary.classList.toggle("text-rose-600", invalid);
+  specWordSummary.classList.toggle("dark:text-rose-400", invalid);
+
+  let text;
+  if (error) {
+    text = error;
+  } else if (detectedItemLimits && !specWordLimit.value) {
+    const parts = detectedItemLimits.map((n, i) => `soal ${i + 1}: ${formatNumber(n)}`).join(", ");
+    text = `Batas dari dosen berbeda tiap soal, ${parts} kata. Total ${formatNumber(total || 0)} kata.`;
+  } else if (items && items.length > 1) {
+    text = `${items.length} soal × ${formatNumber(items[0])} kata = ${formatNumber(total || items[0] * items.length)} kata total. Tiap soal dijaga tidak lewat ${formatNumber(items[0])} kata.`;
+  } else if (items) {
+    text = `Tiap soal maksimal ${formatNumber(items[0])} kata. Isi Jumlah Soal supaya totalnya dihitung.`;
+  } else if (total) {
+    text = `Maksimal ${formatNumber(total)} kata untuk seluruh jawaban.`;
+  } else if (isDirect) {
+    text = "Tidak ada batas dari dosen. Panjang tiap butir menyesuaikan pertanyaannya.";
+  } else {
+    text = "Tidak ada batas dari dosen. Panjang mengikuti Target Panjang.";
+  }
+  specWordSummary.textContent = text;
+  return { total, items, error };
+}
+
+// Opsi yang tidak berpengaruh untuk jenis jawaban terpilih disembunyikan agar form tidak membingungkan
+function updateSpecVisibility() {
+  const type = specAnswerType.value;
+  const isDirect = DIRECT_ANSWER_TYPES.includes(type);
+  const { total, items } = renderWordSummary();
+  const hasLecturerLimit = Boolean(total || items);
+
+  const hideFormat = FORMAT_DECIDED_TYPES.includes(type);
+  formatWrapper.classList.toggle("hidden", hideFormat);
+  if (hideFormat) selectFormat.value = "otomatis";
+
+  toneWrapper.classList.toggle("hidden", isDirect);
+
+  const hideTarget = isDirect || hasLecturerLimit;
+  lengthTargetWrapper.classList.toggle("hidden", hideTarget);
+  customWordsWrapper.classList.toggle("hidden", hideTarget || selectLength.value !== "kustom");
+}
 
 function applyAnswerSpec(spec, source) {
   if (!spec) return;
@@ -44,11 +133,28 @@ function applyAnswerSpec(spec, source) {
   // Hanya pindah ke tanpa rujukan jika dosen jelas tidak butuh sitasi
   specCitations.value = spec.needs_citations === false ? "tidak" : "ya";
   specLanguage.value = spec.answer_language || "";
-  specWordLimit.value = spec.word_limit || "";
+
+  const items = Array.isArray(spec.item_word_limits) && spec.item_word_limits.length ? spec.item_word_limits : null;
+  detectedItemLimits = null;
+  specWordLimit.placeholder = "Tidak ada";
+  if (items && items.every((n) => n === items[0])) {
+    specWordScope.value = "per_soal";
+    specWordLimit.value = items[0];
+  } else if (items) {
+    specWordScope.value = "per_soal";
+    specWordLimit.value = "";
+    specWordLimit.placeholder = "Beda tiap soal";
+    detectedItemLimits = items;
+  } else {
+    specWordScope.value = "total";
+    specWordLimit.value = spec.word_limit || "";
+  }
+
   answerSpecNote.textContent = source === "ai"
     ? "Dideteksi AI dari lembar soal. Cek sekali lagi sebelum lanjut."
     : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.";
   updatePrimaryAction();
+  updateSpecVisibility();
 }
 
 function resetAnswerSpec() {
@@ -57,21 +163,210 @@ function resetAnswerSpec() {
   specCitations.value = "ya";
   specLanguage.value = "";
   specWordLimit.value = "";
+  specWordLimit.placeholder = "Tidak ada";
+  specWordScope.value = "total";
+  detectedItemLimits = null;
   answerSpecNote.textContent = ANSWER_SPEC_DEFAULT_NOTE;
   updatePrimaryAction();
+  updateSpecVisibility();
 }
 
 function readAnswerSpec() {
-  const count = parseInt(specQuestionCount.value, 10);
-  const wordLimit = parseInt(specWordLimit.value, 10);
+  const count = readInt(specQuestionCount);
+  const { total, items } = computeWordLimits();
   return {
     question_count: count >= 1 && count <= 50 ? count : null,
     answer_type: specAnswerType.value || null,
     needs_citations: specCitations.value === "ya",
     answer_language: specLanguage.value || null,
-    word_limit: wordLimit >= 50 && wordLimit <= 10000 ? wordLimit : null
+    word_limit: total,
+    item_word_limits: items
   };
 }
+
+specWordLimit.addEventListener("input", () => {
+  // Angka yang diketik pengguna menggantikan batas berbeda per soal hasil deteksi
+  if (specWordLimit.value) detectedItemLimits = null;
+  updateSpecVisibility();
+});
+[specWordScope, specAnswerType].forEach((el) => el.addEventListener("change", updateSpecVisibility));
+specQuestionCount.addEventListener("input", updateSpecVisibility);
+
+// Question Editor Elements
+const questionEmpty = document.getElementById("question-empty");
+const questionPreview = document.getElementById("question-preview");
+const questionPreviewBody = document.getElementById("question-preview-body");
+const questionPreviewMeta = document.getElementById("question-preview-meta");
+const btnEditQuestion = document.getElementById("btn-edit-question");
+const btnEditQuestionInline = document.getElementById("btn-edit-question-inline");
+const btnOpenQuestionEditor = document.getElementById("btn-open-question-editor");
+const dialogQuestion = document.getElementById("dialog-question");
+const dialogQuestionText = document.getElementById("dialog-question-text");
+const dialogQuestionMeta = document.getElementById("dialog-question-meta");
+
+const ITEM_LINE = /^(\d{1,2})[.)]\s+(.*)$/;
+const OPTION_LINE = /^([a-hA-H])[.)]\s+(.*)$/;
+const FIGURE_BLOCK = /(\[Gambar:[\s\S]*?\])/;
+
+// Blok gambar yang menempel di tengah kalimat soal dipindah ke bawah kalimatnya agar nomor soal tidak terpotong
+function detachFigures(text) {
+  const inline = /^(.*?)[ \t]*(\[Gambar:[^\]]*\])[ \t]*(.*)$/gm;
+  for (let i = 0; i < 10; i += 1) {
+    const next = text.replace(inline, (match, before, figure, after) => {
+      const rest = `${before} ${after}`.trim();
+      return rest ? `${rest}\n${figure}` : figure;
+    });
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
+// Merapikan teks soal: satu baris kosong sebelum tiap nomor dan tiap blok gambar, spasi berlebih dibuang
+function formatQuestionText(raw) {
+  const lines = detachFigures((raw || "").replace(/\r\n?/g, "\n").replace(/\t/g, " "))
+    .split("\n")
+    .map((line) => line.replace(/\s+$/, "").replace(/^\s+/, ""));
+  const out = [];
+  lines.forEach((line) => {
+    const startsBlock = ITEM_LINE.test(line) || line.startsWith("[Gambar:");
+    if (startsBlock && out.length && out[out.length - 1] !== "") out.push("");
+    out.push(line);
+  });
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function countWords(text) {
+  const words = text.replace(/\[Gambar:[\s\S]*?\]/g, " ").match(/\S+/g);
+  return words ? words.length : 0;
+}
+
+function renderQuestionPreview(text) {
+  questionPreviewBody.replaceChildren();
+  let items = 0;
+  let figures = 0;
+
+  text.split(FIGURE_BLOCK).forEach((part, index) => {
+    if (index % 2 === 1) {
+      figures += 1;
+      const details = document.createElement("details");
+      details.className = "ml-6 my-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-950/60 text-xs";
+      const summary = document.createElement("summary");
+      summary.className = "cursor-pointer select-none px-3 py-2 font-semibold text-stone-700 dark:text-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200 rounded-lg";
+      summary.textContent = `Gambar ${figures} terbaca, klik untuk lihat isinya`;
+      const body = document.createElement("p");
+      body.className = "px-3 pb-3 leading-relaxed text-stone-600 dark:text-stone-400 whitespace-pre-line";
+      body.textContent = part.replace(/^\[Gambar:\s*/, "").replace(/\]$/, "");
+      details.append(summary, body);
+      questionPreviewBody.append(details);
+      return;
+    }
+    part.split("\n").forEach((line) => {
+      if (!line.trim()) return;
+      const item = line.match(ITEM_LINE);
+      const option = line.match(OPTION_LINE);
+      const row = document.createElement("p");
+      if (item) {
+        items += 1;
+        row.className = "flex gap-2 pt-2 first:pt-0";
+        const number = document.createElement("span");
+        number.className = "w-6 shrink-0 font-bold text-stone-900 dark:text-stone-100 tabular-nums";
+        number.textContent = `${item[1]}.`;
+        const content = document.createElement("span");
+        content.textContent = item[2];
+        row.append(number, content);
+      } else if (option) {
+        row.className = "flex gap-2 pl-8 text-stone-700 dark:text-stone-300";
+        const letter = document.createElement("span");
+        letter.className = "w-5 shrink-0 font-semibold";
+        letter.textContent = `${option[1]}.`;
+        const content = document.createElement("span");
+        content.textContent = option[2];
+        row.append(letter, content);
+      } else {
+        row.className = "text-stone-700 dark:text-stone-300";
+        row.textContent = line;
+      }
+      questionPreviewBody.append(row);
+    });
+  });
+
+  const meta = [`${formatNumber(countWords(text))} kata`];
+  if (items) meta.unshift(`${items} nomor soal`);
+  if (figures) meta.push(`${figures} gambar terbaca`);
+  questionPreviewMeta.textContent = meta.join(" · ");
+}
+
+// Satu pintu untuk mengisi soal agar kotak data, pratinjau, dan tombol selalu sinkron
+function setQuestionText(raw) {
+  const text = formatQuestionText(raw);
+  inputTopic.value = text;
+  const hasText = text.length > 0;
+  questionEmpty.classList.toggle("hidden", hasText);
+  questionPreview.classList.toggle("hidden", !hasText);
+  btnEditQuestion.classList.toggle("hidden", !hasText);
+  if (hasText) renderQuestionPreview(text);
+}
+
+function setQuestionLoading(isLoading, message) {
+  questionFileStatus.classList.toggle("hidden", !isLoading);
+  if (message) questionFileStatusText.textContent = message;
+  if (isLoading) {
+    questionEmpty.classList.add("hidden");
+    questionPreview.classList.add("hidden");
+  } else {
+    setQuestionText(inputTopic.value);
+  }
+}
+
+function updateDialogMeta() {
+  const text = dialogQuestionText.value;
+  dialogQuestionMeta.textContent = `${formatNumber(countWords(text))} kata · ${formatNumber(text.length)} karakter`;
+}
+
+function openQuestionEditor() {
+  dialogQuestionText.value = inputTopic.value;
+  updateDialogMeta();
+  dialogQuestion.showModal();
+  dialogQuestionText.focus();
+  dialogQuestionText.setSelectionRange(0, 0);
+  dialogQuestionText.scrollTop = 0;
+}
+
+function saveQuestionEditor() {
+  setQuestionText(dialogQuestionText.value);
+  dialogQuestion.close();
+  btnEditQuestion.classList.contains("hidden") ? btnOpenQuestionEditor.focus() : btnEditQuestion.focus();
+}
+
+// Soal wajib diisi. Kotak data tersembunyi, jadi validasi bawaan form tidak bisa dipakai.
+function requireQuestion() {
+  if (inputTopic.value.trim().length >= 3) return true;
+  showAlert("Soal Belum Diisi", "Unggah lembar soal atau tempel teks soal dulu sebelum lanjut.");
+  openQuestionEditor();
+  return false;
+}
+
+// Batas kata yang keliru ditahan di sini supaya tidak dikirim diam-diam sebagai tanpa batas
+function requireValidSpec() {
+  const { error } = computeWordLimits();
+  if (!error) return true;
+  showAlert("Batas Kata Belum Benar", error);
+  specWordLimit.focus();
+  return false;
+}
+
+[btnEditQuestion, btnEditQuestionInline, btnOpenQuestionEditor].forEach((btn) => btn.addEventListener("click", openQuestionEditor));
+document.getElementById("btn-dialog-save").addEventListener("click", saveQuestionEditor);
+document.getElementById("btn-dialog-cancel").addEventListener("click", () => dialogQuestion.close());
+document.getElementById("btn-dialog-close").addEventListener("click", () => dialogQuestion.close());
+dialogQuestionText.addEventListener("input", updateDialogMeta);
+dialogQuestionText.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    saveQuestionEditor();
+  }
+});
 
 function wantsReferences() {
   return specCitations.value === "ya";
@@ -102,10 +397,7 @@ async function handleQuestionFileUpload(file) {
     return;
   }
 
-  if (questionFileStatus) {
-    questionFileStatus.classList.remove("hidden");
-    if (questionFileStatusText) questionFileStatusText.textContent = `Mengekstrak teks soal dari ${fileName}...`;
-  }
+  setQuestionLoading(true, `Membaca ${fileName}. Soal bergambar atau hasil scan bisa butuh setengah menit.`);
 
   try {
     const formData = new FormData();
@@ -117,29 +409,17 @@ async function handleQuestionFileUpload(file) {
     });
 
     const data = await res.json();
-    if (questionFileStatus) questionFileStatus.classList.add("hidden");
 
     if (data.success && data.text) {
-      if (inputTopic) {
-        inputTopic.value = data.questions || data.text;
-      }
+      inputTopic.value = data.questions || data.text;
+      setQuestionLoading(false);
 
       if (data.detected_guidelines && inputInstructions) {
         inputInstructions.value = data.detected_guidelines;
       }
 
+      // Batas kata dari dosen mengunci panjang jawaban, jadi target panjang tidak perlu ditebak lagi
       applyAnswerSpec(data.answer_spec, data.answer_spec_source);
-
-      if (data.word_count_hint && selectLength) {
-        if (data.word_count_hint <= 600) {
-          selectLength.value = "ringkas";
-        } else if (data.word_count_hint <= 1200) {
-          selectLength.value = "sedang";
-        } else {
-          selectLength.value = "panjang";
-        }
-        selectLength.dispatchEvent(new Event("change"));
-      }
 
       if (questionFileInfo) {
         if (data.detected_guidelines) {
@@ -166,6 +446,8 @@ async function handleQuestionFileUpload(file) {
         "success"
       );
     } else {
+      // Soal yang sudah ada sebelumnya dikembalikan, bukan dikosongkan
+      setQuestionLoading(false);
       showAlert(
         "Gagal Membaca Berkas Soal",
         data.message || "Teks dokumen tidak dapat diekstrak.",
@@ -173,7 +455,7 @@ async function handleQuestionFileUpload(file) {
       );
     }
   } catch (err) {
-    if (questionFileStatus) questionFileStatus.classList.add("hidden");
+    setQuestionLoading(false);
     showAlert("Gagal Menghubungi Server", "Periksa koneksi server lokal.");
   }
 }
@@ -192,46 +474,36 @@ if (btnUploadQuestionFile && uploadQuestionFile) {
 
 if (btnClearQuestionFile) {
   btnClearQuestionFile.addEventListener("click", () => {
-    if (inputTopic) inputTopic.value = "";
+    setQuestionText("");
     if (questionFileBadge) questionFileBadge.classList.add("hidden");
     resetAnswerSpec();
     if (uploadQuestionFile) uploadQuestionFile.value = "";
   });
 }
 
-if (inputTopic) {
+// Berkas soal bisa ditarik ke kotak kosong maupun ke pratinjau untuk mengganti soal
+[questionEmpty, questionPreview].forEach((zone) => {
   ["dragenter", "dragover"].forEach((evtName) => {
-    inputTopic.addEventListener(evtName, (e) => {
+    zone.addEventListener(evtName, (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      inputTopic.classList.add("ring-2", "ring-stone-900", "bg-stone-50");
+      zone.classList.add("ring-2", "ring-stone-900", "dark:ring-stone-200");
     });
   });
-
   ["dragleave", "drop"].forEach((evtName) => {
-    inputTopic.addEventListener(evtName, (e) => {
+    zone.addEventListener(evtName, (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      inputTopic.classList.remove("ring-2", "ring-stone-900", "bg-stone-50");
+      zone.classList.remove("ring-2", "ring-stone-900", "dark:ring-stone-200");
     });
   });
-
-  inputTopic.addEventListener("drop", (e) => {
+  zone.addEventListener("drop", (e) => {
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleQuestionFileUpload(e.dataTransfer.files[0]);
     }
   });
-}
+});
 
-if (selectLength && customWordsWrapper) {
-  selectLength.addEventListener("change", () => {
-    if (selectLength.value === "kustom") {
-      customWordsWrapper.classList.remove("hidden");
-    } else {
-      customWordsWrapper.classList.add("hidden");
-    }
-  });
-}
+selectLength.addEventListener("change", updateSpecVisibility);
+updateSpecVisibility();
 
 const step1 = document.getElementById("step-1");
 const step2 = document.getElementById("step-2");
@@ -490,6 +762,7 @@ async function performSearch(query) {
 // 2. Search Papers
 formSearch.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!requireQuestion() || !requireValidSpec()) return;
 
   if (!wantsReferences()) {
     startWithoutReferences();
@@ -535,11 +808,7 @@ formSearch.addEventListener("submit", async (e) => {
 // Tugas tanpa sitasi seperti terjemahan langsung ditulis tanpa lewat pencarian jurnal
 const btnSkipReferences = document.getElementById("btn-skip-references");
 function startWithoutReferences() {
-  if (inputTopic.value.trim().length < 3) {
-    formSearch.reportValidity();
-    inputTopic.focus();
-    return;
-  }
+  if (!requireQuestion() || !requireValidSpec()) return;
   selectedPaperIds.clear();
   currentPapers = [];
   papersList.innerHTML = "";
@@ -1099,6 +1368,9 @@ btnGenerate.addEventListener("click", async () => {
     } else if (lenChoice === "kustom") {
       targetWords = parseInt(inputCustomWords.value) || 1200;
     }
+    // Batas total dari dosen menggantikan target dropdown, dibatasi rentang yang diterima server
+    const lecturerTotal = computeWordLimits().total;
+    if (lecturerTotal) targetWords = Math.min(5000, Math.max(200, lecturerTotal));
 
     const payload = {
       topic: inputTopic.value.trim(),
@@ -1263,7 +1535,8 @@ btnDownloadPdf.addEventListener("click", () => {
 });
 
 function resetToStep1() {
-  inputTopic.value = "";
+  setQuestionText("");
+  if (questionFileBadge) questionFileBadge.classList.add("hidden");
   inputInstructions.value = "";
   resetAnswerSpec();
   selectedPaperIds.clear();

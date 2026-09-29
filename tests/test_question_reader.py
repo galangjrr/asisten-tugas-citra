@@ -133,6 +133,7 @@ Host Welcome."""
         "needs_citations": False,
         "answer_language": "id",
         "word_limit": None,
+        "item_word_limits": None,
     }
 
 
@@ -310,7 +311,7 @@ async def test_read_pdf_ocr_runs_only_when_a_page_is_scanned(monkeypatch):
     import tools.question_reader as qr
     calls = []
 
-    async def fake_ocr(pdf_bytes):
+    async def fake_ocr(pdf_bytes, mark_figures=False):
         calls.append(len(pdf_bytes))
         return "Halaman teks Soal nomor 1 lengkap.\n\n2. Soal dari halaman hasil scan yang dibaca OCR dengan lengkap."
 
@@ -331,9 +332,154 @@ async def test_read_pdf_ocr_runs_only_when_a_page_is_scanned(monkeypatch):
 async def test_read_pdf_keeps_extracted_text_when_ocr_fails(monkeypatch):
     import tools.question_reader as qr
 
-    async def failed_ocr(pdf_bytes):
+    async def failed_ocr(pdf_bytes, mark_figures=False):
         return ""
 
     monkeypatch.setattr(qr, "extract_text_from_pdf", failed_ocr)
     mixed = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler.", ["2. Soal scan"]])
     assert "segmentasi pasar" in await qr.read_pdf_file(mixed)
+
+
+def _noise_png(size: int = 128) -> bytes:
+    """PNG acak tanpa kompresi berarti supaya ukurannya melewati ambang gambar soal."""
+    import os, struct, zlib
+    raw = b"".join(b"\x00" + os.urandom(size * 3) for _ in range(size))
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+@pytest.mark.anyio
+async def test_read_docx_describes_question_images_in_place(monkeypatch):
+    import tools.question_reader as qr
+
+    async def fake_describe(blob, mime, question_context=""):
+        assert mime == "image/png"
+        # Pendeskripsi menerima perintah soal di sekitar gambar, di atas maupun di bawahnya
+        assert "1. Describe the coffee shop" in question_context
+        assert "2. Write a letter" in question_context
+        assert "[GAMBAR INI]" in question_context
+        return "Interior kafe dengan kursi merah dan meja bar kayu."
+
+    monkeypatch.setattr(qr, "describe_image", fake_describe)
+    doc = docx.Document()
+    doc.add_paragraph("1. Describe the coffee shop in the picture below.")
+    doc.add_picture(io.BytesIO(_noise_png()))
+    doc.add_paragraph("2. Write a letter to the editor.")
+    stream = io.BytesIO()
+    doc.save(stream)
+
+    text = await qr.read_docx_with_images(stream.getvalue())
+    assert "[Gambar: Interior kafe dengan kursi merah" in text
+    assert text.index("1. Describe") < text.index("[Gambar:") < text.index("2. Write")
+    # Pembacaan tanpa list gambar tetap teks murni seperti sebelumnya
+    assert "GAMBAR" not in qr.read_docx_file(stream.getvalue())
+
+
+def test_read_docx_keeps_word_equations_as_linear_text():
+    from docx.oxml import parse_xml
+    from tools.question_reader import read_docx_file
+
+    m = 'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"'
+
+    def r(t):
+        return f"<m:r><m:t>{t}</m:t></m:r>"
+
+    doc = docx.Document()
+    p = doc.add_paragraph("1. Hitung ")
+    p._p.append(parse_xml(
+        f"<m:oMath {m}><m:f><m:num>{r('x+1')}</m:num><m:den>{r('2')}</m:den></m:f>{r('+')}"
+        f"<m:sSup><m:e>{r('x')}</m:e><m:sup>{r('2')}</m:sup></m:sSup></m:oMath>"
+    ))
+    p.add_run(" jika x = 3.")
+    p = doc.add_paragraph("2. Tentukan ")
+    p._p.append(parse_xml(
+        f"<m:oMath {m}><m:nary><m:naryPr><m:chr m:val='∑'/></m:naryPr><m:sub>{r('i=1')}</m:sub>"
+        f"<m:sup>{r('n')}</m:sup><m:e>{r('i')}</m:e></m:nary>{r('+')}"
+        f"<m:rad><m:deg/><m:e>{r('16')}</m:e></m:rad></m:oMath>"
+    ))
+    stream = io.BytesIO()
+    doc.save(stream)
+
+    text = read_docx_file(stream.getvalue())
+    assert "1. Hitung (x+1)/2+x^2 jika x = 3." in text
+    assert "2. Tentukan ∑_(i=1)^n i+sqrt(16)" in text
+
+
+@pytest.mark.anyio
+async def test_describe_image_drops_logos(monkeypatch):
+    import tools.ocr_vision as ov
+
+    class Res:
+        text = "ABAIKAN"
+
+    async def fake_generate(*args, **kwargs):
+        return Res()
+
+    monkeypatch.setattr(ov, "generate_with_fallback", fake_generate)
+    assert await ov.describe_image(b"x" * 500) == ""
+
+
+@pytest.mark.anyio
+async def test_pdf_figures_are_cropped_and_described_in_order(monkeypatch):
+    import tools.question_reader as qr
+    marker_text = (
+        "2. Tentukan matriks adjacency graf berikut.\n[[GAMBAR]]\n"
+        "3. Diketahui graf di bawah ini.\n[[GAMBAR]]\na. Tentukan derajat tiap simpul."
+    )
+    contexts = []
+
+    async def fake_ocr(pdf_bytes, mark_figures=False):
+        return marker_text if mark_figures else "DESKRIPSI HALAMAN PENUH"
+
+    async def fake_locate(page_png):
+        return [(100, 100, 300, 500), (500, 100, 700, 500)]
+
+    async def fake_describe(blob, mime, question_context=""):
+        contexts.append(question_context)
+        assert blob[1:4] == b"PNG"
+        return f"graf ke-{len(contexts)}"
+
+    monkeypatch.setattr(qr, "extract_text_from_pdf", fake_ocr)
+    monkeypatch.setattr(qr, "locate_figures", fake_locate)
+    monkeypatch.setattr(qr, "describe_image", fake_describe)
+    pdf = _make_pdf(["Halaman soal graf"])
+
+    text = await qr._transcribe_with_figures(pdf)
+    assert text.index("[Gambar: graf ke-") < text.index("3. Diketahui") < text.rindex("[Gambar: graf ke-")
+    # Setiap potongan menerima teks soal di sekitarnya dengan posisinya ditandai
+    assert all("[GAMBAR INI]" in c for c in contexts)
+
+    # Jumlah potongan tidak cocok dengan penanda, jadi urutan tidak dipercaya dan pakai deskripsi halaman penuh
+    async def one_box(page_png):
+        return [(100, 100, 300, 500)]
+
+    monkeypatch.setattr(qr, "locate_figures", one_box)
+    assert await qr._transcribe_with_figures(pdf) == "DESKRIPSI HALAMAN PENUH"
+
+
+def test_item_word_limit_is_totalled_per_question():
+    from tools.question_reader import guess_answer_spec, normalize_answer_spec
+
+    questions = "1. Jelaskan konsep pasar.\n2. Jelaskan segmentasi.\n3. Jelaskan positioning."
+    spec = guess_answer_spec(questions, "Jawaban maksimal 150 kata per soal. Waktu: 90 menit")
+    assert spec["item_word_limits"] == [150, 150, 150]
+    assert spec["word_limit"] == 450
+
+    spec = guess_answer_spec(questions, "Tiap soal dijawab paling banyak 200 kata.")
+    assert spec["item_word_limits"] == [200, 200, 200] and spec["word_limit"] == 600
+
+    # Batas total tetap dibaca sebagai total, bukan dikali jumlah soal
+    spec = guess_answer_spec(questions, "Seluruh jawaban maksimal 500 kata.")
+    assert spec["word_limit"] == 500 and spec["item_word_limits"] is None
+
+    # Batas berbeda per nomor dari AI dijumlahkan sendiri
+    spec = normalize_answer_spec({"question_count": 2, "item_word_limits": [200, 300]}, "1. A\n2. B")
+    assert spec["word_limit"] == 500 and spec["item_word_limits"] == [200, 300]
+
+    # Tanpa batas di soal, keduanya kosong sehingga pengaturan panjang di form yang dipakai
+    spec = guess_answer_spec(questions, "")
+    assert spec["word_limit"] is None and spec["item_word_limits"] is None

@@ -145,3 +145,32 @@
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background-color: var(--primitive-stone-600);
 }
+
+/* Modal editor soal: lebar dan tinggi mengikuti layar agar teks panjang tidak perlu digulir di kotak sempit */
+.question-dialog {
+  width: min(64rem, calc(100vw - 2rem));
+  height: min(52rem, calc(100dvh - 2rem));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+}
+.question-dialog[open] {
+  animation: question-dialog-in 180ms ease-out;
+}
+.question-dialog::backdrop {
+  background: rgb(12 10 9 / 0.55);
+  backdrop-filter: blur(2px);
+}
+@keyframes question-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .question-dialog[open] { animation: none; }
+}
+
+/* Plus Jakarta Sans mengubah x jadi × dan - jadi – secara otomatis. Soal matematika harus tampil persis seperti diketik. */
+#dialog-question-text,
+#question-preview-body {
+  font-feature-settings: "calt" 0, "liga" 0;
+}

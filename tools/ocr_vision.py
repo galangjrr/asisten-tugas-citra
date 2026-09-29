@@ -55,9 +55,12 @@ IMAGE_CONTENT_GUIDE = (
     "di dekat simpul tanpa berhenti di titiknya bukan sisi ke simpul itu. Jika ada garis yang ujungnya ragu karena bertumpuk atau buram, "
     "jangan dimasukkan ke daftar sisi, tulis terpisah sebagai 'sisi tidak pasti: X-Y (kemungkinan X-Z)'. "
     "Jika berisi tabel, salin isinya per baris dengan pemisah ' | '. "
-    "Jika berupa foto atau ilustrasi, sebut objek yang terlihat, warna, material, tata letak, ada tidaknya orang, dan suasana. "
+    # Foto dan ilustrasi cukup gambaran umum, kalau tidak deskripsi melebar ke isi rak dan tulisan kecil yang tidak ditanyakan
+    "Jika berupa foto atau ilustrasi, tulis ringkas dalam 3 sampai 5 kalimat, paling banyak sekitar 100 kata: jenis tempat atau objek utama, "
+    "warna dan material dominan, tata letak umum, ada tidaknya orang, dan suasana. Detail kecil seperti isi rak, jumlah benda, "
+    "atau tulisan kecil hanya ditulis jika ditanyakan soal. "
     "Jika bangunan, tempat, atau landmark terkenal dikenali dengan jelas, sebut namanya, tetapi jangan mengidentifikasi siapa orang di dalam gambar. "
-    "Salin juga setiap teks yang terbaca di dalam gambar. Tulis hanya yang benar-benar terlihat, jangan menebak atau menghitung jawabannya."
+    "Salin teks di dalam gambar yang menjadi bahan soal, seperti label, angka, judul, atau keterangan, dan lewati tulisan dekorasi yang tidak terbaca jelas. Tulis hanya yang benar-benar terlihat, jangan menebak atau menghitung jawabannya."
 )
 
 # Pendeskripsi harus tahu apa yang ditanyakan, kalau tidak detail seperti jumlah atau tulisan bisa terlewat
@@ -70,7 +73,7 @@ QUESTION_FOCUS_RULE = (
 
 IMAGE_DESCRIPTION_RULE = (
     "Untuk setiap gambar, foto, ilustrasi, grafik, diagram, atau rumus berbentuk gambar yang menjadi bahan soal, "
-    "tulis di posisinya satu blok '[Gambar: ...]' berisi deskripsi objektif dan rinci. " + IMAGE_CONTENT_GUIDE +
+    "tulis di posisinya satu blok '[Gambar: ...]' berisi deskripsi objektif. " + IMAGE_CONTENT_GUIDE +
     " " + QUESTION_FOCUS_RULE + " Abaikan logo kampus di kop."
 )
 
@@ -103,7 +106,7 @@ async def describe_image(image_bytes: bytes, mime_type: str = "image/png", quest
         focus = f" Teks soal di sekitar gambar:\n{question_context.strip()}\n" + QUESTION_FOCUS_RULE
 
     prompt = (
-        "Gambar ini bagian dari lembar soal tugas kuliah. Deskripsikan isinya secara objektif dan rinci. "
+        "Gambar ini bagian dari lembar soal tugas kuliah. Deskripsikan isinya secara objektif. Data soal seperti rumus, grafik, graf, dan tabel ditulis lengkap, foto dan ilustrasi ditulis ringkas. "
         + IMAGE_CONTENT_GUIDE
         + focus
         + f" Jika gambar hanya logo, ikon, stempel, atau hiasan yang bukan bahan soal, balas persis: {SKIP_IMAGE}. "

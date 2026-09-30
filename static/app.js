@@ -1853,9 +1853,43 @@ function enableDesktopChrome() {
   document.getElementById("btn-window-close").addEventListener("click", () => api.close());
 }
 
+// Baca modul dari jendela Ruang Baca Virtual. Halaman gambar dikirim ke OCR yang sama dengan unggah screenshot.
+function enableRbvReader() {
+  const api = window.pywebview.api;
+  const btnGrab = document.getElementById("btn-grab-rbv");
+  document.getElementById("rbv-actions").classList.remove("hidden");
+  document.getElementById("btn-open-rbv").addEventListener("click", () => api.open_rbv());
+
+  btnGrab.addEventListener("click", async () => {
+    btnGrab.disabled = true;
+    btnGrab.textContent = "Mengambil Halaman...";
+    try {
+      const page = await api.grab_rbv_page();
+      if (page.error) {
+        showAlert("Halaman Modul Belum Terbaca", page.error);
+      } else if (page.text) {
+        const current = inputUtContent.value.trim();
+        inputUtContent.value = current ? `${current}\n\n${page.text}` : page.text;
+        showAlert("Teks Modul Berhasil Diambil", `${page.text.length} karakter masuk ke kotak materi.`, "", "success");
+      } else {
+        for (const [i, dataUrl] of page.images.entries()) {
+          const blob = await (await fetch(dataUrl)).blob();
+          await processScreenshotFile(new File([blob], `rbv-${i + 1}.jpg`, { type: "image/jpeg" }), inputUtContent, step2OcrStatus);
+        }
+      }
+    } catch (e) {
+      showAlert("Gagal Membaca Jendela RBV", "Tutup jendela Ruang Baca Virtual lalu buka lagi.");
+    } finally {
+      btnGrab.disabled = false;
+      btnGrab.textContent = "Ambil Halaman yang Terbuka";
+    }
+  });
+}
+
 // Di mode desktop, API pywebview baru siap setelah halaman dimuat
 window.addEventListener("pywebviewready", () => {
   enableDesktopChrome();
+  enableRbvReader();
   syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
   window.pywebview.api.fit_height(document.documentElement.scrollHeight);
 });

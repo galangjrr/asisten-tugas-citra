@@ -21,6 +21,42 @@ DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMWA_BORDER_COLOR = 34
 DWMWCP_ROUND = 2
 
+RBV_URL = "https://pustaka.ut.ac.id/reader/"
+RBV_HOST = "pustaka.ut.ac.id"
+# Ambil halaman modul yang sedang terlihat di jendela RBV. Halaman BMP berupa gambar, jadi gambar yang
+# kelihatan di layar diubah ke JPEG untuk dibaca OCR. Kalau tidak ada gambar, pakai teks halamannya.
+RBV_GRAB_JS = r"""
+(() => {
+  const vh = window.innerHeight;
+  const shots = [];
+  for (const node of document.querySelectorAll("img, canvas")) {
+    const r = node.getBoundingClientRect();
+    const visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+    if (r.width < 300 || visible < 150) continue;
+    try {
+      let canvas = node;
+      if (node.tagName === "IMG") {
+        if (!node.complete || !node.naturalWidth) continue;
+        canvas = document.createElement("canvas");
+        canvas.width = node.naturalWidth;
+        canvas.height = node.naturalHeight;
+        canvas.getContext("2d").drawImage(node, 0, 0);
+      }
+      shots.push({ visible, data: canvas.toDataURL("image/jpeg", 0.9) });
+    } catch (e) {
+      // Gambar dari domain lain bikin canvas tercemar dan tidak bisa dibaca, lewati saja
+    }
+  }
+  shots.sort((a, b) => b.visible - a.visible);
+  return {
+    host: location.hostname,
+    path: location.pathname,
+    text: (document.body ? document.body.innerText : "").trim(),
+    images: shots.slice(0, 2).map(s => s.data),
+  };
+})()
+"""
+
 
 def hex_to_colorref(hex_color: str) -> ctypes.c_uint:
     r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
@@ -55,6 +91,7 @@ class DesktopApi:
 
     def __init__(self):
         self._window = None
+        self._rbv_window = None
         self._maximized = False
         self._restore_bounds = None
 
@@ -92,6 +129,32 @@ class DesktopApi:
 
     def close(self):
         self._window.destroy()
+
+    def open_rbv(self):
+        """Buka Ruang Baca Virtual di jendela terpisah. Login dan navigasi dikerjakan pengguna sendiri."""
+        if self._rbv_window:
+            self._rbv_window.show()
+            self._rbv_window.restore()
+            return
+        self._rbv_window = webview.create_window("Ruang Baca Virtual UT", RBV_URL, width=1100, height=820)
+        self._rbv_window.events.closed += self._forget_rbv
+
+    def _forget_rbv(self):
+        self._rbv_window = None
+
+    def grab_rbv_page(self) -> dict:
+        """Ambil gambar atau teks halaman modul yang sedang dibuka pengguna di jendela RBV."""
+        if not self._rbv_window:
+            return {"error": "Jendela Ruang Baca Virtual belum dibuka."}
+        page = self._rbv_window.evaluate_js(RBV_GRAB_JS)
+        if not page or page.get("host") != RBV_HOST:
+            return {"error": "Jendela itu sedang tidak membuka halaman pustaka.ut.ac.id."}
+        if page["images"]:
+            return {"images": page["images"]}
+        # Halaman login dan daftar modul juga berisi teks, jadi teks pendek dianggap bukan isi modul
+        if len(page["text"]) < 400:
+            return {"error": "Belum ada halaman modul yang terbuka. Login lalu buka modulnya di jendela Ruang Baca Virtual."}
+        return {"text": page["text"]}
 
     def fit_height(self, content_height: int):
         """Tinggi jendela ngikutin tinggi halaman, mentok di tinggi layar di luar taskbar."""
@@ -157,7 +220,9 @@ def main():
         easy_drag=False,
         shadow=True,
     )
-    webview.start()
+    # Profil WebView disimpan permanen supaya login Ruang Baca Virtual tetap ingat di sesi berikutnya
+    storage = os.path.join(os.environ.get("LOCALAPPDATA", project_dir), "AsistenTugasCitra", "webview")
+    webview.start(private_mode=False, storage_path=storage)
 
     # Jendela ditutup, server ikut berhenti
     server.should_exit = True

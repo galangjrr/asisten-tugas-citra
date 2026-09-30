@@ -264,3 +264,16 @@ async def test_auto_format_does_not_number_single_writing_task(monkeypatch):
     # Soal ditempel manual tanpa deteksi tetap dinomori sesuai lembar soal
     await gen.generate_academic_draft("1. Jelaskan X.\n2. Uraikan Y.", [], target_words=600, answer_spec={"question_count": None})
     assert "TEPAT 2 butir" in captured["system"]
+
+
+@pytest.mark.anyio
+async def test_citation_rules_stay_natural(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    paper = {"title": "Kerukunan", "authors": ["Budi Prakosa"], "year": 2022, "pages_content": [{"page_number": 51, "text": "Isi."}]}
+    await gen.generate_academic_draft("Jelaskan kerukunan antarumat beragama.", [paper], target_words=600, answer_spec={"answer_type": "esai"})
+    system = captured["system"]
+    assert "Paling banyak satu sitasi per paragraf" in system
+    assert "Kesimpulan atau penutup DILARANG berisi sitasi" in system
+    # Aturan lama yang memaksa sitasi di mana-mana tidak boleh balik lagi
+    assert "WAJIB 100%" not in system and "Modul 3, hlm. 3.14" not in system
+    assert "WAJIB DISITASI" not in captured["user"]

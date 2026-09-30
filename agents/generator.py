@@ -598,19 +598,21 @@ async def generate_academic_draft(
     """
 
     if papers_with_content:
+        # Sitasi dibuat seperti tulisan mahasiswa biasa. Aturan lama yang serba wajib membuat tiap kalimat menyebut sumber dan terbaca lebay.
         citation_rules = f"""
-    ATURAN SITASI KHUSUS MODUL BMP UT ATAU BAHAN AJAR KAMPUS:
-    - Jika terdapat sumber berlabel 'Buku Materi Pokok (BMP) UT / Diktat Bahan Ajar', perlakukan sumber ini sebagai fondasi konseptual utama tugas kuliah.
-    - Wajib kutip materi modul tersebut sesuai format baku akademik, contoh: (Kuswandi, 2023, Modul 3, hlm. 3.14) atau (Universitas Terbuka, 2023, Modul 2) atau menurut BMP Modul X.
-    - Hubungkan teori dari modul UT tersebut dengan data empiris dari naskah jurnal lainnya secara harmonis.
-
-    MANDAT SITASI SELURUH SUMBER TERVERIFIKASI (WAJIB 100%):
-    - Pengguna telah memilih {len(papers_with_content)} sumber naskah ilmiah berikut:
+    ATURAN SITASI YANG WAJAR:
+    - Pengguna memilih {len(papers_with_content)} sumber berikut:
 {summary_sources_text}
-    - Kamu WAJIB menyitir, membahas, dan menghubungkan SELURUH {len(papers_with_content)} sumber di atas di dalam badan naskah! DILARANG KERAS mengabaikan sumber manapun. Setiap naskah minimal harus disitir setidaknya satu kali.
-    - Format sitasi di dalam teks: (NamaBelakangPenulis, Tahun, hlm. X) atau (NamaBelakangPenulis, Tahun).
-    - Setiap sitasi harus memiliki dasar bukti nyata dari teks sumber yang dilampirkan.
-    - Catat setiap bukti kutipan pada array 'evidence_log'.
+    - Sumber adalah pendukung argumen, bukan pusat kalimat. Tulis gagasan dengan kalimatmu sendiri, lalu taruh sitasi singkat di akhir kalimat yang memakai ide sumber itu.
+    - Setiap sumber cukup disitir satu atau dua kali di tempat yang paling relevan. Paling banyak satu sitasi per paragraf, dan banyak paragraf memang tidak perlu sitasi sama sekali, terutama pembuka dan refleksi atau pendapat pribadi.
+    - Kesimpulan atau penutup DILARANG berisi sitasi atau menyebut sumber. Tulis dengan suara sendiri dari hasil pembahasan.
+    - Format sitasi pendek dalam kurung: (NamaBelakang, Tahun). Tambahkan halaman hanya jika mengutip kalimat persis dalam tanda petik, misal (NamaBelakang, Tahun, hlm. 12). Untuk modul BMP UT cukup (NamaBelakang, Tahun) atau (Universitas Terbuka, Tahun).
+    - DILARANG menyebut judul artikel, nama jurnal, kode atau nama mata kuliah, nomor modul, 'materi ...', 'Sumber 1', atau 'penelitian yang dilakukan oleh ... dalam jurnal berjudul ...' di badan naskah.
+    - DILARANG frasa pengantar sumber yang berlebihan seperti 'Sebagaimana ditegaskan dalam ...', 'diperkuat oleh pemikiran ...', 'Hal ini sejalan dengan ...', 'Berdasarkan penelitian ...', atau 'Penelitian menunjukkan ...'. 'Menurut NamaBelakang (Tahun)' boleh dipakai paling banyak sekali di seluruh naskah.
+    - Contoh buruk: 'Sebagaimana ditegaskan dalam materi MKWN4101 dan diperkuat oleh pemikiran Prakosa (2022, hlm. 51-52), menjalankan kewajiban agama ...'
+      Contoh baik: 'Menjalankan kewajiban agama secara benar berjalan beriringan dengan tanggung jawab menjaga kedamaian sosial (Prakosa, 2022).'
+    - Modul BMP UT, jika ada, jadi dasar konsep utama. Jurnal lain melengkapi seperlunya.
+    - Setiap sitasi harus berdasar isi sumber yang dilampirkan. Catat buktinya di array 'evidence_log'.
     """
     else:
         citation_rules = """
@@ -662,9 +664,9 @@ async def generate_academic_draft(
     if not papers_with_content:
         sources_block = "No references selected. Answer directly without citations." if is_en else "Tidak ada rujukan dipilih. Jawab langsung tanpa sitasi."
     elif is_en:
-        sources_block = f"LIST OF ALL VERIFIED REFERENCES (ALL MUST BE CITED):\n{summary_sources_text}\n\nSOURCE MATERIALS AND READING EXCERPTS:\n{sources_text}"
+        sources_block = f"SELECTED REFERENCES:\n{summary_sources_text}\n\nSOURCE MATERIALS AND READING EXCERPTS:\n{sources_text}"
     else:
-        sources_block = f"DAFTAR SELURUH SUMBER YANG WAJIB DISITASI:\n{summary_sources_text}\n\nBAHAN BACAAN SUMBER RESMI:\n{sources_text}"
+        sources_block = f"SUMBER RUJUKAN TERPILIH:\n{summary_sources_text}\n\nBAHAN BACAAN SUMBER RESMI:\n{sources_text}"
 
     # Jawaban langsung tidak boleh didorong target kata dan analisis mendalam, karena model akan menggembungkan jawaban singkat
     if is_direct_answer:

@@ -245,3 +245,22 @@ async def test_item_over_word_limit_is_trimmed(monkeypatch):
     assert trimmed == {"index": 1, "limit": 250}
     assert result["sections"][1]["content"] == "short letter"
     assert result["sections"][0]["content"] == "free length"
+
+
+@pytest.mark.anyio
+async def test_auto_format_does_not_number_single_writing_task(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    # Satu soal di mode otomatis ditulis utuh tanpa heading '1. ...'
+    result = await gen.generate_academic_draft("1. Tulislah pendapatmu tentang literasi digital.", [], target_words=600,
+                                               answer_spec={"answer_type": "uraian", "question_count": 1})
+    assert "TEPAT 1 butir" not in captured["system"]
+    assert result["sections"][0]["heading"] == "1. A"  # heading dari model tidak ditambah nomor lagi
+
+    # AI bilang satu tulisan tanpa nomor, poin panduan '1. 2. 3.' tidak boleh dihitung ulang jadi 3 soal
+    guided = "Tulislah esai tentang kota yang memuat:\n1. Definisi kota\n2. Contoh kota\n3. Pendapatmu"
+    await gen.generate_academic_draft(guided, [], target_words=600, answer_spec={"answer_type": "esai", "question_count": None})
+    assert "TEPAT 3 butir" not in captured["system"]
+
+    # Soal ditempel manual tanpa deteksi tetap dinomori sesuai lembar soal
+    await gen.generate_academic_draft("1. Jelaskan X.\n2. Uraikan Y.", [], target_words=600, answer_spec={"question_count": None})
+    assert "TEPAT 2 butir" in captured["system"]

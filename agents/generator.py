@@ -4,7 +4,7 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from google.genai import types
 from tools.gemini_client import generate_with_fallback
-from tools.question_reader import count_numbered_questions
+from tools.question_reader import count_numbered_questions, extract_required_sections
 
 
 def detect_language(topic: str, custom_instructions: str = "") -> str:
@@ -126,9 +126,13 @@ async def generate_academic_draft(
         section_req = f"Hasilkan minimal {min_sections} bagian atau sub-bab naskah terperinci. Setiap bagian WAJIB terdiri dari minimal 3 sampai 5 paragraf panjang dan berbobot (sekitar {words_per_sec} kata per bagian). DILARANG MERINGKAS."
 
     # Soal bernomor menentukan jumlah bagian, bukan target kata, agar 2 soal tidak dipecah jadi 4 nomor
-    question_count = spec.get("question_count") or count_numbered_questions(topic)
-    # Lebih dari satu soal selalu dijawab per nomor, termasuk jika tiap soal berbentuk esai, supaya judul butir tidak dikosongkan format esai
-    if question_count and (format_type in ("otomatis", "bernomor") or is_direct_answer or question_count > 1):
+    # Jenis jawaban terisi berarti lembar soal sudah dideteksi dan dicek pengguna, jadi jumlah soal kosong dipercaya.
+    # Hitung ulang pola teks akan membaca poin panduan satu tulisan, misal '1. definisi 2. contoh', sebagai beberapa soal.
+    # Pola teks hanya dipakai untuk soal yang ditempel manual tanpa deteksi.
+    question_count = spec.get("question_count") or (None if answer_type else count_numbered_questions(topic))
+    # Lebih dari satu soal selalu dijawab per nomor, termasuk jika tiap soal berbentuk esai, supaya judul butir tidak dikosongkan format esai.
+    # Satu soal di mode otomatis tidak perlu nomor, cukup ditulis sebagai satu tulisan utuh.
+    if question_count and (format_type == "bernomor" or is_direct_answer or question_count > 1):
         format_type = "bernomor"
         min_sections = question_count
         words_per_sec = round(target_words / question_count)
@@ -136,6 +140,23 @@ async def generate_academic_draft(
             f"Lembar soal memuat TEPAT {question_count} butir soal bernomor. Hasilkan TEPAT {question_count} bagian di array 'sections', "
             f"satu bagian per butir soal dengan heading '1. ...' sampai '{question_count}. ...' mengikuti urutan soal. "
             "DILARANG menambah bagian pendahuluan, penutup, kesimpulan, atau nomor lain di luar butir soal."
+        )
+
+    # Format penulisan yang ditulis dosen, misal Pendahuluan, Pembahasan, Refleksi, Kesimpulan, mengalahkan semua format bawaan
+    required_sections = None if is_direct_answer else (
+        spec.get("required_sections") or extract_required_sections(f"{topic}\n{custom_instructions}")
+    )
+    if required_sections:
+        numbered_note = (
+            f" Bagian pembahasan wajib menjawab ke-{question_count} butir soal secara berurutan dengan menyebut nomornya."
+            if question_count and question_count > 1 else ""
+        )
+        format_type = "wajib"
+        min_sections = len(required_sections)
+        words_per_sec = round(target_words / min_sections)
+        section_req = (
+            f"Dosen mewajibkan format penulisan ini. Hasilkan TEPAT {min_sections} bagian di array 'sections' dengan heading persis "
+            f"berurutan: {', '.join(repr(n) for n in required_sections)}. DILARANG menambah, menggabung, menomori, atau mengganti nama bagian.{numbered_note}"
         )
 
     if paragraph_depth == "ringkas":
@@ -157,7 +178,19 @@ async def generate_academic_draft(
     summary_sources_text = "\n".join(paper_summary_list)
 
     # Siapkan instruksi format berdasarkan pilihan pengguna dan bahasa
-    if format_type == "esai":
+    if format_type == "wajib":
+        format_guideline = f"""
+            {"FORMAT STRUCTURE: Required by the lecturer" if is_en else "STRUKTUR FORMAT: Wajib dari dosen"}
+            - {section_req}
+            - {"Format ini adalah aturan dosen yang wajib dipatuhi, bukan rubrik penilaian." if not is_en else "This structure is a mandatory lecturer rule, not a grading rubric."}
+            - {"Setiap bagian berisi" if not is_en else "Each section contains"} {paras_per_sec}, {"total sekitar" if not is_en else "about"} {target_words} {"kata" if not is_en else "words in total"}.
+            """
+        json_example = json.dumps({
+            "title": "...",
+            "sections": [{"heading": name, "content": "..."} for name in required_sections],
+            "evidence_log": [{"source_index": 1, "paper_title": "...", "author_year": "...", "page_ref": "...", "evidence_summary": "..."}],
+        }, ensure_ascii=False, indent=2)
+    elif format_type == "esai":
         if is_en:
             format_guideline = f"""
             FORMAT STRUCTURE: Pure Organic Flowing Essay (NO Artificial Subheadings)
@@ -717,6 +750,11 @@ async def generate_academic_draft(
         for sec in parsed.get("sections") or []
         if isinstance(sec, dict)
     ]
+    # Heading bagian wajib dikunci persis sesuai tulisan dosen, model sering menambah nomor atau kata BAB
+    if format_type == "wajib" and len(sections) == len(required_sections):
+        for name, sec in zip(required_sections, sections):
+            sec["heading"] = name
+
     # Jaring pengaman: model kadang tetap mengosongkan heading, padahal tiap butir wajib bernomor sesuai lembar soal
     if format_type == "bernomor" and len(sections) == question_count:
         for number, sec in enumerate(sections, 1):

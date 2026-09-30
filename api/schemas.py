@@ -47,6 +47,8 @@ class AnswerSpec(BaseModel):
     # Batas kata tiap butir sesuai urutan soal. word_limit berisi totalnya.
     # None berarti butir itu tanpa batas atas, misal dosen hanya menulis 'at least 200 words'
     item_word_limits: Optional[List[Optional[Annotated[int, Field(ge=10, le=5000)]]]] = Field(None, max_length=50)
+    # Urutan bagian wajib dari format penulisan dosen, misal Pendahuluan, Pembahasan, Kesimpulan
+    required_sections: Optional[List[Annotated[str, Field(min_length=1, max_length=60)]]] = Field(None, max_length=12)
 
 
 class GenerateRequest(BaseModel):

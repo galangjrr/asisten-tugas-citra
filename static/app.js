@@ -68,6 +68,8 @@ const FORMAT_DECIDED_TYPES = ["esai", "makalah", "terjemahan", "jawaban_singkat"
 
 // Batas per soal yang berbeda tiap nomor dari lembar soal, misal soal 1 maksimal 200 dan soal 2 maksimal 300
 let detectedItemLimits = null;
+// Format bagian wajib dari dosen tidak punya kolom sendiri, jadi dibawa apa adanya ke permintaan generate
+let detectedSections = null;
 
 function readInt(input) {
   const n = parseInt(input.value, 10);
@@ -174,9 +176,11 @@ function applyAnswerSpec(spec, source) {
     specWordLimit.value = spec.word_limit || "";
   }
 
-  answerSpecNote.textContent = source === "ai"
+  detectedSections = Array.isArray(spec.required_sections) && spec.required_sections.length ? spec.required_sections : null;
+  answerSpecNote.textContent = (source === "ai"
     ? "Dideteksi AI dari lembar soal. Cek sekali lagi sebelum lanjut."
-    : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.";
+    : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.")
+    + (detectedSections ? ` Format wajib: ${detectedSections.join(", ")}.` : "");
   updatePrimaryAction();
   updateSpecVisibility();
 }
@@ -190,6 +194,7 @@ function resetAnswerSpec() {
   specWordLimit.placeholder = "Tidak ada";
   specWordScope.value = "total";
   detectedItemLimits = null;
+  detectedSections = null;
   answerSpecNote.textContent = ANSWER_SPEC_DEFAULT_NOTE;
   updatePrimaryAction();
   updateSpecVisibility();
@@ -204,7 +209,8 @@ function readAnswerSpec() {
     needs_citations: specCitations.value === "ya",
     answer_language: specLanguage.value || null,
     word_limit: total,
-    item_word_limits: items
+    item_word_limits: items,
+    required_sections: detectedSections
   };
 }
 

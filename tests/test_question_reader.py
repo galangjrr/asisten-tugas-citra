@@ -134,6 +134,7 @@ Host Welcome."""
         "answer_language": "id",
         "word_limit": None,
         "item_word_limits": None,
+        "required_sections": None,
     }
 
 
@@ -529,3 +530,20 @@ def test_minimum_word_count_is_not_an_upper_limit():
     assert spec["word_limit"] is None
     spec = normalize_answer_spec({"question_count": 2, "word_limit": 250, "item_word_limits": [None, 250]}, "Describe.\nWrite (200-250 words).")
     assert spec["word_limit"] is None
+
+
+def test_extract_required_sections():
+    from tools.question_reader import extract_required_sections, guess_answer_spec, normalize_answer_spec
+    sheet = " Format Penulisan\n\nJudul\nPendahuluan\nPembahasan\nRefleksi\nKesimpulan\n"
+    assert extract_required_sections(sheet) == ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]
+    inline = "Sistematika penulisan: Judul, Pendahuluan, Isi dan Penutup. Daftar Pustaka"
+    assert extract_required_sections(inline) == ["Pendahuluan", "Isi", "Penutup"]
+    numbered = "Struktur makalah:\n1. Pendahuluan: latar belakang\n2. Pembahasan - analisis kasus\n3. Penutup\n\nKirim sebelum tanggal 5."
+    assert extract_required_sections(numbered) == ["Pendahuluan", "Pembahasan", "Penutup"]
+    # Aturan format huruf dan kalimat biasa bukan daftar bagian
+    assert extract_required_sections("Format: Times New Roman 12, spasi 1.5") is None
+    assert extract_required_sections("Format file PDF\nKirim lewat tuton\nJangan terlambat") is None
+    assert guess_answer_spec(sheet)["required_sections"] == ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]
+    # AI yang mengarang struktur dari rubrik kalah oleh pola teks, dan daftar AI tetap dibersihkan
+    assert normalize_answer_spec({"required_sections": ["1. Pendahuluan", "Judul", "Isi"]}, "Jelaskan konsep X.")["required_sections"] == ["Pendahuluan", "Isi"]
+    assert normalize_answer_spec({"required_sections": ["A"]}, sheet)["required_sections"] == ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]

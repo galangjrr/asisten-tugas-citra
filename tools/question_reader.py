@@ -514,6 +514,49 @@ def count_numbered_questions(topic: str) -> int:
     return count
 
 
+FORMAT_HEADING = re.compile(
+    r'(?i)^(?:format|sistematika|struktur|susunan|kerangka|outline|structure)'
+    r'(?:\s+(?:of\s+)?(?:penulisan|jawaban|tugas|makalah|esai|essay|laporan|naskah|tulisan|paper|answer|the\s+\w+))?'
+    r'\s*(?::\s*(.*))?$'
+)
+# Judul dan daftar pustaka sudah dibuat terpisah oleh exporter, jadi tidak ikut jadi bagian isi
+NOT_BODY_SECTION = re.compile(r'(?i)^(?:judul|title|daftar\s+pustaka|referensi|references?|bibliography|nama|nim)\b')
+
+
+def _section_name(line: str) -> str:
+    """'2. Pembahasan: berisi analisis' menjadi 'Pembahasan'."""
+    name = re.sub(r'^\s*(?:[-•*·]|\(?[0-9a-zA-Z]{1,2}[.)])\s+', "", line)
+    return re.split(r'\s*(?::|\s[-–]\s|\()', name, maxsplit=1)[0].strip()
+
+
+def extract_required_sections(text: str) -> Optional[list]:
+    """Mencari urutan bagian wajib dari dosen, misal 'Format Penulisan: Judul, Pendahuluan, Pembahasan, Kesimpulan'."""
+    lines = [ln.strip() for ln in text.split("\n")]
+    for index, line in enumerate(lines):
+        match = FORMAT_HEADING.match(line)
+        if not match:
+            continue
+        if match.group(1):
+            names = [_section_name(part) for part in re.split(r'[,;.]|\s+dan\s+|\s+and\s+', match.group(1))]
+        else:
+            names = []
+            for item in lines[index + 1:]:
+                if not item:
+                    if names:
+                        break
+                    continue
+                name = _section_name(item)
+                # Nama bagian itu pendek. Kalimat panjang berarti daftar sudah selesai.
+                if len(name.split()) > 5:
+                    break
+                names.append(name)
+        names = [n for n in names if n and not NOT_BODY_SECTION.match(n)]
+        # Nama bagian tidak mengandung angka, jadi 'Times New Roman 12, spasi 1.5' bukan daftar bagian
+        if 2 <= len(names) <= 12 and not any(re.search(r'\d', n) for n in names):
+            return names
+    return None
+
+
 WORD_LIMIT = r'\b(\d{2,5})(?:\s*[-–]\s*(\d{2,5}))?\s*(?:kata|words?)\b'
 # Batas yang berlaku per butir, misal '150 kata per soal', '100 words for each question', 'tiap soal maksimal 200 kata'
 ITEM_SCOPE = r'(?:per|untuk\s+(?:setiap|tiap|masing-masing)|setiap|tiap|masing-masing|for\s+each|each)\s+(?:soal|nomor|butir|pertanyaan|jawaban|questions?|items?|answers?)'
@@ -611,6 +654,7 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
         "answer_language": language,
         "word_limit": total,
         "item_word_limits": items,
+        "required_sections": extract_required_sections(combined),
     }
 
 
@@ -639,6 +683,12 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
     valid = items and len(items) <= 50 and all(n is not None for v, n in zip(raw_items, items) if v is not None)
     items = items if valid else guess["item_word_limits"]
     total, items = resolve_word_limits(as_int(raw.get("word_limit"), 50, 10000), items, question_count)
+    sections = raw.get("required_sections")
+    if isinstance(sections, list):
+        sections = [_section_name(str(n)) for n in sections if n]
+        sections = [n for n in sections if n and len(n) <= 60 and not NOT_BODY_SECTION.match(n)]
+    # Pola teks lebih bisa dipercaya daripada AI yang kadang mengarang struktur dari rubrik
+    sections = guess["required_sections"] or (sections if sections and 2 <= len(sections) <= 12 else None)
     return {
         "question_count": question_count,
         "answer_type": answer_type or guess["answer_type"],
@@ -646,6 +696,7 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
         "answer_language": language if language in ("id", "en") else guess["answer_language"],
         "word_limit": total if items else (total or guess["word_limit"]),
         "item_word_limits": items,
+        "required_sections": sections,
     }
 
 
@@ -666,6 +717,7 @@ Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
    - "word_limit": batas atas kata untuk SELURUH jawaban jika tertulis sebagai batas total (jika rentang seperti 250-300 kata, isi angka terbesar), atau null. Batas minimal seperti 'at least 300 words' bukan batas atas, isi null. Jika dosen hanya menulis batas per soal, isi null.
    - "item_word_limits": daftar batas kata per butir soal sesuai urutan nomor, jika dosen menulis batas per soal. Contoh 'maksimal 150 kata per soal' untuk 3 soal menjadi [150, 150, 150], sedangkan 'Soal 1 (200 kata), Soal 2 (300 kata)' menjadi [200, 300]. Batas minimal seperti 'at least 200 words' atau 'minimal 200 kata' BUKAN batas, jadi butir itu diisi null, misal 'Soal 1 at least 200 words, Soal 2 200-250 words' menjadi [null, 250]. Rentang seperti 200-250 memakai angka terbesar. Isi null untuk seluruh daftar jika tidak ada batas atas per soal.
+   - "required_sections": daftar nama bagian yang WAJIB ada di jawaban sesuai urutan, jika dosen menulis format, sistematika, atau struktur penulisan. Contoh 'Format Penulisan: Judul, Pendahuluan, Pembahasan, Refleksi, Kesimpulan' menjadi ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]. Buang Judul dan Daftar Pustaka. Isi null jika dosen tidak menulis format bagian.
 
 Format Keluaran (JSON murni):
 {
@@ -678,7 +730,8 @@ Format Keluaran (JSON murni):
     "needs_citations": null,
     "answer_language": null,
     "word_limit": null,
-    "item_word_limits": null
+    "item_word_limits": null,
+    "required_sections": null
   }
 }
 

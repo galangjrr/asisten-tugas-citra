@@ -583,3 +583,29 @@ def test_extract_required_sections():
     # AI yang mengarang struktur dari rubrik kalah oleh pola teks, dan daftar AI tetap dibersihkan
     assert normalize_answer_spec({"required_sections": ["1. Pendahuluan", "Judul", "Isi"]}, "Jelaskan konsep X.")["required_sections"] == ["Pendahuluan", "Isi"]
     assert normalize_answer_spec({"required_sections": ["A"]}, sheet)["required_sections"] == ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]
+
+
+@pytest.mark.anyio
+async def test_screenshot_question_goes_through_scan_path(monkeypatch):
+    import tools.question_reader as qr
+    from PIL import Image
+    seen = {}
+
+    async def fake_read_pdf(file_bytes):
+        seen["pdf"] = file_bytes[:4]
+        return "1. Jelaskan perubahan tokoh.\n2. Analisis tema.", []
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(qr, "read_pdf_file", fake_read_pdf)
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 20), "white").save(buf, format="PNG")
+    res = await qr.parse_question_document(buf.getvalue(), "soal-tempel.png")
+    # Screenshot dibungkus jadi PDF lalu dibaca jalur scan yang sama dengan PDF hasil scan
+    assert seen["pdf"] == b"%PDF"
+    assert res["file_type"] == "gambar"
+    assert res["answer_spec"]["question_count"] == 2
+
+
+def test_tidy_guidelines_closes_ocr_blank_lines():
+    from tools.question_reader import tidy_guidelines
+    assert tidy_guidelines("Instruksi Umum\n\n\nSilakan baca cerpen.\n \nMaksimal 800 kata.\n") == "Instruksi Umum\nSilakan baca cerpen.\nMaksimal 800 kata."

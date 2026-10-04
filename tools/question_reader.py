@@ -847,6 +847,22 @@ Format Keluaran (JSON murni):
     return parsed
 
 
+QUESTION_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def image_to_pdf(file_bytes: bytes) -> bytes:
+    """Screenshot soal dibungkus jadi PDF satu halaman supaya lewat jalur scan yang sama, termasuk potongan gambar soalnya."""
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.open(io.BytesIO(file_bytes)).convert("RGB").save(buf, format="PDF", resolution=150)
+    return buf.getvalue()
+
+
+def tidy_guidelines(text: str) -> str:
+    """Rubrik hasil OCR sering berjarak satu baris kosong di tiap baris, jadi baris kosong beruntun dirapatkan."""
+    return re.sub(r"\n[ \t]*(?:\n[ \t]*)+", "\n", text or "").strip()
+
+
 async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str, Any]:
     """Membaca berkas soal dosen (PDF, DOCX, TXT) secara utuh tanpa memotong isi."""
     fn_lower = filename.lower()
@@ -860,6 +876,9 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
     elif fn_lower.endswith(".pdf"):
         file_type = "pdf"
         text, images = await read_pdf_file(file_bytes)
+    elif fn_lower.endswith(QUESTION_IMAGE_EXTS):
+        file_type = "gambar"
+        text, images = await read_pdf_file(image_to_pdf(file_bytes))
     elif fn_lower.endswith(".txt"):
         file_type = "txt"
         text = file_bytes.decode("utf-8", errors="replace").strip()
@@ -883,7 +902,7 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
     if ai_res and ai_res.get("question_topic"):
         q_topic = fill_image_markers(str(ai_res.get("question_topic") or ""), descriptions).strip()
         questions = q_topic if len(q_topic) >= 10 else clean_text
-        g_lines = fill_image_markers(str(ai_res.get("guidelines") or ""), descriptions).strip()
+        g_lines = tidy_guidelines(fill_image_markers(str(ai_res.get("guidelines") or ""), descriptions))
         c_code = ai_res.get("course_code") or detected_code
         spec = normalize_answer_spec(ai_res.get("answer_spec"), questions, g_lines)
 
@@ -904,7 +923,7 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
     # Fallback ke pemisah pola aturan regex jika AI tidak tersedia
     split_res = split_questions_and_guidelines(clean_text)
     questions = split_res.get("questions", clean_text)
-    guidelines = split_res.get("guidelines", "")
+    guidelines = tidy_guidelines(split_res.get("guidelines", ""))
     spec = guess_answer_spec(questions, guidelines)
 
     return {

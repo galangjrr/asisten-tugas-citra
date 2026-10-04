@@ -64,3 +64,27 @@ def test_manual_module_ut_code_gets_ut_label():
     data = res.json()
     assert data["is_ut_bmp"] is True
     assert data["authors"] == ["Universitas Terbuka"]
+
+
+def test_pdf_reader_drops_repeated_header_footer_and_page_numbers():
+    import anyio
+    from reportlab.pdfgen import canvas
+    from tools.reading_doc_reader import read_reading_doc
+
+    buf = io.BytesIO()
+    pdf = canvas.Canvas(buf)
+    for page in range(1, 5):
+        pdf.drawString(72, 800, "https://americanliterature.com/author/willa-cather/short-story")
+        pdf.drawString(72, 700, f"Isi cerita halaman {page} tentang kakek penjaga surau dan Ajo Sidi.")
+        pdf.drawString(72, 650, "1896")
+        pdf.drawString(72, 600, f"Isi lanjutan halaman {page} yang tetap harus terbaca utuh.")
+        pdf.drawString(300, 40, str(page))
+        pdf.showPage()
+    pdf.save()
+
+    text, _ = anyio.run(read_reading_doc, buf.getvalue(), "cerpen.pdf")
+    assert "americanliterature.com" not in text
+    assert "[Halaman 4]" in text and "Isi cerita halaman 4" in text
+    # Nomor halaman di kaki halaman dibuang, angka di tengah naskah tetap
+    assert "\n4\n" not in text + "\n" and not text.rstrip().endswith("\n4")
+    assert "1896" in text and "Isi lanjutan halaman 4" in text

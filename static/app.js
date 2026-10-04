@@ -10,6 +10,8 @@ const STORAGE = {
   name: "atc-student-name",
   nim: "atc-student-id",
   draft: "atc-question-draft",
+  // Rubrik dosen dan spesifikasi jawaban ikut disimpan, supaya batas kata dosen tidak hilang saat aplikasi dibuka ulang
+  draftSetup: "atc-question-setup",
   mode: "atc-mode"
 };
 
@@ -301,7 +303,8 @@ function formatAuthorsAPA(authors) {
 }
 
 function formatAcademicReferenceText(ref, isEnDoc) {
-  const authorStr = formatAuthorsAPA(ref.authors);
+  // Inisial seperti 'Cather, W.' sudah diakhiri titik, jadi titiknya dibuang di sini lalu ditambah sekali saat dirangkai
+  const authorStr = formatAuthorsAPA(ref.authors).replace(/\.$/, "");
   const year = ref.year || "n.d.";
   const title = (ref.title || "Tanpa Judul").trim().replace(/\.+$/, "");
   const venue = (ref.venue || "").trim().replace(/\.+$/, "");
@@ -320,8 +323,7 @@ function formatAcademicReferenceText(ref, isEnDoc) {
   else if (pgs) pubDetails = `${isEnDoc ? "pp. " : "hlm. "}${pgs}`;
   else if (pageInfo) pubDetails = pageInfo;
 
-  // Inisial seperti 'Cather, W.' sudah diakhiri titik, jadi jangan ditambah titik lagi
-  const parts = [`${authorStr.replace(/\.$/, "")}. (${year}). ${title}.`];
+  const parts = [`${authorStr}. (${year}). ${title}.`];
   if (venue && pubDetails) parts.push(`${venue}, ${pubDetails}.`);
   else if (venue) parts.push(`${venue}.`);
   else if (pubDetails) parts.push(`${pubDetails}.`);
@@ -686,7 +688,8 @@ const UI = {
 
   renderMaterialPreview() {
     UI.renderMaterialMeta();
-    const chunks = chunkParagraphs(dom.materialText.value);
+    const chunks = splitMarkedPages(dom.materialText.value)
+      .flatMap(({ label, body }) => chunkParagraphs(body).map((text) => ({ label, text })));
     dom.materialChunkCount.textContent = chunks.length ? `${chunks.length} bagian` : "";
     if (!chunks.length) {
       const empty = el("li", "empty-state !py-8");
@@ -700,10 +703,11 @@ const UI = {
     }
     const shown = chunks.slice(0, 6).map((chunk, i) => {
       const li = el("li", "flex gap-3 p-3 rounded-xl border border-line bg-subtle");
-      li.append(
-        el("span", "font-serif italic text-ink-3 text-sm w-6 shrink-0 tabular-nums", String(i + 1).padStart(2, "0")),
-        el("p", "text-xs leading-relaxed text-ink-2 line-clamp-3", chunk)
-      );
+      const body = el("div", "min-w-0");
+      // Label halaman asli dipakai model untuk sitasi hlm., jadi ditampilkan supaya bisa dicek
+      if (chunk.label) body.append(el("p", "text-[11px] font-semibold text-ink-3 mb-1 tabular-nums", chunk.label));
+      body.append(el("p", "text-xs leading-relaxed text-ink-2 line-clamp-3", chunk.text));
+      li.append(el("span", "font-serif italic text-ink-3 text-sm w-6 shrink-0 tabular-nums", String(i + 1).padStart(2, "0")), body);
       return li;
     });
     if (chunks.length > 6) shown.push(el("li", "text-[11px] text-ink-3 pl-9", `dan ${chunks.length - 6} bagian lainnya ikut dibaca`));
@@ -1024,6 +1028,29 @@ const UI = {
 // 4. LOGIKA MURNI
 // =====================================================================
 
+// Mencari baris penulis seperti 'by Willa Cather' atau 'oleh A.A. Navis' di awal naskah, judulnya baris tepat di atasnya
+function findByline(text) {
+  const lines = (text || "").split("\n").map((ln) => ln.trim()).filter((ln) => ln && !/^\[Halaman \d+\]$/.test(ln)).slice(0, 8);
+  for (let i = 0; i < lines.length; i++) {
+    // Nama wajib berhuruf besar supaya kalimat seperti 'by the river' tidak dianggap nama penulis
+    const match = lines[i].match(/^(?:[Bb]y|[Oo]leh|[Kk]arya)\s+([A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*){0,4})$/);
+    if (!match) continue;
+    const prev = i > 0 ? lines[i - 1] : "";
+    return { author: match[1].trim(), title: prev.length >= 3 && prev.length <= 120 ? prev : "" };
+  }
+  return null;
+}
+
+// Mengikuti split_marked_pages di tools/reading_doc_reader.py: penanda [Halaman n] dari PDF jadi label halaman
+function splitMarkedPages(text) {
+  const parts = (text || "").split(/^\[Halaman (\d+)\][ \t]*$/m);
+  const pages = parts[0].trim() ? [{ label: "", body: parts[0] }] : [];
+  for (let i = 1; i < parts.length; i += 2) {
+    if ((parts[i + 1] || "").trim()) pages.push({ label: `Halaman ${parts[i]}`, body: parts[i + 1] });
+  }
+  return pages;
+}
+
 // Mengikuti tools/content_chunker.py supaya pratinjau sama dengan potongan yang disimpan server
 function chunkParagraphs(text, maxChars = 3000) {
   const clean = (text || "").replace(/\r\n?/g, "\n").trim();
@@ -1242,6 +1269,11 @@ function saveDraft() {
       storage.remove(STORAGE.draft);
       dom.draftStatus.textContent = "";
     }
+    storage.set(STORAGE.draftSetup, JSON.stringify({
+      instructions: dom.instructions.value,
+      spec: readAnswerSpec(),
+      source: State.specSource
+    }));
   }, 400);
 }
 
@@ -1311,8 +1343,8 @@ async function applyDetectedCourse(code) {
 async function handleQuestionFile(file) {
   if (!file) return;
   const ext = "." + (file.name || "").split(".").pop().toLowerCase();
-  if (![".pdf", ".docx", ".txt"].includes(ext)) {
-    UI.showAlert("Format berkas soal belum didukung", "Unggah lembar soal dalam format PDF, Word .docx, atau TXT.");
+  if (![".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".webp"].includes(ext)) {
+    UI.showAlert("Format berkas soal belum didukung", "Unggah lembar soal dalam format PDF, Word .docx, TXT, atau screenshot PNG dan JPG.");
     return;
   }
   // Defensive UI: soal yang sudah diketik tidak ditimpa diam diam
@@ -1470,7 +1502,12 @@ async function handleMaterialFile(file) {
     const data = await Api.parseReadingDoc(file);
     if (!data.success) throw new ApiError(data.message, 422);
     dom.materialText.value = data.text;
-    if (!dom.materialTitle.value.trim()) dom.materialTitle.value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    // Baris 'by Willa Cather' di awal naskah lebih bisa dipercaya daripada nama berkas yang sering mencampur judul dan penulis
+    const byline = findByline(data.text);
+    if (!dom.materialAuthor.value.trim() && byline) dom.materialAuthor.value = byline.author;
+    if (!dom.materialTitle.value.trim()) {
+      dom.materialTitle.value = (byline && byline.title) || file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    }
     UI.renderMaterialPreview();
     UI.toast(`${formatNumber(data.char_count)} karakter terbaca`);
   } catch (err) {
@@ -1751,6 +1788,7 @@ async function startNewTask() {
   State.questionFileName = "";
   setQuestionText("");
   storage.remove(STORAGE.draft);
+  storage.remove(STORAGE.draftSetup);
   dom.draftStatus.textContent = "";
   dom.instructions.value = "";
   dom.courseName.value = "";
@@ -1868,11 +1906,20 @@ function init() {
     dom.topic.value = draft;
     dom.draftStatus.textContent = "Draf dari sesi sebelumnya dipulihkan";
   }
+  try {
+    const setup = JSON.parse(storage.get(STORAGE.draftSetup) || "null");
+    if (setup) {
+      dom.instructions.value = setup.instructions || "";
+      if (setup.source) applyAnswerSpec(setup.spec, setup.source);
+    }
+  } catch (err) { /* draf rusak diabaikan, pengguna tinggal isi ulang */ }
   UI.renderTopicMeta();
   dom.topic.addEventListener("input", () => {
     UI.renderTopicMeta();
     saveDraft();
   });
+  [dom.instructions, dom.specQuestionCount, dom.specAnswerType, dom.specLanguage, dom.specWordLimit, dom.specWordScope]
+    .forEach((input) => input.addEventListener("input", saveDraft));
 
   // Tab soal dengan navigasi panah kiri kanan
   dom.tabType.addEventListener("click", () => UI.selectQuestionTab("type"));
@@ -1938,14 +1985,23 @@ function init() {
   attachUtLookup();
   dom.btnGenerate.addEventListener("click", generate);
 
-  // Ctrl+V gambar dari Snipping Tool saat mengisi bahan dosen
+  // Ctrl+V gambar dari Snipping Tool: di Tahap 1 jadi lembar soal, di Tahap 2 jadi bahan dosen
   window.addEventListener("paste", (e) => {
-    if (State.step !== 2 || State.mode !== "bahan") return;
+    const onQuestion = State.step === 1;
+    if (!onQuestion && (State.step !== 2 || State.mode !== "bahan")) return;
+    // Salinan dari Word juga membawa versi gambar. Kalau ada teksnya, biarkan jadi tempel teks biasa.
+    if (e.clipboardData && e.clipboardData.types.includes("text/plain")) return;
     const item = Array.from((e.clipboardData && e.clipboardData.items) || []).find((i) => i.type.startsWith("image/"));
     const file = item && item.getAsFile();
     if (!file) return;
     e.preventDefault();
-    readScreenshot(file);
+    if (onQuestion) {
+      // Gambar tempelan tidak punya nama berkas, jadi diberi nama supaya ekstensinya terbaca
+      const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+      handleQuestionFile(new File([file], `soal-tempel.${ext}`, { type: file.type }));
+    } else {
+      readScreenshot(file);
+    }
   });
 
   // Tahap 3

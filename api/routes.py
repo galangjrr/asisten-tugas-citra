@@ -12,7 +12,7 @@ from api.schemas import (
     ExtractScreenshotRequest, ExtractScreenshotResponse,
     ParseQuestionDocRequest, ParseQuestionDocResponse,
     TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse,
-    ParseReadingDocResponse
+    ParseReadingDocResponse, PublicationLookupRequest, PublicationLookupResponse
 )
 from tools.academic_search import search_openalex_papers
 from tools.pdf_downloader import download_paper_pdf
@@ -22,6 +22,7 @@ from tools.ocr_vision import extract_text_from_image
 from tools.question_reader import parse_question_document
 from tools.reading_doc_reader import read_reading_doc, split_marked_pages, MAX_READING_DOC_BYTES
 from tools.content_chunker import chunk_paragraphs
+from tools.publication_lookup import lookup_publication
 from tools.gemini_client import get_ai_status
 from agents.generator import generate_academic_draft, rewrite_section
 from exporters.docx_builder import create_assignment_docx
@@ -233,6 +234,19 @@ async def parse_reading_doc(file: UploadFile = File(...)):
         char_count=len(text),
         message=f"Berhasil membaca {len(text)} karakter dari {filename} {source}."
     )
+
+
+@router.post("/lookup-publication", response_model=PublicationLookupResponse)
+async def lookup_publication_info(payload: PublicationLookupRequest):
+    """Mencari penulis, tahun terbit pertama, dan tempat terbit lewat Google Search. Hanya jalan saat tombol diklik."""
+    try:
+        result = await lookup_publication(payload.title, payload.author or "")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error cari info terbit: {e}")
+        raise HTTPException(status_code=503, detail="Gemini sedang sibuk atau kuota hariannya habis. Isi tahun manual dulu, atau coba lagi nanti.")
+    return PublicationLookupResponse(**result)
 
 
 @router.get("/ut-course-lookup", response_model=UTCourseLookupResponse)

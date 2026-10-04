@@ -448,9 +448,13 @@
                 <input type="text" id="input-material-author" maxlength="200" class="field" placeholder="A.A. Navis">
               </div>
               <div>
-                <label for="input-material-year" class="label">Tahun terbit</label>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label for="input-material-year" class="label !mb-0">Tahun terbit</label>
+                  <button type="button" id="btn-lookup-publication" class="btn btn-secondary px-2.5 py-1 text-[11px]" aria-describedby="publication-result">Cari info terbit</button>
+                </div>
                 <input type="number" id="input-material-year" min="1000" max="2100" inputmode="numeric" class="field tabular-nums" placeholder="1956">
               </div>
+              <div id="publication-result" class="hidden sm:col-span-2 rounded-xl border border-line bg-subtle p-3 text-xs text-ink-2" aria-live="polite"></div>
               <div>
                 <label for="input-material-publisher" class="label">Penerbit atau nama sumber</label>
                 <input type="text" id="input-material-publisher" maxlength="200" class="field" placeholder="Gramedia Pustaka Utama">

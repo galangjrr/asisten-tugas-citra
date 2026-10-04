@@ -111,6 +111,7 @@ const Api = {
   uploadQuestion: (file) => Api.upload("/api/upload-question-file", file),
   parseReadingDoc: (file) => Api.upload("/api/parse-reading-doc", file),
   saveMaterial: (payload) => Api.postJson("/api/manual-module", payload),
+  lookupPublication: (title, author) => Api.postJson("/api/lookup-publication", { title, author: author || null }),
   search: (query, limit) => Api.postJson("/api/search", { query, limit }),
   generate: (payload) => Api.postJson("/api/generate", payload),
   utLookup: (query) => Api.request(`/api/ut-course-lookup?query=${encodeURIComponent(query)}`),
@@ -185,6 +186,8 @@ const dom = {
   materialYear: $("input-material-year"),
   materialPublisher: $("input-material-publisher"),
   materialPage: $("input-material-page"),
+  btnLookupPublication: $("btn-lookup-publication"),
+  publicationResult: $("publication-result"),
   materialText: $("input-material-text"),
   materialTextMeta: $("material-text-meta"),
   materialScreenshot: $("upload-material-screenshot"),
@@ -1028,6 +1031,60 @@ const UI = {
 // 4. LOGIKA MURNI
 // =====================================================================
 
+// Satu pencarian Google lewat Gemini per klik. Hasil hanya mengisi kolom yang masih kosong supaya isian pengguna tidak ditimpa.
+async function lookupPublicationInfo() {
+  const title = dom.materialTitle.value.trim();
+  const box = dom.publicationResult;
+  if (title.length < 3) {
+    dom.materialTitle.focus();
+    UI.toast("Isi judul naskah dulu");
+    return;
+  }
+  setBusy(dom.btnLookupPublication, true, "Mencari");
+  box.classList.remove("hidden");
+  box.replaceChildren(el("p", "animate-pulse", "Mencari info terbit pertama di internet..."));
+  try {
+    const data = await Api.lookupPublication(title, dom.materialAuthor.value.trim());
+    if (!data.found) {
+      box.replaceChildren(el("p", "", data.note || "Info terbit tidak ditemukan. Isi manual dari sampul atau halaman hak cipta naskah."));
+      return;
+    }
+    const filled = [];
+    [[dom.materialAuthor, data.author, "penulis"], [dom.materialYear, data.year, "tahun"], [dom.materialPublisher, data.venue, "tempat terbit"]]
+      .forEach(([input, value, name]) => {
+        if (value && !input.value.trim()) {
+          input.value = value;
+          filled.push(name);
+        }
+      });
+    UI.renderMaterialMeta();
+    const facts = [data.author, data.year, data.venue].filter(Boolean).join(" · ");
+    const children = [
+      el("p", "font-semibold text-ink", facts),
+      el("p", "mt-1", data.note),
+      el("p", "mt-1 text-ink-3", filled.length
+        ? `Terisi otomatis: ${filled.join(", ")}. Cek dulu sebelum simpan, hasil pencarian bisa meleset.`
+        : "Kolom sudah terisi, jadi tidak ditimpa. Bandingkan dengan isianmu.")
+    ];
+    const list = el("ul", "mt-2 space-y-0.5");
+    data.sources.forEach((src) => {
+      const a = el("a", "underline underline-offset-2 hover:text-ink break-all", src.title);
+      a.href = src.uri;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      const li = el("li");
+      li.append(a);
+      list.append(li);
+    });
+    children.push(el("p", "mt-2 font-semibold text-ink-3", "Sumber"), list);
+    box.replaceChildren(...children);
+  } catch (err) {
+    box.replaceChildren(el("p", "text-danger-text", err.message || "Pencarian gagal. Isi tahun manual dulu."));
+  } finally {
+    setBusy(dom.btnLookupPublication, false);
+  }
+}
+
 // Mencari baris penulis seperti 'by Willa Cather' atau 'oleh A.A. Navis' di awal naskah, judulnya baris tepat di atasnya
 function findByline(text) {
   const lines = (text || "").split("\n").map((ln) => ln.trim()).filter((ln) => ln && !/^\[Halaman \d+\]$/.test(ln)).slice(0, 8);
@@ -1537,6 +1594,7 @@ function readMaterialForm() {
 
 function clearMaterialForm() {
   [dom.materialTitle, dom.materialAuthor, dom.materialYear, dom.materialPublisher, dom.materialPage, dom.materialText].forEach((input) => { input.value = ""; });
+  dom.publicationResult.classList.add("hidden");
   UI.renderUtResult(null);
   UI.renderMaterialPreview();
 }
@@ -1982,6 +2040,7 @@ function init() {
     dom.materialScreenshot.value = "";
   });
   dom.btnSaveMaterial.addEventListener("click", saveMaterial);
+  dom.btnLookupPublication.addEventListener("click", lookupPublicationInfo);
   attachUtLookup();
   dom.btnGenerate.addEventListener("click", generate);
 

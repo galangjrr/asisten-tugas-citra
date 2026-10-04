@@ -107,6 +107,26 @@ class ManualModuleRequest(BaseModel):
     content_text: str = Field(..., min_length=15, max_length=2_000_000, description="Teks bahan bacaan dari dosen")
 
 
+class PublicationLookupRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=300)
+    author: Optional[str] = Field(None, max_length=200)
+
+
+class PublicationSource(BaseModel):
+    title: str
+    uri: str
+
+
+class PublicationLookupResponse(BaseModel):
+    """Saran info terbit dari pencarian web. Pengguna tetap mengecek sebelum dipakai di daftar pustaka."""
+    found: bool
+    author: Optional[str] = None
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    note: str = ""
+    sources: List[PublicationSource] = []
+
+
 class ParseReadingDocResponse(BaseModel):
     success: bool
     filename: str = ""

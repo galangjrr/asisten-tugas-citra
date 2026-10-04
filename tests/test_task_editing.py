@@ -61,3 +61,14 @@ def test_rewrite_only_touches_one_section(monkeypatch):
     assert seen["word_limit"] == 250 and seen["student_name"] == "Citra" and seen["instruction"] == "lebih santai"
 
     assert client.post("/api/tasks/rw1/sections/5/rewrite", json={}).status_code == 400
+
+
+def test_download_after_restart_loads_task_from_disk():
+    make_task("unduh1")
+    routes.save_task_to_disk("unduh1", routes.TASKS_DB["unduh1"])
+    # Aplikasi dibuka ulang: memori kosong, tugas cuma ada di disk
+    routes.TASKS_DB.pop("unduh1")
+    res = client.get("/api/download/docx/unduh1")
+    assert res.status_code == 200
+    assert res.content[:2] == b"PK"
+    assert client.get("/api/download/pdf/tidakada").status_code == 404

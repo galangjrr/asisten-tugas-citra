@@ -536,9 +536,8 @@ async def generate_task(payload: GenerateRequest):
 @router.get("/download/{file_type}/{task_id}")
 async def download_file(file_type: str, task_id: str):
     """Mengunduh berkas docx atau pdf hasil rakitan tugas."""
-    task = TASKS_DB.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Berkas tugas tidak ditemukan atau sudah kadaluarsa.")
+    # Tugas lama dimuat ulang dari disk supaya tetap bisa diunduh setelah aplikasi dibuka ulang
+    task = get_task_or_404(task_id)
 
     if file_type == "docx":
         file_path = task.get("docx_path")

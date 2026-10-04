@@ -529,6 +529,7 @@ async def generate_task(payload: GenerateRequest):
         references=selected_papers,
         evidence=evidence_list,
         identity_lines=identity_lines,
+        language=language,
     )
 
 

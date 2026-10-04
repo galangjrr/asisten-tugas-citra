@@ -320,7 +320,8 @@ function formatAcademicReferenceText(ref, isEnDoc) {
   else if (pgs) pubDetails = `${isEnDoc ? "pp. " : "hlm. "}${pgs}`;
   else if (pageInfo) pubDetails = pageInfo;
 
-  const parts = [`${authorStr}. (${year}). ${title}.`];
+  // Inisial seperti 'Cather, W.' sudah diakhiri titik, jadi jangan ditambah titik lagi
+  const parts = [`${authorStr.replace(/\.$/, "")}. (${year}). ${title}.`];
   if (venue && pubDetails) parts.push(`${venue}, ${pubDetails}.`);
   else if (venue) parts.push(`${venue}.`);
   else if (pubDetails) parts.push(`${pubDetails}.`);
@@ -912,8 +913,8 @@ const UI = {
   },
 
   buildReferencesBlock() {
-    const sample = (State.doc.title + " " + (State.doc.sections[0] ? State.doc.sections[0].content : "")).toLowerCase().split(/\s+/);
-    const isEnDoc = ["the", "and", "is", "of", "to", "that", "this"].some((w) => sample.includes(w));
+    // Bahasa diambil dari generator. Menebak dari kata 'the' salah untuk naskah Indonesia yang memuat kutipan bahasa Inggris.
+    const isEnDoc = State.doc.language === "en";
     const block = el("div", "paper-refs");
     block.append(el("h3", "paper-heading", isEnDoc ? "References" : "Daftar Pustaka"));
     const list = el("ol");
@@ -1639,7 +1640,8 @@ async function generate() {
       sections: data.sections,
       references: data.references,
       identityLines: data.identity_lines || [],
-      wordCount: data.word_count
+      wordCount: data.word_count,
+      language: data.language
     };
     UI.renderPipeline(5);
     UI.renderEvidence(data.evidence);

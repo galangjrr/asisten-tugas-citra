@@ -94,6 +94,8 @@ class GenerateResponse(BaseModel):
     references: List[dict]
     evidence: Optional[List[EvidenceItem]] = None
     identity_lines: List[str] = []
+    # Bahasa naskah dari generator, dipakai frontend untuk judul daftar pustaka
+    language: Optional[str] = None
 
 
 class ManualModuleRequest(BaseModel):

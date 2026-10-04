@@ -97,6 +97,8 @@ def test_endpoint_references_indonesian(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
+    # Frontend memakai bahasa ini untuk judul Daftar Pustaka, bukan menebak dari kata di naskah
+    assert data["language"] == "id"
     task_id = data["task_id"]
 
     # 4. Unduh berkas melalui endpoint /api/download

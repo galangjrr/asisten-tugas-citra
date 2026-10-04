@@ -229,6 +229,7 @@ const dom = {
   result: $("result-container"),
   resultTitle: $("result-title"),
   resultStats: $("result-stats"),
+  resultShortfall: $("result-shortfall"),
   evidence: $("evidence-container"),
   evidenceList: $("evidence-list"),
   evidenceCount: $("evidence-count-badge"),
@@ -806,6 +807,16 @@ const UI = {
   renderStats() {
     const refs = State.doc.references.length;
     dom.resultStats.textContent = `Sekitar ${formatNumber(State.doc.wordCount)} kata · ${refs ? `${refs} rujukan terverifikasi` : "tanpa rujukan"}`;
+    // Pengembangan otomatis di server bisa gagal diam diam saat Gemini kena limit, jadi kekurangannya ditampilkan di sini
+    const min = State.doc.wordMin;
+    const short = Boolean(min) && State.doc.wordCount < min;
+    dom.resultShortfall.classList.toggle("hidden", !short);
+    if (short) {
+      dom.resultShortfall.replaceChildren(
+        el("span", "flex-1 min-w-[12rem]", `Baru ${formatNumber(State.doc.wordCount)} dari minimal ${formatNumber(min)} kata dosen. Pengembangan otomatis belum berhasil, biasanya karena Gemini sedang sibuk.`),
+        UI.docButton(`Kembangkan sampai ${formatNumber(min)} kata`, true, expandToMinimum)
+      );
+    }
   },
 
   renderEvidence(evidence) {
@@ -1877,7 +1888,8 @@ async function generate() {
   UI.renderGenerating(true);
   runPipelineAnimation();
   try {
-    const data = await Api.generate(buildGeneratePayload(paperIds));
+    const payload = buildGeneratePayload(paperIds);
+    const data = await Api.generate(payload);
     if (!data.success) throw new ApiError("Naskah gagal disusun. Coba sekali lagi.", 500);
     State.taskId = data.task_id;
     State.doc = {
@@ -1886,7 +1898,8 @@ async function generate() {
       references: data.references,
       identityLines: data.identity_lines || [],
       wordCount: data.word_count,
-      language: data.language
+      language: data.language,
+      wordMin: (payload.answer_spec && payload.answer_spec.word_min) || null
     };
     State.sectionHistory = {};
     UI.renderPipeline(5);
@@ -1963,6 +1976,46 @@ async function rewriteSection(article, index, instruction) {
     UI.showSectionError(article, err.message || "Gagal menghubungi server.");
   } finally {
     checkSystemHealth();
+  }
+}
+
+// Mengembangkan bagian terpendek lewat endpoint tulis ulang sampai total memenuhi batas minimal dosen.
+// Tiap bagian yang dikembangkan masuk riwayat, jadi bisa dibatalkan dengan tombol Kembalikan.
+async function expandToMinimum() {
+  const min = State.doc && State.doc.wordMin;
+  if (!min || State.docBusy) return;
+  const goal = Math.round(min * 1.05);
+  const order = State.doc.sections
+    .map((sec, i) => [i, countWords(sec.content)])
+    .sort((a, b) => a[1] - b[1])
+    .map(([i]) => i);
+  UI.setDocBusy(true);
+  let failure = null;
+  try {
+    for (let step = 0; step < order.length && State.doc.wordCount < min; step++) {
+      const index = order[step];
+      const current = countWords(State.doc.sections[index].content);
+      // Kekurangan dibagi ke paling banyak dua bagian supaya hemat kuota Gemini
+      const want = current + Math.ceil((goal - State.doc.wordCount) / Math.min(order.length - step, 2));
+      dom.resultShortfall.firstChild.textContent = `Mengembangkan bagian ${index + 1} jadi sekitar ${want} kata...`;
+      const previous = State.doc.sections[index];
+      const data = await Api.rewriteSection(State.taskId, index,
+        `Kembangkan bagian ini menjadi sekitar ${want} kata dengan penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. Pertahankan semua poin, kutipan, dan sitasi yang sudah ada. DILARANG mengulang kalimat atau mengarang fakta.`);
+      rememberSection(index, previous);
+      Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
+    }
+  } catch (err) {
+    failure = err.message || "Gagal menghubungi server.";
+  } finally {
+    UI.setDocBusy(false);
+    UI.renderDocument();
+    checkSystemHealth();
+  }
+  // Kotak peringatan tetap tampil selama masih kurang, jadi pesan gagal ditaruh di sana bersama tombol coba lagi
+  if (failure && State.doc.wordCount < State.doc.wordMin) {
+    dom.resultShortfall.firstChild.textContent = `Baru ${formatNumber(State.doc.wordCount)} dari minimal ${formatNumber(State.doc.wordMin)} kata. ${failure} Coba lagi setelah status Gemini hijau.`;
+  } else {
+    UI.toast(`Naskah sekarang ${formatNumber(State.doc.wordCount)} kata`);
   }
 }
 

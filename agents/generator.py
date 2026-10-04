@@ -237,9 +237,9 @@ async def generate_academic_draft(
     word_min = spec.get("word_min")
     if word_limit:
         target_words = min(target_words, word_limit)
-    # Model cenderung menulis lebih pendek dari target, jadi target dinaikkan 10 persen di atas batas minimal dosen
+    # Model cenderung menulis 15 sampai 20 persen lebih pendek dari target, jadi target dinaikkan 20 persen di atas batas minimal dosen
     if word_min:
-        target_words = max(target_words, round(word_min * 1.1))
+        target_words = max(target_words, round(word_min * 1.2))
         if word_limit:
             target_words = min(target_words, word_limit)
     if format_type == "otomatis" and answer_type in ("esai", "makalah"):
@@ -981,7 +981,8 @@ async def generate_academic_draft(
             if total >= word_min:
                 break
             current = len(sections[index]["content"].split())
-            want = current + -(-(goal - total) // (len(order) - step))
+            # Kekurangan dibagi ke paling banyak dua bagian supaya hemat kuota, tiap bagian satu panggilan Gemini
+            want = current + -(-(goal - total) // min(len(order) - step, 2))
             item_cap = limits_per_section[index] if len(limits_per_section) == len(sections) else None
             try:
                 sections[index] = await rewrite_section(

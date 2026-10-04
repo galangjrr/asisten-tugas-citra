@@ -59,7 +59,7 @@ async def test_minimum_raises_target_and_overrides_short_answer_rule(monkeypatch
     assert "MENGALAHKAN anjuran menjawab singkat" in system
     assert "maksimal 800" not in system
     # Target dinaikkan di atas minimal dan dibagi per butir
-    assert "sekitar 950 kata" in system or "sekitar 880 kata" in system
+    assert "sekitar 960 kata" in system
     assert "rata-rata sekitar" in system
     # Total 900 kata sudah di atas minimal, jadi tidak ada pengembangan
     assert captured["rewrites"] == []

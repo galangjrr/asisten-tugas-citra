@@ -172,6 +172,10 @@ async def fetch_paper_by_doi(doi_str: str) -> Optional[Dict[str, Any]]:
                         if u not in pdf_urls:
                             pdf_urls.append(u)
 
+                vol = str(it.get("volume") or "").strip()
+                iss = str(it.get("issue") or "").strip()
+                pgs = str(it.get("page") or "").strip()
+
                 return {
                     "id": doi.replace("/", "_"),
                     "title": title,
@@ -179,6 +183,9 @@ async def fetch_paper_by_doi(doi_str: str) -> Optional[Dict[str, Any]]:
                     "year": year,
                     "venue": venue,
                     "doi": f"https://doi.org/{doi}",
+                    "volume": vol or None,
+                    "issue": iss or None,
+                    "pages": pgs or None,
                     "pdf_url": pdf_urls[0] if pdf_urls else f"https://doi.org/{doi}",
                     "all_pdf_urls": pdf_urls,
                     "abstract": f"Naskah terverifikasi dari registri resmi DOI Crossref dengan penerbit {venue}.",
@@ -248,12 +255,22 @@ async def search_openalex_papers(query: str, limit: int = 6) -> Dict[str, Any]:
         source_venue = primary_loc.get("source", {}) or {}
         venue_name = source_venue.get("display_name", "Publikasi Akademik")
 
+        biblio = work.get("biblio") or {}
+        vol = str(biblio.get("volume") or "").strip()
+        iss = str(biblio.get("issue") or "").strip()
+        fp = str(biblio.get("first_page") or "").strip()
+        lp = str(biblio.get("last_page") or "").strip()
+        pgs = f"{fp}–{lp}" if (fp and lp and fp != lp) else (fp or lp)
+
         results.append({
             "id": work_id,
             "title": title,
             "authors": authors if authors else ["Anonim"],
             "year": work.get("publication_year"),
             "venue": venue_name,
+            "volume": vol or None,
+            "issue": iss or None,
+            "pages": pgs or None,
             "doi": work.get("doi", ""),
             "pdf_url": pdf_url or (all_urls[0] if all_urls else None),
             "all_pdf_urls": all_urls,
@@ -302,12 +319,19 @@ async def search_openalex_papers(query: str, limit: int = 6) -> Dict[str, Any]:
                     if u not in pdf_urls:
                         pdf_urls.append(u)
 
+            vol = str(it.get("volume") or "").strip()
+            iss = str(it.get("issue") or "").strip()
+            pgs = str(it.get("page") or "").strip()
+
             results.append({
                 "id": c_id,
                 "title": title,
                 "authors": authors if authors else ["Peneliti Terverifikasi"],
                 "year": year,
                 "venue": venue,
+                "volume": vol or None,
+                "issue": iss or None,
+                "pages": pgs or None,
                 "doi": f"https://doi.org/{doi}" if doi else "",
                 "pdf_url": pdf_urls[0] if pdf_urls else (f"https://doi.org/{doi}" if doi else None),
                 "all_pdf_urls": pdf_urls,

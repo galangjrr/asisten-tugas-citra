@@ -6,6 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from xml.sax.saxutils import escape
+from tools.citation_formatter import build_academic_reference_data
 
 
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
@@ -117,16 +118,29 @@ def create_assignment_pdf(
         story.append(Paragraph(ref_title_text, heading_style))
 
     for ref in references:
-        authors_str = ", ".join(ref.get("authors") or ["Anonim"])
-        year = ref.get("year") or "n.d."
-        ref_title = ref.get("title", "")
-        venue = (ref.get("venue") or "").strip()
-        doi = ref.get("doi", "")
+        ref_data = build_academic_reference_data(ref, is_en=is_en_doc)
 
-        cit = f"{authors_str}. ({year}). {ref_title}." + (f" <i>{venue}</i>." if venue else "")
-        if doi:
-            cit += f" {doi}"
+        author_esc = escape(ref_data["authors"])
+        year_esc = escape(ref_data["year"])
+        title_esc = escape(ref_data["title"])
+        venue_esc = escape(ref_data["venue"])
+        details_esc = escape(ref_data["pub_details"])
+        doi_esc = escape(ref_data["doi"])
 
+        venue_html = f" <i>{venue_esc}</i>" if venue_esc else ""
+        if venue_esc and details_esc:
+            details_html = f", {details_esc}."
+        elif venue_esc:
+            details_html = "."
+        elif details_esc:
+            details_html = f" {details_esc}."
+        else:
+            details_html = ""
+
+        doi_html = f" {doi_esc}" if doi_esc else ""
+
+        author_lead = author_esc.rstrip(".") + "."
+        cit = f"{author_lead} ({year_esc}). {title_esc}.{venue_html}{details_html}{doi_html}"
         story.append(Paragraph(cit, ref_style))
 
     doc.build(story)

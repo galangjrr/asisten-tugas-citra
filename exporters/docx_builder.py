@@ -5,6 +5,7 @@ from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from tools.citation_formatter import build_academic_reference_data
 
 
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
@@ -113,11 +114,7 @@ def create_assignment_docx(
     ref_h_run.font.size = Pt(12)
 
     for ref in references:
-        authors_str = ", ".join(ref.get("authors") or ["Anonim"])
-        year = ref.get("year") or "n.d."
-        ref_title = ref.get("title", "")
-        venue = (ref.get("venue") or "").strip()
-        doi = ref.get("doi", "")
+        ref_data = build_academic_reference_data(ref, is_en=is_en_doc)
 
         ref_p = doc.add_paragraph()
         ref_p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -125,14 +122,40 @@ def create_assignment_docx(
         ref_p.paragraph_format.first_line_indent = Inches(-0.5)
         ref_p.paragraph_format.space_after = Pt(6)
 
-        # Bahan dosen tanpa penerbit tidak boleh menyisakan titik ganda
-        citation_line = f"{authors_str}. ({year}). {ref_title}." + (f" {venue}." if venue else "")
-        if doi:
-            citation_line += f" {doi}"
+        # 1. Penulis dan Tahun
+        lead_text = f"{ref_data['authors'].rstrip('.')}. ({ref_data['year']}). "
+        run_lead = ref_p.add_run(lead_text)
+        run_lead.font.name = "Times New Roman"
+        run_lead.font.size = Pt(11)
 
-        ref_run = ref_p.add_run(citation_line)
-        ref_run.font.name = "Times New Roman"
-        ref_run.font.size = Pt(11)
+        # 2. Judul Naskah
+        run_title = ref_p.add_run(f"{ref_data['title']}.")
+        run_title.font.name = "Times New Roman"
+        run_title.font.size = Pt(11)
+
+        # 3. Nama Jurnal / Publikasi (Cetak miring sesuai standar APA)
+        if ref_data["venue"]:
+            run_venue = ref_p.add_run(f" {ref_data['venue']}")
+            run_venue.font.name = "Times New Roman"
+            run_venue.font.size = Pt(11)
+            run_venue.italic = True
+
+        # 4. Detail Volume, Isu, Halaman
+        if ref_data["pub_details"]:
+            sep = ", " if ref_data["venue"] else " "
+            run_details = ref_p.add_run(f"{sep}{ref_data['pub_details']}.")
+            run_details.font.name = "Times New Roman"
+            run_details.font.size = Pt(11)
+        elif ref_data["venue"]:
+            run_dot = ref_p.add_run(".")
+            run_dot.font.name = "Times New Roman"
+            run_dot.font.size = Pt(11)
+
+        # 5. Tautan DOI
+        if ref_data["doi"]:
+            run_doi = ref_p.add_run(f" {ref_data['doi']}")
+            run_doi.font.name = "Times New Roman"
+            run_doi.font.size = Pt(11)
 
     doc.save(file_path)
     return file_path

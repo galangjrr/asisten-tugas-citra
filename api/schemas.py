@@ -23,6 +23,10 @@ class PaperItem(BaseModel):
     abstract: Optional[str] = None
     scholar_url: Optional[str] = None
     is_ut_bmp: bool = False
+    volume: Optional[str] = None
+    issue: Optional[str] = None
+    pages: Optional[str] = None
+    page_info: Optional[str] = None
 
 
 class SearchRequest(BaseModel):

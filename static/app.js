@@ -858,6 +858,59 @@ const UI = {
     setTimeout(() => item.classList.remove("is-flash"), 1600);
   },
 
+function formatAuthorsAPA(authors) {
+  if (!authors || !authors.length) return "Anonim";
+  const institutional = ["universitas", "kementerian", "badan", "lembaga", "organisasi", "bureau", "department", "ministry", "organization", "institute", "university", "press", "who", "unesco", "anonim"];
+  const formatted = authors.map((a) => {
+    if (!a || !a.trim()) return "Anonim";
+    const clean = a.trim();
+    if (institutional.some((k) => clean.toLowerCase().includes(k))) return clean;
+    if (clean.includes(",")) {
+      const parts = clean.split(",");
+      const surname = parts[0].trim();
+      const initials = (parts[1] || "").trim().split(/\s+/).filter(Boolean).map((n) => n[0].toUpperCase() + ".").join(" ");
+      return initials ? `${surname}, ${initials}` : surname;
+    }
+    const tokens = clean.split(/\s+/);
+    if (tokens.length === 1) return clean;
+    const surname = tokens[tokens.length - 1];
+    const initials = tokens.slice(0, -1).map((n) => n[0].toUpperCase() + ".").join(" ");
+    return initials ? `${surname}, ${initials}` : surname;
+  });
+  if (formatted.length === 1) return formatted[0];
+  if (formatted.length === 2) return `${formatted[0]}, & ${formatted[1]}`;
+  return `${formatted.slice(0, -1).join(", ")}, & ${formatted[formatted.length - 1]}`;
+}
+
+function formatAcademicReferenceText(ref, isEnDoc) {
+  const authorStr = formatAuthorsAPA(ref.authors);
+  const year = ref.year || "n.d.";
+  const title = (ref.title || "Tanpa Judul").trim().replace(/\.+$/, "");
+  const venue = (ref.venue || "").trim().replace(/\.+$/, "");
+  let doi = (ref.doi || "").trim();
+  if (doi && !doi.startsWith("http")) doi = `https://doi.org/${doi.replace(/^\/+/, "")}`;
+
+  let pubDetails = "";
+  const vol = (ref.volume || "").trim();
+  const iss = (ref.issue || "").trim();
+  const pgs = (ref.pages || "").trim();
+  const pageInfo = (ref.page_info || "").trim().replace(/\.+$/, "");
+
+  if (vol && iss && pgs) pubDetails = `${vol}(${iss}), ${pgs}`;
+  else if (vol && pgs) pubDetails = `${vol}, ${pgs}`;
+  else if (vol && iss) pubDetails = `${vol}(${iss})`;
+  else if (pgs) pubDetails = `${isEnDoc ? "pp. " : "hlm. "}${pgs}`;
+  else if (pageInfo) pubDetails = pageInfo;
+
+  const parts = [`${authorStr}. (${year}). ${title}.`];
+  if (venue && pubDetails) parts.push(`${venue}, ${pubDetails}.`);
+  else if (venue) parts.push(`${venue}.`);
+  else if (pubDetails) parts.push(`${pubDetails}.`);
+  if (doi) parts.push(doi);
+
+  return { authorStr, year, title, venue, pubDetails, doi, fullText: parts.join(" ") };
+}
+
   buildReferencesBlock() {
     const sample = (State.doc.title + " " + (State.doc.sections[0] ? State.doc.sections[0].content : "")).toLowerCase().split(/\s+/);
     const isEnDoc = ["the", "and", "is", "of", "to", "that", "this"].some((w) => sample.includes(w));
@@ -865,12 +918,29 @@ const UI = {
     block.append(el("h3", "paper-heading", isEnDoc ? "References" : "Daftar Pustaka"));
     const list = el("ol");
     State.doc.references.forEach((ref, i) => {
-      const authors = (ref.authors && ref.authors.length ? ref.authors : ["Anonim"]).join(", ");
-      const parts = [`${authors}. (${ref.year || "n.d."}). ${ref.title}.`];
-      if (ref.venue) parts.push(`${ref.venue}.`);
-      if (ref.doi) parts.push(ref.doi);
-      const li = el("li", "", parts.join(" "));
+      const data = formatAcademicReferenceText(ref, isEnDoc);
+      const li = el("li");
       li.dataset.refIndex = String(i);
+
+      li.append(document.createTextNode(`${data.authorStr}. (${data.year}). ${data.title}.`));
+      if (data.venue) {
+        li.append(document.createTextNode(" "));
+        const em = el("em", "italic", data.venue);
+        li.append(em);
+      }
+      if (data.pubDetails) {
+        li.append(document.createTextNode(`${data.venue ? ", " : " "}${data.pubDetails}.`));
+      } else if (data.venue) {
+        li.append(document.createTextNode("."));
+      }
+      if (data.doi) {
+        li.append(document.createTextNode(" "));
+        const a = el("a", "underline text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100", data.doi);
+        a.href = data.doi;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        li.append(a);
+      }
       list.append(li);
     });
     block.append(list);
@@ -1093,10 +1163,11 @@ function documentAsText() {
     out.push(sec.content, "");
   });
   if (doc.references.length) {
-    out.push("Daftar Pustaka");
+    const isEn = State.doc.language === "en";
+    out.push(isEn ? "REFERENCES" : "DAFTAR PUSTAKA", "");
     doc.references.forEach((ref) => {
-      const authors = (ref.authors && ref.authors.length ? ref.authors : ["Anonim"]).join(", ");
-      out.push([`${authors}. (${ref.year || "n.d."}). ${ref.title}.`, ref.venue ? `${ref.venue}.` : "", ref.doi || ""].filter(Boolean).join(" "));
+      const data = formatAcademicReferenceText(ref, isEn);
+      out.push(data.fullText);
     });
   }
   return out.join("\n").trim();

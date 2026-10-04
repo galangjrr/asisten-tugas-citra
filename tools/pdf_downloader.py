@@ -4,7 +4,7 @@ from typing import Optional, Any, Union
 
 
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+from tools.paths import STORAGE_DIR
 
 
 async def download_paper_pdf(pdf_candidates: Any, paper_id: str) -> Optional[str]:

@@ -72,3 +72,47 @@ def test_download_after_restart_loads_task_from_disk():
     assert res.status_code == 200
     assert res.content[:2] == b"PK"
     assert client.get("/api/download/pdf/tidakada").status_code == 404
+
+
+def test_model_html_tags_are_removed_but_math_signs_stay():
+    from agents.generator import clean_output_text
+    assert clean_output_text("<p>Paragraf satu.</p><p>Paragraf dua.</p>") == "Paragraf satu.\nParagraf dua."
+    assert clean_output_text("Baris satu<br>baris dua <strong>tebal</strong>") == "Baris satu\nbaris dua tebal"
+    assert clean_output_text("Jika x < 5 dan y > 2 maka x<y") == "Jika x < 5 dan y > 2 maka x<y"
+
+
+import pytest
+
+
+@pytest.mark.anyio
+async def test_rewrite_is_a_conservative_revision(monkeypatch):
+    import agents.generator as gen
+    captured = {}
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        captured["system"], captured["user"], captured["temp"] = config.system_instruction, contents, config.temperature
+        return type("Res", (), {"text": '{"content": "<p>Versi baru.</p>"}'})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    result = await gen.rewrite_section("1. Jelaskan.", [{"heading": "1. A", "content": "Versi lama."}], 0)
+
+    assert result["content"] == "Versi baru."
+    assert captured["temp"] <= 0.3
+    assert "Ini REVISI, bukan menulis dari nol" in captured["system"]
+    assert "DILARANG memakai tag HTML" in captured["system"]
+    assert "isi dan kutipan tetap sama" in captured["user"]
+
+
+def test_frozen_exe_stores_data_in_local_appdata(monkeypatch, tmp_path):
+    import importlib, sys
+    import tools.paths as paths
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    try:
+        importlib.reload(paths)
+        # Folder Temp\_MEIxxxx milik exe dihapus saat aplikasi ditutup, jadi data wajib di LocalAppData
+        assert paths.STORAGE_DIR == str(tmp_path / "AsistenTugasCitra" / "storage")
+    finally:
+        monkeypatch.delattr(sys, "frozen")
+        importlib.reload(paths)
+    assert paths.STORAGE_DIR.endswith("storage") and "AsistenTugasCitra" not in paths.STORAGE_DIR

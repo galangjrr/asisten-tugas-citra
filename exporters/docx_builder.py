@@ -8,7 +8,7 @@ from docx.oxml.ns import qn
 from tools.citation_formatter import build_academic_reference_data
 
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+from tools.paths import STORAGE_DIR
 
 
 def set_a4_margins(doc: Document):

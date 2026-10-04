@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 
-DEFAULT_STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+from tools.paths import STORAGE_DIR as DEFAULT_STORAGE_DIR
 
 
 def clean_storage_by_age(max_age_hours: int = 24, storage_dir: Optional[str] = None) -> int:

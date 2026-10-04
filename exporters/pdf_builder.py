@@ -9,7 +9,7 @@ from xml.sax.saxutils import escape
 from tools.citation_formatter import build_academic_reference_data
 
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+from tools.paths import STORAGE_DIR
 
 
 def create_assignment_pdf(

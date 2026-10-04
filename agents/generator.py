@@ -80,6 +80,10 @@ def clean_output_text(text: str) -> str:
     """Merapikan keluaran model supaya terbaca seperti ketikan mahasiswa di Word.
     Em dash, en dash, dan elipsis satu karakter diganti tanda baca umum.
     Notasi linear seperti x^2 dan sqrt(100) diubah ke x² dan √100."""
+    # Model kadang membalas dalam HTML. Pemisah paragraf jadi baris baru, tag format lain dibuang.
+    # Hanya nama tag yang dikenal, supaya tanda < di rumus seperti x < 5 tidak ikut terhapus.
+    text = re.sub(r"(?i)<br\s*/?>|</p>\s*<p[^>]*>", "\n", text)
+    text = re.sub(r"(?i)</?(?:p|div|span|b|i|u|em|strong|h[1-6]|ul|ol|li)\b[^>]*>", "", text)
     text = re.sub(r"(?<=\d)[ \t]*[—–][ \t]*(?=\d)", "-", text)
     text = re.sub(r"^([ \t]*)[—–][ \t]*", r"\1- ", text, flags=re.M)
     text = re.sub(r"[ \t]*[—–][ \t]*", ", ", text)
@@ -996,7 +1000,10 @@ async def rewrite_section(
     )
 
     system_instruction = f"""
-    Kamu mahasiswa yang merevisi SATU bagian jawaban tugasnya sendiri. Tulis ulang hanya bagian yang ditandai, dengan suara mahasiswa yang alami dan bebas klise AI.
+    Kamu mahasiswa yang merevisi SATU bagian jawaban tugasnya sendiri. Revisi hanya bagian yang ditandai, dengan suara mahasiswa yang alami dan bebas klise AI.
+    - Ini REVISI, bukan menulis dari nol. Pertahankan poin, urutan argumen, contoh, kutipan langsung, sitasi, jumlah paragraf, dan panjang versi sekarang. Ubah hanya yang diminta arahan revisi. Tanpa arahan, cukup perbaiki kejelasan kalimat, alur, dan salah ketik.
+    - Ganti, tambah, atau buang poin dan kutipan HANYA jika arahan revisi memintanya.
+    - Tulis teks biasa. DILARANG memakai tag HTML seperti <p> atau <br>, dan DILARANG markdown seperti ** atau #.
     - Bahasa keluaran: {'ENGLISH' if is_en else 'BAHASA INDONESIA'}.
     - Jawaban tetap harus menjawab butir soal yang sama sesuai lembar soal dan petunjuk dosen. Jika soal merujuk blok '[Gambar: ...]', jangan mengarang detail di luar deskripsi itu.
     - {limit_rule}
@@ -1017,7 +1024,7 @@ async def rewrite_section(
     NASKAH SEKARANG:
     {draft}
 
-    ARAHAN REVISI DARI MAHASISWA: {instruction.strip() or 'Tulis ulang dengan kalimat yang lebih baik dan tetap setia pada soal.'}
+    ARAHAN REVISI DARI MAHASISWA: {instruction.strip() or 'Tidak ada arahan khusus. Perbaiki kejelasan kalimat dan alur seperlunya, isi dan kutipan tetap sama.'}
     """
     # Tanpa isi naskah, model tidak bisa mengecek kutipan, halaman, dan siapa yang berbicara saat menulis ulang
     if papers:
@@ -1028,7 +1035,8 @@ async def rewrite_section(
         user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
-            temperature=0.7,
+            # Suhu rendah supaya revisi tidak melenceng jauh dari versi awal
+            temperature=0.3,
             max_output_tokens=8192,
             response_mime_type="application/json",
             thinking_config=types.ThinkingConfig(thinking_level="high") if REASONING_HINT.search(topic) else None,

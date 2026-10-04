@@ -53,7 +53,9 @@ const State = {
   generating: false,
   taskId: null,
   doc: null,
-  docBusy: false
+  docBusy: false,
+  // Versi lama tiap bagian sebelum diedit atau ditulis ulang, supaya bisa dikembalikan. Kunci: nomor bagian.
+  sectionHistory: {}
 };
 
 const storage = {
@@ -875,6 +877,11 @@ const UI = {
       UI.docButton("Edit", false, () => UI.openSectionEditor(article, index), `Edit ${label}`),
       UI.docButton("Tulis ulang", false, () => UI.openRewriteForm(article, index), `Tulis ulang ${label}`)
     );
+    const history = State.sectionHistory[index] || [];
+    if (history.length) {
+      tools.append(UI.docButton("Kembalikan", false, () => restoreSection(article, index),
+        `Kembalikan ${label} ke versi sebelumnya, tersisa ${history.length} versi`));
+    }
     head.append(tools);
     const body = el("div", "section-body");
     UI.fillParagraphs(body, sec.content);
@@ -985,7 +992,7 @@ const UI = {
         return contentInput.focus();
       }
       const sections = State.doc.sections.map((s, i) => i === index ? { heading: headingInput.value.trim(), content: contentInput.value.trim() } : s);
-      saveDocument({ title: State.doc.title, sections }, article);
+      saveDocument({ title: State.doc.title, sections }, article, index);
     };
     contentInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save();
@@ -1741,6 +1748,7 @@ async function generate() {
       wordCount: data.word_count,
       language: data.language
     };
+    State.sectionHistory = {};
     UI.renderPipeline(5);
     UI.renderEvidence(data.evidence);
     UI.renderDocument();
@@ -1766,10 +1774,19 @@ async function generate() {
 }
 
 // ---------- Studio naskah ----------
-async function saveDocument(doc, container) {
+// Simpan versi lama satu bagian sebelum diganti. Dibatasi supaya memori tidak membengkak.
+function rememberSection(index, section) {
+  const history = State.sectionHistory[index] || (State.sectionHistory[index] = []);
+  history.push({ heading: section.heading, content: section.content });
+  if (history.length > 10) history.shift();
+}
+
+async function saveDocument(doc, container, changedIndex = null) {
   UI.setDocBusy(true);
   try {
+    const previous = changedIndex === null ? null : State.doc.sections[changedIndex];
     const data = await Api.updateTask(State.taskId, doc);
+    if (previous) rememberSection(changedIndex, previous);
     Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
     UI.setDocBusy(false);
     UI.renderDocument();
@@ -1793,17 +1810,39 @@ async function rewriteSection(article, index, instruction) {
   body.append(status);
   UI.setDocBusy(true);
   try {
+    const previous = State.doc.sections[index];
     const data = await Api.rewriteSection(State.taskId, index, instruction);
+    rememberSection(index, previous);
     Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
     UI.setDocBusy(false);
     UI.renderDocument();
-    UI.toast("Bagian berhasil ditulis ulang");
+    UI.toast("Bagian ditulis ulang. Tekan Kembalikan jika versi lama lebih baik");
   } catch (err) {
     UI.setDocBusy(false);
     UI.fillParagraphs(body, original);
     UI.showSectionError(article, err.message || "Gagal menghubungi server.");
   } finally {
     checkSystemHealth();
+  }
+}
+
+// Mengembalikan satu bagian ke versi sebelum diedit atau ditulis ulang, lalu menyimpan ulang berkas Word dan PDF
+async function restoreSection(article, index) {
+  const history = State.sectionHistory[index];
+  if (!history || !history.length) return;
+  const previous = history[history.length - 1];
+  const sections = State.doc.sections.map((s, i) => i === index ? previous : s);
+  UI.setDocBusy(true);
+  try {
+    const data = await Api.updateTask(State.taskId, { title: State.doc.title, sections });
+    history.pop();
+    Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
+    UI.setDocBusy(false);
+    UI.renderDocument();
+    UI.toast("Versi sebelumnya dikembalikan");
+  } catch (err) {
+    UI.setDocBusy(false);
+    UI.showSectionError(article, `Gagal mengembalikan: ${err.message}`);
   }
 }
 
@@ -1860,6 +1899,7 @@ async function startNewTask() {
   State.materials = [];
   State.taskId = null;
   State.doc = null;
+  State.sectionHistory = {};
   dom.papersList.replaceChildren();
   dom.searchInfo.textContent = "";
   clearMaterialForm();

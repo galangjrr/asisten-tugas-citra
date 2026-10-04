@@ -2,7 +2,7 @@ import os
 import json
 from typing import Dict, Any, Optional
 
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage")
+from tools.paths import STORAGE_DIR
 TASKS_DIR = os.path.join(STORAGE_DIR, "tasks")
 
 

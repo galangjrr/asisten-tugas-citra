@@ -149,7 +149,8 @@ async def test_essay_spec_applies_lecturer_word_limit(monkeypatch):
 
     system = captured["system"]
     assert "maksimal 300 kata" in system
-    assert "sekitar 300 kata" in system
+    # Target 95 persen dari batas maksimal supaya ada ruang aman di bawah batas
+    assert "sekitar 285 kata" in system
     assert "Esai" in system
 
 

@@ -237,11 +237,10 @@ async def generate_academic_draft(
     word_min = spec.get("word_min")
     if word_limit:
         target_words = min(target_words, word_limit)
-    # Model cenderung menulis 15 sampai 20 persen lebih pendek dari target, jadi target dinaikkan 20 persen di atas batas minimal dosen
-    if word_min:
-        target_words = max(target_words, round(word_min * 1.2))
-        if word_limit:
-            target_words = min(target_words, word_limit)
+    # Batas dosen menentukan target. Rentangnya dipakai lagi setelah naskah jadi untuk menyesuaikan panjang.
+    bounds = length_bounds(word_min, word_limit)
+    if bounds:
+        target_words = bounds["goal"]
     if format_type == "otomatis" and answer_type in ("esai", "makalah"):
         format_type = answer_type
 
@@ -706,11 +705,11 @@ async def generate_academic_draft(
     if word_limit:
         length_rules += (
             f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini. "
-            f"Usahakan total antara {max(word_min or 0, round(word_limit * 0.9))} dan {word_limit} kata, jangan jauh di bawahnya.\n"
+            f"Usahakan total antara {bounds['low'] or round(word_limit * 0.9)} dan {bounds['high']} kata, jangan jauh di bawahnya.\n"
         )
     if word_min:
         length_rules += (
-            f"    - Batas minimal dari dosen: seluruh jawaban WAJIB paling sedikit {word_min} kata, tidak termasuk judul, dengan target sekitar {target_words} kata. "
+            f"    - Batas minimal dari dosen: seluruh jawaban WAJIB paling sedikit {word_min} kata, tidak termasuk judul. Tulis antara {bounds['low']} dan {bounds['high']} kata, target sekitar {bounds['goal']} kata. "
             "Aturan ini MENGALAHKAN anjuran menjawab singkat dan larangan memperpanjang: butir faktual tetap diberi penjelasan, contoh, dan alasan yang relevan "
             "sampai total terpenuhi. DILARANG mengulang kalimat, berputar-putar, atau mengarang fakta untuk menambah panjang.\n"
         )
@@ -970,32 +969,19 @@ async def generate_academic_draft(
             except Exception as e:
                 print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
 
-    # Model sering berhenti di bawah batas minimal dosen. Bagian terpendek dikembangkan dulu sampai total terpenuhi,
-    # sisa kekurangan dibagi rata ke bagian yang belum dikembangkan.
-    # ponytail: satu panggilan Gemini per bagian yang dikembangkan, berhenti begitu total sudah cukup
-    if word_min and sections:
-        goal = round(word_min * 1.05)
-        order = sorted(range(len(sections)), key=lambda i: len(sections[i]["content"].split()))
-        for step, index in enumerate(order):
-            total = sum(len(s["content"].split()) for s in sections)
-            if total >= word_min:
-                break
-            current = len(sections[index]["content"].split())
-            # Kekurangan dibagi ke paling banyak dua bagian supaya hemat kuota, tiap bagian satu panggilan Gemini
-            want = current + -(-(goal - total) // min(len(order) - step, 2))
-            item_cap = limits_per_section[index] if len(limits_per_section) == len(sections) else None
+    # Model meleset sekitar 20 persen dari target ke dua arah, jadi naskah di luar rentang dosen disesuaikan sekali
+    # dalam satu panggilan untuk seluruh naskah, bukan satu panggilan per bagian.
+    bounds = length_bounds(word_min, word_limit)
+    # Terjemahan dan jawaban singkat mengikuti teks soal, jadi panjangnya tidak boleh diubah demi target kata
+    if bounds and sections and not is_direct_answer:
+        total = sum(len(sec["content"].split()) for sec in sections)
+        if total < bounds["low"] or (bounds["trigger_high"] and total > bounds["trigger_high"]):
             try:
-                sections[index] = await rewrite_section(
-                    topic, sections, index, language=language,
-                    instruction=(
-                        f"Kembangkan bagian ini menjadi sekitar {want} kata dengan penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. "
-                        "Pertahankan semua poin, kutipan, dan sitasi yang sudah ada. DILARANG mengulang kalimat atau mengarang fakta."
-                    ),
-                    word_limit=item_cap, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
-                    quote_citations=quote_citations,
+                sections = await adjust_total_length(
+                    topic, sections, bounds, language=language, papers=papers_with_content, quote_citations=quote_citations,
                 )
             except Exception as e:
-                print(f"Peringatan: gagal mengembangkan butir {index + 1} ke batas minimal: {e}")
+                print(f"Peringatan: gagal menyesuaikan panjang naskah {total} kata ke rentang dosen: {e}")
     return {
         "title": clean_output_text(str(parsed.get("title") or topic.title())),
         "sections": sections,
@@ -1003,6 +989,88 @@ async def generate_academic_draft(
         "language": language,
     }
 
+
+
+def length_bounds(word_min: Optional[int], word_limit: Optional[int]) -> Optional[Dict[str, int]]:
+    """
+    Rentang panjang dari batas dosen. low dan high dipakai di prompt, goal jadi target, trigger_high batas sebelum dipangkas.
+    Hanya minimal: 800 sampai 1.000 kata, target 880, tidak dipangkas. Hanya maksimal: 90 sampai 100 persen batas.
+    """
+    if word_min and word_limit and word_limit > word_min:
+        return {"low": word_min, "high": word_limit, "goal": round((word_min + word_limit) / 2), "trigger_high": word_limit}
+    if word_min:
+        # Lebih panjang dari minimal tidak melanggar aturan dosen. Uji nyata menunjukkan model cadangan saat kuota padat
+        # memangkas kebablasan sampai di bawah minimal atau mengabaikan instruksi, jadi kelebihan tidak dipangkas otomatis.
+        return {"low": word_min, "high": round(word_min * 1.25), "goal": round(word_min * 1.1), "trigger_high": None}
+    if word_limit:
+        # Di bawah batas maksimal tidak melanggar aturan dosen, jadi tidak dipanjangkan otomatis
+        return {"low": 0, "high": word_limit, "goal": round(word_limit * 0.95), "trigger_high": word_limit}
+    return None
+
+
+async def adjust_total_length(
+    topic: str,
+    sections: List[Dict[str, str]],
+    bounds: Dict[str, int],
+    language: str = "id",
+    papers: Optional[List[Dict[str, Any]]] = None,
+    quote_citations: bool = False,
+) -> List[Dict[str, str]]:
+    """Memanjangkan atau memendekkan seluruh naskah ke rentang dosen dalam satu panggilan. Naskah asli dikembalikan jika hasilnya tidak valid."""
+    total = sum(len(sec["content"].split()) for sec in sections)
+    goal = bounds["goal"]
+    direction = "Panjangkan" if total < goal else "Persingkat"
+    # Target per bagian lebih mudah diikuti model daripada satu angka total, yang sering dipangkas atau ditambah kebablasan
+    targets = [max(30, round(len(sec["content"].split()) * goal / total)) for sec in sections]
+    draft = "\n\n".join(
+        f"[BAGIAN {i + 1}: sekarang {len(sec['content'].split())} kata, ubah menjadi sekitar {target} kata]\n{sec['heading']}\n{sec['content']}"
+        for i, (sec, target) in enumerate(zip(sections, targets))
+    )
+    system_instruction = f"""
+    Kamu mahasiswa yang menyesuaikan panjang naskah tugasnya sendiri tanpa mengubah isi jawabannya.
+    - Total isi sekarang {total} kata. {direction} menjadi sekitar {goal} kata, paling sedikit {bounds['low']} dan paling banyak {bounds['high']} kata, tidak termasuk heading.
+    - Ikuti target kata yang tertulis di label setiap bagian. Selisih tiap bagian paling banyak 10 persen dari targetnya.
+    - Jika memanjangkan, tambah penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. Jika memendekkan, buang pengulangan dan kalimat yang paling tidak penting.
+    - Pertahankan jumlah dan urutan bagian, heading, semua poin yang diminta soal, kutipan langsung persis kata per kata, dan sitasi.
+    - DILARANG mengulang kalimat, berputar-putar, atau mengarang fakta. DILARANG memakai tag HTML, markdown, em dash, atau LaTeX.
+    - Bahasa keluaran: {'ENGLISH' if language == 'en' else 'BAHASA INDONESIA'}.
+    {TEXT_FIDELITY_RULES}
+    FORMAT KELUARAN (JSON MURNI): {{"sections": [{{"heading": "...", "content": "..."}}]}}
+    """
+    user_prompt = f"LEMBAR SOAL:\n{topic}\n\nNASKAH SEKARANG:\n{draft}\n"
+    if papers:
+        user_prompt += f"\nBAHAN SUMBER:\n{format_sources_text(papers)}\n"
+
+    response = await generate_with_fallback(
+        "generation",
+        user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.3,
+            max_output_tokens=32768,
+            response_mime_type="application/json",
+        ),
+        timeout=120.0,
+        total_budget=200.0,
+    )
+    parsed = robust_json_dict_parse(response.text) or {}
+    new_sections = [sec for sec in parsed.get("sections") or [] if isinstance(sec, dict)]
+    # Bagian yang hilang atau bertambah berarti model merombak struktur, jadi naskah asli lebih aman
+    if len(new_sections) != len(sections):
+        raise ValueError(f"jumlah bagian berubah dari {len(sections)} menjadi {len(new_sections)}")
+    adjusted = []
+    for old, new in zip(sections, new_sections):
+        content = clean_output_text(str(new.get("content") or ""))
+        if not content.strip():
+            raise ValueError("ada bagian kosong")
+        adjusted.append({"heading": old["heading"], "content": content if quote_citations else strip_quote_citations(content)})
+    # Model yang memangkas atau menambah kebablasan bisa membuat naskah makin jauh dari aturan dosen, jadi hasilnya dicek dulu
+    new_total = sum(len(sec["content"].split()) for sec in adjusted)
+    if new_total < bounds["low"] and new_total < total:
+        raise ValueError(f"hasil penyesuaian {new_total} kata malah di bawah batas minimal {bounds['low']}")
+    if abs(new_total - goal) >= abs(total - goal):
+        raise ValueError(f"hasil penyesuaian {new_total} kata tidak lebih dekat ke target {goal} daripada {total}")
+    return adjusted
 
 
 async def rewrite_section(

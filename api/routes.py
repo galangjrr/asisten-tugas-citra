@@ -20,7 +20,7 @@ from tools.pdf_parser import extract_text_with_pages
 from tools.ut_catalog import lookup_ut_course
 from tools.ocr_vision import extract_text_from_image
 from tools.question_reader import parse_question_document
-from tools.reading_doc_reader import read_reading_doc, MAX_READING_DOC_BYTES
+from tools.reading_doc_reader import read_reading_doc, split_marked_pages, MAX_READING_DOC_BYTES
 from tools.content_chunker import chunk_paragraphs
 from tools.gemini_client import get_ai_status
 from agents.generator import generate_academic_draft, rewrite_section
@@ -143,8 +143,18 @@ async def rewrite_task_section(task_id: str, index: int, payload: SectionRewrite
 async def add_manual_module(payload: ManualModuleRequest):
     """Menyimpan bahan bacaan dosen, cerpen, bab buku, atau modul BMP UT sebagai rujukan tugas."""
     content = payload.content_text.strip()
-    chunks = chunk_paragraphs(content, max_chars=3000)
-    if not chunks:
+    page_ref = (payload.page_or_ref or "").strip()
+    # PDF yang dibaca lokal membawa penanda [Halaman n], jadi halaman fisik dipakai sebagai label supaya hlm. bisa dicek dosen.
+    # Teks tanpa penanda, misal ketikan atau DOCX, tetap berlabel 'Bagian n' karena halaman aslinya tidak diketahui.
+    pages_content = []
+    part = 0
+    for label, body in split_marked_pages(content):
+        for chunk in chunk_paragraphs(body, max_chars=3000):
+            if not label:
+                part += 1
+            page_number = label or (f"{page_ref}, bagian {part}" if page_ref else f"Bagian {part}")
+            pages_content.append({"page_number": page_number, "text": chunk})
+    if not pages_content:
         raise HTTPException(status_code=400, detail="Isi bahan bacaan masih kosong.")
 
     module_title = payload.module_title.strip()
@@ -159,7 +169,6 @@ async def add_manual_module(payload: ManualModuleRequest):
     venue = (payload.publisher_or_venue or "").strip()
     if not venue and is_ut_bmp:
         venue = "Buku Materi Pokok (BMP) Universitas Terbuka"
-    page_ref = (payload.page_or_ref or "").strip()
 
     mod_id = f"bmp_{uuid.uuid4().hex[:8]}"
     item_data = {
@@ -171,17 +180,14 @@ async def add_manual_module(payload: ManualModuleRequest):
         "doi": "",
         "pdf_url": "",
         "all_pdf_urls": [],
-        "abstract": " ".join(content.split())[:400],
+        "abstract": " ".join(" ".join(p["text"] for p in pages_content[:2]).split())[:400],
         "scholar_url": "https://pustaka.ut.ac.id/" if is_ut_bmp else "",
         "has_full_pdf": True,
         "is_manual_module": True,
         "is_ut_bmp": is_ut_bmp,
         "source_status": "Buku Materi Pokok UT" if is_ut_bmp else "Bahan bacaan dosen",
         "page_info": page_ref,
-        "pages_content": [
-            {"page_number": f"{page_ref}, bagian {i}" if page_ref else f"Bagian {i}", "text": chunk}
-            for i, chunk in enumerate(chunks, 1)
-        ],
+        "pages_content": pages_content,
     }
     CACHED_PAPERS[mod_id] = item_data
     return PaperItem(

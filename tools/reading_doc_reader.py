@@ -1,5 +1,6 @@
 import io
-from typing import Tuple
+import re
+from typing import List, Tuple
 
 import pypdf
 
@@ -22,9 +23,21 @@ def _decode_text(file_bytes: bytes) -> str:
 
 
 def _read_pdf_text(file_bytes: bytes) -> str:
+    """Teks per halaman diberi penanda [Halaman n] supaya sitasi hlm. bisa dicek ke berkas asli dosen."""
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-    pages = [(page.extract_text() or "").strip() for page in reader.pages]
-    return "\n\n".join(p for p in pages if p)
+    pages = [(i, (page.extract_text() or "").strip()) for i, page in enumerate(reader.pages, 1)]
+    return "\n\n".join(f"[Halaman {i}]\n{text}" for i, text in pages if text)
+
+
+PAGE_MARKER = re.compile(r"(?m)^\[Halaman (\d+)\]\s*$")
+
+
+def split_marked_pages(text: str) -> List[Tuple[str, str]]:
+    """Memecah teks berpenanda [Halaman n] menjadi (label halaman, isi). Teks tanpa penanda dikembalikan dengan label kosong."""
+    parts = PAGE_MARKER.split(text or "")
+    pages = [("", parts[0])] if parts[0].strip() else []
+    pages += [(f"Halaman {num}", body) for num, body in zip(parts[1::2], parts[2::2]) if body.strip()]
+    return pages
 
 
 async def read_reading_doc(file_bytes: bytes, filename: str) -> Tuple[str, bool]:

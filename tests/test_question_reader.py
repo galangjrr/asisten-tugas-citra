@@ -135,6 +135,7 @@ Host Welcome."""
         "word_limit": None,
         "item_word_limits": None,
         "required_sections": None,
+        "is_mathematical": False,
     }
 
 

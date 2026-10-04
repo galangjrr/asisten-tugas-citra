@@ -4,7 +4,7 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from google.genai import types
 from tools.gemini_client import generate_with_fallback
-from tools.question_reader import count_numbered_questions, extract_required_sections
+from tools.question_reader import count_numbered_questions, extract_required_sections, is_stem_question
 
 
 def detect_language(topic: str, custom_instructions: str = "") -> str:
@@ -32,6 +32,10 @@ def detect_language(topic: str, custom_instructions: str = "") -> str:
     return "id"
 
 
+# Soal yang meminta bukti teks verbatim, jadi kutipan langsung wajib walau aturan sitasi biasanya menyarankan parafrase
+EVIDENCE_HINT = re.compile(
+    r"(?i)\b(?:kutipan|kutip\w*|quotes?|quotations?|textual\s+evidence|bukti\s+teks\w*|bunyi\s+(?:teks|pasal)|salin\s+kalimat|pasal)\b"
+)
 # Tanda soal hitungan atau logika: operasi angka, simbol matematika, atau istilah matematika.
 # Tanda hubung di antara angka sengaja tidak dihitung karena rentang tahun dan halaman seperti 2020-2021 sering muncul di esai.
 REASONING_HINT = re.compile(
@@ -43,6 +47,35 @@ IMAGE_BLOCK = re.compile(r"\[Gambar:[^\]]*\]\s*")
 SUPERSCRIPT = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 
 
+LATEX_SYMBOLS = {
+    "times": "×", "cdot": "·", "div": "÷", "pm": "±", "leq": "≤", "le": "≤", "geq": "≥", "ge": "≥", "neq": "≠",
+    "approx": "≈", "infty": "∞", "sum": "∑", "int": "∫", "oint": "∮", "pi": "π", "mu": "μ", "epsilon": "ε",
+    "varepsilon": "ε", "lambda": "λ", "Omega": "Ω", "omega": "ω", "alpha": "α", "beta": "β", "theta": "θ",
+    "sigma": "σ", "Delta": "Δ", "delta": "δ", "rightarrow": "→", "to": "→", "sqrt": "√",
+}
+
+
+def strip_latex(text: str) -> str:
+    """Mengubah LaTeX mentah yang lolos dari model menjadi notasi teks biasa, karena Word dan PDF tidak merendernya."""
+    if "\\" not in text and "$" not in text:
+        return text
+
+    # Baris matriks LaTeX dipisah \\ dan kolomnya &, diubah ke tabel pipa yang dibaca exporter
+    def matrix_rows(m: re.Match) -> str:
+        rows = [r.strip() for r in m.group(1).split("\\\\") if r.strip()]
+        return "\n" + "\n".join(" | ".join(c.strip() for c in r.split("&")) for r in rows) + "\n"
+
+    text = re.sub(r"\\begin\{[a-z]*matrix\}(.*?)\\end\{[a-z]*matrix\}", matrix_rows, text, flags=re.S)
+    # ponytail: hanya pecahan dan akar tanpa kurung kurawal bersarang, sisanya cukup dibuang tandanya
+    text = re.sub(r"\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}", r"(\1)/(\2)", text)
+    text = re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", text)
+    text = re.sub(r"\\(?:text|mathrm|mathbf)\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"\\(?:left|right)\b|\\[()\[\]]", "", text)
+    text = re.sub(r"\\([A-Za-z]+)", lambda m: LATEX_SYMBOLS.get(m.group(1), m.group(1)), text)
+    # Pembatas $ matematika dibuang, tapi $ sebelum angka tetap karena itu mata uang
+    return re.sub(r"\$\$|\$(?! ?\d)", "", text)
+
+
 def clean_output_text(text: str) -> str:
     """Merapikan keluaran model supaya terbaca seperti ketikan mahasiswa di Word.
     Em dash, en dash, dan elipsis satu karakter diganti tanda baca umum.
@@ -51,6 +84,7 @@ def clean_output_text(text: str) -> str:
     text = re.sub(r"^([ \t]*)[—–][ \t]*", r"\1- ", text, flags=re.M)
     text = re.sub(r"[ \t]*[—–][ \t]*", ", ", text)
     text = re.sub(r",\s*([.,;:?!])", r"\1", text)
+    text = strip_latex(text)
     text = re.sub(r"\^\(?(-?\d+)\)?", lambda m: m.group(1).translate(SUPERSCRIPT), text)
     text = re.sub(r"\bsqrt\((\w+)\)", r"√\1", text)
     text = re.sub(r"\bsqrt\(", "√(", text)
@@ -132,6 +166,10 @@ async def generate_academic_draft(
     spec = answer_spec or {}
     answer_type = spec.get("answer_type")
     is_direct_answer = answer_type in DIRECT_ANSWER_LABELS
+    # Soal eksakta ditulis sebagai langkah hitungan, bukan esai, kecuali dosen jelas meminta esai atau makalah
+    is_math = answer_type not in ("esai", "makalah", "terjemahan") and (spec.get("is_mathematical") or is_stem_question(topic))
+    # Bukti teks diminta eksplisit di soal, jadi kutipan langsung wajib muncul walau aturan sitasi biasanya menyarankan parafrase
+    wants_quotes = bool(EVIDENCE_HINT.search(f"{topic} {custom_instructions}"))
     word_limit = spec.get("word_limit")
     if word_limit:
         target_words = min(target_words, word_limit)
@@ -191,7 +229,8 @@ async def generate_academic_draft(
         section_req = (
             f"Lembar soal memuat TEPAT {question_count} butir soal bernomor. Hasilkan TEPAT {question_count} bagian di array 'sections', "
             f"satu bagian per butir soal dengan heading '1. ...' sampai '{question_count}. ...' mengikuti urutan soal. "
-            "DILARANG menambah bagian pendahuluan, penutup, kesimpulan, atau nomor lain di luar butir soal."
+            "Heading memuat nomor dan topik butirnya, misal '1. PERUBAHAN KARAKTER UTAMA' dan '2. ANALISIS TEMA UTAMA'. "
+            "DILARANG menggabung dua nomor dalam satu bagian, melewatkan nomor mana pun, atau menambah bagian pendahuluan, penutup, kesimpulan, atau nomor lain di luar butir soal."
         )
 
     # Format penulisan yang ditulis dosen, misal Pendahuluan, Pembahasan, Refleksi, Kesimpulan, mengalahkan semua format bawaan
@@ -641,6 +680,8 @@ async def generate_academic_draft(
     - Jika lembar soal menyertakan teks bacaan, kasus, data, atau dialog, jawaban wajib bersumber dari teks itu dan tidak boleh bertentangan dengannya. Pengetahuan umum hanya boleh dipakai bila soal memintanya.
     - Untuk pernyataan benar salah, cocokkan setiap kata kunci pernyataan (tujuan, alasan, lokasi, jumlah, waktu, pelaku) dengan teks. Pernyataan yang sebagian isinya bertentangan dengan teks dinilai salah, lalu beri alasan singkat dari teks.
     - Pertahankan nomor butir sesuai lembar soal.
+    - Satu butir sering memuat beberapa pertanyaan sekaligus, misal alur perubahan tokoh, bukti kutipan teks, lalu tokoh pilihanmu beserta alasannya. Pecah dulu butir itu menjadi daftar sub-pertanyaan dalam pikiranmu, lalu jawab SETIAP sub-pertanyaan secara tuntas dan proporsional di bagian butir itu. Pertanyaan di ujung kalimat soal sama wajibnya dengan pertanyaan di awal.
+    - Jika butir meminta kutipan, bukti teks, atau bunyi pasal, salin kalimat dari teks persis kata per kata di dalam tanda petik ganda "...", lalu jelaskan dengan kalimatmu sendiri kaitan kutipan itu dengan pertanyaan. DILARANG mengganti kutipan dengan parafrase.
     - Soal matematika, logika, statistika, atau hitungan wajib menampilkan langkah pengerjaan baris per baris dengan karakter \\n, mulai dari yang diketahui, rumus atau metode yang dipakai, substitusi, sampai hasil akhir beserta satuannya. Aturan ini MENGALAHKAN aturan gaya paragraf dan batas 1 sampai 2 kalimat.
     - Matriks, tabel kebenaran, peta Karnaugh, dan tabel hasil wajib ditulis lengkap, satu baris per baris dengan pemisah ' | ' dan baris judul kolom. DILARANG hanya menceritakan isinya dalam paragraf.
     - Sebelum menulis hasil akhir, cek silang dengan cara lain, misalnya substitusi balik, minterm dan maxterm yang saling melengkapi sampai 2^n, atau jumlah derajat sama dengan dua kali jumlah sisi.
@@ -650,6 +691,20 @@ async def generate_academic_draft(
     - Jika angka, label, atau keterangan di gambar berbeda dengan teks soal, kerjakan hitungan utama dengan data teks soal, lalu tutup dengan satu kalimat catatan terpisah yang menyebut perbedaannya dan hasil jika memakai data gambar. Jangan mencampur kedua data di baris yang sama.
     - Baca setiap angka dan simbol di soal persis seperti tertulis. DILARANG menafsirkan ulang angka sebagai salah ketik, misalnya membaca 142 sebagai 14², kecuali gambar dan teks jelas bertentangan.
     - Abaikan petunjuk waktu pengerjaan seperti 'Waktu: 30 menit'. Batas waktu tidak menentukan panjang, kedalaman, atau isi jawaban.
+    """
+
+    if is_math:
+        length_rules += """
+    PROTOKOL SOAL HITUNGAN EKSAKTA (MENGALAHKAN ATURAN GAYA PARAGRAF, PANJANG, DAN KEDALAMAN):
+    - Soal ini soal eksakta (matematika, statistika, fisika, atau algoritma). DILARANG menjawab dengan esai naratif. Tulis setiap langkah di baris sendiri dengan karakter \\n.
+    - Setiap butir hitungan WAJIB memakai empat bagian berurutan dengan label persis:
+      Diketahui: semua variabel, konstanta, data, dan satuannya, satu per baris. Lalu Ditanya: besaran yang dicari.
+      Rumus: rumus, teorema, atau metode yang dipakai, misal Hukum Ampere ∮ B · dl = μ₀ I, eliminasi Gauss-Jordan, atau Master Theorem T(n) = aT(n/b) + f(n).
+      Penyelesaian: substitusi angka ke rumus lalu penyederhanaan baris demi baris. DILARANG melompat langsung ke hasil.
+      Jawaban: nilai akhir yang tegas beserta satuan SI atau notasi kompleksitas seperti O(n log n).
+    - Untuk sistem persamaan, nilai eigen, optimasi, atau persamaan aljabar, substitusikan balik hasilnya ke persamaan awal sampai ruas kiri sama dengan ruas kanan sebelum menulis Jawaban. Tulis satu baris cek singkat.
+    - Matriks, tabel kebenaran, tabel distribusi frekuensi, dan peta Karnaugh ditulis satu baris per baris dengan pemisah ' | ' dan baris judul kolom.
+    - Pakai simbol Unicode seperti ², ³, ⁻¹, √, ∑, ∫, ≤, ≥, ×, ÷, π, μ, ε, λ, Ω. DILARANG KERAS LaTeX seperti \\frac, \\sqrt, \\begin{matrix}, atau tanda $.
     """
 
     if papers_with_content:
@@ -668,6 +723,15 @@ async def generate_academic_draft(
       Contoh baik: 'Menjalankan kewajiban agama secara benar berjalan beriringan dengan tanggung jawab menjaga kedamaian sosial (Prakosa, 2022).'
     - Modul BMP UT, jika ada, jadi dasar konsep utama. Jurnal lain melengkapi seperlunya.
     - Setiap sitasi harus berdasar isi sumber yang dilampirkan. Catat buktinya di array 'evidence_log'.
+    """
+        # Bahan bacaan dosen seperti cerpen atau bab buku dianalisis lewat kutipan langsung, bukan parafrase
+        if wants_quotes or any(p.get("is_manual_module") and not p.get("is_ut_bmp") for p in papers_with_content):
+            citation_rules += """
+    ATURAN KUTIPAN LANGSUNG (MENGALAHKAN SARAN PARAFRASE DI ATAS UNTUK BAGIAN YANG MENUNTUT BUKTI TEKS):
+    - Bagian yang meminta bukti, kutipan, analisis tokoh, tema, atau bunyi pasal WAJIB memuat kutipan langsung yang disalin persis kata per kata dari bahan bacaan, di dalam tanda petik ganda "...".
+    - Setiap kutipan langsung WAJIB diikuti sitasi dengan halaman naskah asli sesuai label halaman di bahan bacaan, misal (Navis, 1956, hlm. 3). Jika label bahan berbentuk 'Bagian n', tulis (NamaBelakang, Tahun) tanpa nomor halaman karena halaman aslinya tidak diketahui. DILARANG mengarang nomor halaman.
+    - Di luar tanda petik, uraikan dengan kalimatmu sendiri bagaimana kutipan itu menjawab pertanyaan.
+    - Bagian lain yang tidak menuntut bukti teks tetap memakai parafrase biasa.
     """
     else:
         citation_rules = """
@@ -763,7 +827,7 @@ async def generate_academic_draft(
         """
 
     # Soal hitungan dan logika sering salah tanpa mode berpikir. Esai dan makalah tidak butuh dan jadi jauh lebih lambat.
-    needs_reasoning = is_direct_answer or (answer_type not in ("esai", "makalah") and bool(REASONING_HINT.search(topic)))
+    needs_reasoning = is_direct_answer or is_math or (answer_type not in ("esai", "makalah") and bool(REASONING_HINT.search(topic)))
     response = await generate_with_fallback(
         "generation",
         user_prompt,

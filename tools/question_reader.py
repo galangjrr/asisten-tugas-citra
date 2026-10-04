@@ -495,12 +495,7 @@ def split_questions_and_guidelines(text: str) -> Dict[str, str]:
 ANSWER_TYPES = {"uraian", "terjemahan", "jawaban_singkat", "esai", "makalah", "jawaban_bernomor"}
 
 
-def count_numbered_questions(topic: str) -> int:
-    """Menghitung butir soal bernomor berurutan dari 1, misal '1. Translate...' atau 'Soal 2:'."""
-    numbers = [
-        int(m.group(1))
-        for m in re.finditer(r'(?im)^\s*(?:soal|pertanyaan|question)?\s*(\d{1,2})\s*[.):]\s+\S', topic)
-    ]
+def _sequential_count(numbers: list) -> int:
     # Nomor yang mulai lagi dari 1 berarti soal terdiri dari beberapa bagian, jumlah section tidak bisa dikunci
     if numbers.count(1) > 1:
         return 0
@@ -508,6 +503,41 @@ def count_numbered_questions(topic: str) -> int:
     while count + 1 in numbers:
         count += 1
     return count
+
+
+def count_numbered_questions(topic: str) -> int:
+    """Menghitung butir soal bernomor berurutan dari 1, misal '1. Translate...', 'Soal 2:', atau 'a.' 'b.' tanpa angka."""
+    numbers = [
+        int(m.group(1))
+        for m in re.finditer(r'(?im)^\s*(?:soal|pertanyaan|question)?\s*(\d{1,2})\s*[.):]\s+\S', topic)
+    ]
+    if numbers:
+        return _sequential_count(numbers)
+    # Huruf hanya dihitung jika tidak ada nomor angka, karena 'a. b.' di bawah nomor biasanya sub-soal
+    letters = [ord(m.group(1).lower()) - 96 for m in re.finditer(r'(?m)^\s*([a-hA-H])\s*[.)]\s+\S', topic)]
+    return _sequential_count(letters)
+
+
+# Tanda soal eksakta. Satu istilah saja belum cukup, misal 'matriks' di esai ekonomi, jadi dihitung per istilah berbeda.
+STEM_TERMS = re.compile(
+    r'(?i)\b(?:big\s*o|O\(\s*n|kompleksitas|algoritma|algorithm|pseudocode|rekursif|recursive|sorting|stack|queue|'
+    r'matriks|matrix|vektor|vector|determinan|determinant|invers|eigen\w*|gauss|jordan|cramer|'
+    r'rata-rata|median|modus|varians|variance|standar\s+deviasi|standard\s+deviation|distribusi\s+normal|regresi|regression|'
+    r'hipotesis|hypothesis|uji\s+[tz]|p-value|'
+    r'coulomb|ampere|volt|ohm|farad|tesla|weber|henry|hukum\s+(?:gauss|faraday|ampere|ohm|kirchhoff)|'
+    r'fluks\s+magnetik|medan\s+(?:listrik|magnet)|kapasitor|induktor|resistor|'
+    r'persamaan\s+(?:linear|linier|kuadrat|diferensial)|equation|turunan|derivative|integral|peluang|probabilitas|probability|logaritma|'
+    r'hitunglah|tentukan\s+nilai|calculate|compute)\b'
+)
+# Operasi angka seperti 3 + 4, x^2, atau 2 × 5. Rentang tahun seperti 2020-2021 sengaja tidak dihitung.
+STEM_SYMBOLS = re.compile(r'\d\s*[+×*/÷^=]\s*\(?[\dA-Za-z]|[A-Za-z]\s*=\s*-?\d|[√∑∫∮≤≥μπΩλε²³]')
+
+
+def is_stem_question(text: str) -> bool:
+    """Soal hitungan eksakta: minimal dua istilah eksakta berbeda, atau satu istilah plus operasi angka."""
+    terms = {m.group(0).lower() for m in STEM_TERMS.finditer(text or "")}
+    has_symbols = bool(STEM_SYMBOLS.search(text or ""))
+    return len(terms) >= 2 or (len(terms) >= 1 and has_symbols)
 
 
 FORMAT_HEADING = re.compile(
@@ -651,6 +681,7 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
         "word_limit": total,
         "item_word_limits": items,
         "required_sections": extract_required_sections(combined),
+        "is_mathematical": answer_type not in ("esai", "makalah", "terjemahan") and is_stem_question(questions),
     }
 
 
@@ -671,6 +702,13 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
     language = raw.get("answer_language")
     needs_citations = raw.get("needs_citations")
     question_count = as_int(raw.get("question_count"), 1, 50) or guess["question_count"]
+    # AI sering menghitung soal majemuk sebagai satu butir. Nomor eksplisit di teks soal lebih bisa dipercaya,
+    # kecuali untuk esai atau makalah yang nomornya biasanya poin panduan satu tulisan.
+    numbered = guess["question_count"] or 0
+    if numbered >= 2 and (question_count or 0) < numbered and answer_type not in ("esai", "makalah"):
+        question_count = numbered
+        if answer_type in (None, "uraian"):
+            answer_type = "jawaban_bernomor"
     raw_items = raw.get("item_word_limits")
     raw_items = raw_items if isinstance(raw_items, list) and any(v is not None for v in raw_items) else []
     # None berarti butir itu tanpa batas atas, misal dosen hanya menulis batas minimal
@@ -693,6 +731,7 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
         "word_limit": total if items else (total or guess["word_limit"]),
         "item_word_limits": items,
         "required_sections": sections,
+        "is_mathematical": (answer_type or guess["answer_type"]) not in ("esai", "makalah", "terjemahan") and is_stem_question(questions),
     }
 
 
@@ -712,10 +751,11 @@ async def structure_assignment_with_ai(raw_text: str, images: list = ()) -> Opti
     prompt = """Analisis lembar tugas kuliah ini (bisa berbahasa Indonesia atau Inggris).
 Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
 1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab, beserta SELURUH teks bacaan, kasus, atau dialog yang dibutuhkan untuk menjawabnya. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan. Penanda gambar seperti [[GAMBAR_0]] wajib disalin persis di posisinya, jangan dihapus, diubah, atau diganti deskripsi.
-2. "guidelines": Seluruh capaian pembelajaran, indikator, petunjuk teknis, rubrik penilaian, kriteria dosen, ketentuan format, atau batasan kata yang harus dipatuhi saat menulis jawaban.
+   Seluruh nomor butir soal dan SELURUH anak kalimat pertanyaan di dalam satu butir wajib tetap di sini, termasuk permintaan kutipan atau bukti teks ('sertakan kutipan teks pendukung'), permintaan pendapat pribadi beserta alasannya ('sebutkan tokoh pilihanmu dan alasannya'), data, tabel, dan matriks soal. DILARANG memindahkan bagian pertanyaan apa pun ke guidelines atau memangkasnya.
+2. "guidelines": HANYA keterangan administratif di luar materi yang dikerjakan: capaian pembelajaran, indikator, rubrik dan skor penilaian, batas waktu pengumpulan, ketentuan format (font, margin, spasi), batas jumlah kata, dan sapaan. Kalimat yang meminta mahasiswa menjawab, menganalisis, mengutip, atau memilih sesuatu adalah bagian soal, bukan guidelines.
 3. "course_code": Kode mata kuliah resmi jika ada (contoh: EKMA4116, FSSI4206), atau null.
 4. "answer_spec": spesifikasi bentuk jawaban yang diminta dosen:
-   - "question_count": jumlah butir soal utama yang harus dijawab, atau null jika berupa satu topik esai tanpa nomor atau jika soal terdiri dari beberapa bagian yang nomornya mulai lagi dari 1.
+   - "question_count": jumlah butir soal utama yang harus dijawab. Jika soal bernomor 1, 2, 3 atau Soal 1, Soal 2, isi sesuai jumlah nomor itu walau satu nomor berisi beberapa sub-pertanyaan. Isi null jika berupa satu topik esai tanpa nomor atau jika soal terdiri dari beberapa bagian yang nomornya mulai lagi dari 1.
    - "answer_type": salah satu dari "terjemahan" (menerjemahkan teks), "jawaban_singkat" (isian, hitungan, benar salah, pemahaman bacaan, gagasan utama, atau jawaban pendek per butir, MESKIPUN soalnya bernomor), "esai" (satu esai mengalir), "makalah" (makalah berbab), "jawaban_bernomor" (uraian atau analisis panjang per nomor soal yang butuh beberapa paragraf), atau "uraian" (uraian analitis umum). Pilih "jawaban_singkat" bila jawaban tiap butir cukup satu sampai dua kalimat atau cukup diambil dari teks bacaan.
    - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan, hitungan, atau menjawab dari teks bacaan yang sudah disediakan; null jika tidak jelas.
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.

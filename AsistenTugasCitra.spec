@@ -19,6 +19,7 @@ datas = [
     (os.path.join(ROOT_DIR, 'static'), 'static'),
     (os.path.join(ROOT_DIR, 'data'), 'data'),
     (os.path.join(ROOT_DIR, 'assets'), 'assets'),
+    (os.path.join(ROOT_DIR, 'saved_modules'), 'saved_modules'),
 ]
 
 a = Analysis(

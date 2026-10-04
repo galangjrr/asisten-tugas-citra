@@ -50,6 +50,7 @@ const State = {
   selectedPaperIds: new Set(),
   lastQuery: "",
   materials: [],
+  savedModules: [],
   generating: false,
   taskId: null,
   doc: null,
@@ -120,7 +121,10 @@ const Api = {
   utLookup: (query) => Api.request(`/api/ut-course-lookup?query=${encodeURIComponent(query)}`),
   extractScreenshot: (dataUrl) => Api.postJson("/api/extract-screenshot", { image_data: dataUrl }),
   updateTask: (id, doc) => Api.request(`/api/tasks/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) }),
-  rewriteSection: (id, index, instruction) => Api.postJson(`/api/tasks/${id}/sections/${index}/rewrite`, { instruction })
+  rewriteSection: (id, index, instruction) => Api.postJson(`/api/tasks/${id}/sections/${index}/rewrite`, { instruction }),
+  getSavedModules: () => Api.request("/api/saved-modules"),
+  loadSavedModule: (moduleId) => Api.postJson("/api/saved-modules/load", { module_id: moduleId }),
+  saveSavedModule: (payload) => Api.postJson("/api/saved-modules/save", payload)
 };
 
 // =====================================================================
@@ -200,6 +204,11 @@ const dom = {
   materialChunkCount: $("material-chunk-count"),
   materialList: $("material-list"),
   btnSaveMaterial: $("btn-save-material"),
+  btnSaveToLibrary: $("btn-save-to-library"),
+  panelSavedLibrary: $("panel-saved-library"),
+  savedLibraryCount: $("saved-library-count"),
+  savedModulesContainer: $("saved-modules-container"),
+  btnRefreshSavedLibrary: $("btn-refresh-saved-library"),
   refineForm: $("form-refine"),
   refineQuery: $("input-refine-query"),
   btnRefine: $("btn-refine-search"),
@@ -600,6 +609,7 @@ const UI = {
     if (isBahan) {
       UI.renderMaterialPreview();
       UI.renderMaterialList();
+      loadAndRenderSavedModules();
     } else if (!State.papers.length && dom.papersLoading.classList.contains("hidden")) {
       UI.renderPapersEmpty("Tekan Cari jurnal untuk mulai mencari artikel yang relevan.");
     }
@@ -1643,6 +1653,117 @@ function removeMaterial(id) {
   State.materials = State.materials.filter((m) => m.id !== id);
   UI.renderMaterialList();
   UI.renderSelection();
+  renderSavedModulesCards();
+}
+
+async function loadAndRenderSavedModules(forceToast = false) {
+  if (!dom.panelSavedLibrary || !dom.savedModulesContainer) return;
+  try {
+    const res = await Api.getSavedModules();
+    State.savedModules = (res && res.modules) || [];
+    if (!State.savedModules.length) {
+      dom.panelSavedLibrary.classList.add("hidden");
+      return;
+    }
+    dom.panelSavedLibrary.classList.remove("hidden");
+    dom.savedLibraryCount.textContent = `${State.savedModules.length} modul`;
+    renderSavedModulesCards();
+    if (forceToast) UI.toast(`${State.savedModules.length} modul siap di pustaka`);
+  } catch (err) {
+    console.warn("Gagal memuat pustaka modul tersimpan:", err);
+  }
+}
+
+function renderSavedModulesCards() {
+  if (!dom.savedModulesContainer) return;
+  dom.savedModulesContainer.replaceChildren(...State.savedModules.map((m) => {
+    const isLoaded = State.materials.some((mat) => mat.id === m.id || mat.title === m.title);
+    const card = el("div", `p-4 rounded-2xl border transition-colors ${isLoaded ? "border-ok-line bg-ok-bg/30" : "border-line bg-subtle"}`);
+
+    const topRow = el("div", "flex items-start justify-between gap-3");
+    const info = el("div", "flex-1 min-w-0");
+    info.append(el("h3", `text-xs font-bold leading-snug ${isLoaded ? "text-ok-text" : "text-ink"}`, m.title));
+
+    const metaParts = [(m.authors || []).join(", "), m.year, m.venue].filter(Boolean);
+    if (metaParts.length) {
+      info.append(el("p", "text-[11px] text-ink-3 mt-0.5 truncate", metaParts.join(" · ")));
+    }
+
+    const stats = el("p", "text-[11px] font-mono text-ink-2 mt-1", `${m.chunk_count} bagian · ${formatNumber(m.char_count)} karakter`);
+    info.append(stats);
+
+    if (m.abstract) {
+      info.append(el("p", "text-[11px] text-ink-3 line-clamp-2 mt-1.5 leading-relaxed", m.abstract));
+    }
+
+    const btnWrapper = el("div", "shrink-0 pt-0.5");
+    const btn = el("button", `btn text-xs px-3 py-1.5 ${isLoaded ? "btn-secondary opacity-75" : "btn-primary"}`);
+    btn.type = "button";
+    if (isLoaded) {
+      btn.innerHTML = `${ICON.check} Digunakan`;
+      btn.disabled = true;
+    } else {
+      btn.textContent = "Gunakan Modul";
+      btn.addEventListener("click", () => handleLoadSavedModule(m, btn));
+    }
+    btnWrapper.append(btn);
+
+    topRow.append(info, btnWrapper);
+    card.append(topRow);
+    return card;
+  }));
+}
+
+async function handleLoadSavedModule(m, btn) {
+  setBusy(btn, true, "Memuat");
+  try {
+    const loaded = await Api.loadSavedModule(m.id || m.filename);
+    if (!State.materials.some((x) => x.id === loaded.id)) {
+      State.materials.push(loaded);
+    }
+    if (!dom.courseName.value.trim()) {
+      const match = (loaded.title || "").match(/^[A-Z]{4}\d{4}/);
+      if (match) applyDetectedCourse(match[0]);
+    }
+    UI.renderMaterialList();
+    UI.renderSelection();
+    renderSavedModulesCards();
+    UI.toast(`Modul ${loaded.title} siap digunakan`);
+  } catch (err) {
+    UI.showError("Gagal memuat modul tersimpan", err, () => handleLoadSavedModule(m, btn));
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+async function saveToPermanentLibrary() {
+  const payload = readMaterialForm();
+  if (payload.module_title.length < 3) {
+    UI.showAlert("Judul naskah belum diisi", "Isi judul naskah minimal tiga huruf sebelum menyimpan ke folder modul.");
+    dom.materialTitle.focus();
+    return;
+  }
+  if (payload.content_text.length < 15) {
+    UI.showAlert("Isi naskah masih kosong", "Unggah berkas bahan atau tempel isi naskah minimal 15 karakter.");
+    dom.materialText.focus();
+    return;
+  }
+  setBusy(dom.btnSaveToLibrary, true, "Menyimpan ke pustaka");
+  try {
+    const saved = await Api.saveSavedModule(payload);
+    if (!State.materials.some((x) => x.id === saved.id)) {
+      State.materials.push(saved);
+    }
+    clearMaterialForm();
+    UI.renderMaterialList();
+    UI.renderSelection();
+    await loadAndRenderSavedModules();
+    UI.toast(`Modul ${saved.title} tersimpan permanen di folder saved_modules`);
+  } catch (err) {
+    UI.showError("Gagal menyimpan ke pustaka modul", err, saveToPermanentLibrary);
+  } finally {
+    setBusy(dom.btnSaveToLibrary, false);
+  }
 }
 
 function attachUtLookup() {
@@ -2086,6 +2207,8 @@ function init() {
     dom.materialScreenshot.value = "";
   });
   dom.btnSaveMaterial.addEventListener("click", saveMaterial);
+  if (dom.btnSaveToLibrary) dom.btnSaveToLibrary.addEventListener("click", saveToPermanentLibrary);
+  if (dom.btnRefreshSavedLibrary) dom.btnRefreshSavedLibrary.addEventListener("click", () => loadAndRenderSavedModules(true));
   dom.btnLookupPublication.addEventListener("click", lookupPublicationInfo);
   attachUtLookup();
   dom.btnGenerate.addEventListener("click", generate);

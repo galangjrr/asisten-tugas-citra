@@ -211,3 +211,27 @@ class TaskUpdateResponse(BaseModel):
     title: str
     sections: List[dict]
     word_count: int
+
+
+class SavedModuleItem(BaseModel):
+    id: str
+    filename: str
+    title: str
+    authors: List[str] = Field(default_factory=list)
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    source_status: Optional[str] = None
+    chunk_count: int = 0
+    char_count: int = 0
+    abstract: Optional[str] = None
+    file_path: Optional[str] = None
+
+
+class SavedModuleListResponse(BaseModel):
+    success: bool = True
+    total: int = 0
+    modules: List[SavedModuleItem] = Field(default_factory=list)
+
+
+class LoadSavedModuleRequest(BaseModel):
+    module_id: str = Field(..., min_length=1, description="ID modul atau nama berkas modul yang tersimpan")

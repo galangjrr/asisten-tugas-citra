@@ -1,0 +1,583 @@
+FSSI4105 Pengantar Linguistik Umum (Edisi 1)
+Penulis: Prof. Dr. Djatmika, M.A.; Dr. Nurhayati,M.Hum.
+Penerbit: Universitas Terbuka (2026)
+============================================================
+
+--- Bagian 1 ---
+
+**Sejarah dan Cabang-Cabang Ilmu Linguistik**
+
+Mahasiswa yang luar biasa, linguistik, sebagai ilmu yang mempelajari bahasa, memiliki sejarah panjang yang meliputi perkembangan pemikiran dari berbagai budaya dan zaman. Dari para filsuf kuno hingga para ilmuwan modern, pemahaman tentang bahasa terus berkembang seiring waktu. Salah satu tonggak penting dalam sejarah linguistik adalah era filsafat Yunani kuno, di mana pemikir seperti Plato dan Aristoteles mempertimbangkan peran bahasa dalam pemikiran dan komunikasi manusia. Selanjutnya, abad pertengahan Eropa melihat studi intensif tentang tata bahasa Latin dan bahasa lainnya dalam konteks gerejawi dan keilmuan.
+
+Pada abad ke-19, perkembangan pemikiran linguistik modern dimulai dengan penemuan bahasa Sanskerta dan analisis komparatif oleh ahli bahasa seperti Franz Bopp dan August Schleicher. Pemikiran-pemikiran ini mengarah pada konsep nenek moyang bahasa atau Proto-Indo-Eropa dan mendorong pemikiran strukturalis tentang bahasa.
+
+Abad ke-20 menjadi masa keemasan untuk linguistik, dengan munculnya teori-teori strukturalisme, transformasional, dan generatif yang dipimpin oleh tokoh-tokoh seperti Ferdinand de Saussure dan Naom Chomsky. Era ini juga menyaksikan perkembangan linguistik terapan dalam bidang seperti terjemahan, pembelajaran bahasa, dan teknologi bahasa.
+
+**A. PERKEMBANGAN LINGUISTIK**
+
+Untuk memahami linguistik sebagai disiplin ilmu yang berkembang secara sistematis, penting bagi mahasiswa menelusuri sejarah pemikiran yang melandasi kajian bahasa dari masa ke masa. Perkembangan linguistik tidak terjadi secara tiba-tiba, melainkan melalui rangkaian pemikiran filosofis, tradisi keilmuan, dan pendekatan ilmiah yang muncul dalam konteks sosial dan budaya tertentu. Bagian ini membahas tahapan-tahapan penting dalam perkembangan linguistik, mulai dari pemikiran filsafat kuno hingga pendekatan linguistik modern. Pemahaman terhadap perkembangan ini akan membantu mahasiswa melihat keterkaitan antarteori linguistik serta memahami posisi masing-masing cabang linguistik dalam kerangka keilmuan yang lebih luas.
+
+---
+
+1. **Teori Penamaan dalam Filsafat Kuno**
+
+Teori penamaan dalam filsafat kuno menggambarkan usaha para filsuf seperti Plato dan Aristoteles untuk memahami peran dan fungsi bahasa dalam pemikiran manusia. Dalam kerangka ini, bahasa dipandang sebagai alat yang esensial bagi manusia untuk memahami dunia di sekitarnya. Objek kajian utama dari teori ini adalah proses penamaan dan hubungannya dengan konsep-konsep abstrak. Plato, salah satu tokoh utama dalam perkembangan teori ini, mengemukakan gagasan tentang "nama-nama ide", yang merupakan representasi dari bentuk-bentuk sempurna yang ada di alam semesta. Baginda, kata-kata adalah gambaran dari ide-ide atau bentuk-bentuk abstrak yang lebih tinggi, yang ada di alam semesta yang sempurna dan abadi.
+
+--- Bagian 2 ---
+
+Tujuan dari teori penamaan ini adalah untuk memahami bagaimana bahasa digunakan sebagai alat untuk menyampaikan konsep-konsep abstrak dan membantu manusia dalam memahami realitas di sekitarnya. Para filsuf kuno tertarik untuk menemukan hubungan antara kata-kata dan konsep-konsep yang mereka wakili. Mereka ingin menjelaskan bagaimana kata-kata bisa menjadi simbol dari ide-ide yang lebih tinggi, dan bagaimana proses penamaan ini membantu dalam pemikiran dan pemahaman manusia.
+
+Objek kajian utama dari teori penamaan ini adalah kata-kata dan konsep-konsep yang mereka wakili. Para filsuf kuno melakukan analisis mendalam tentang bagaimana kata-kata digunakan untuk menggambarkan ide-ide abstrak seperti keadilan, kebaikan, dan keindahan. Mereka mempertimbangkan hubungan antara bahasa dan realitas, serta bagaimana kata-kata bisa merefleksikan atau mencerminkan realitas yang ada di luar sana.
+
+Beberapa tokoh utama dalam pengembangan teori penamaan ini adalah Plato dan Aristoteles. Plato mengembangkan konsep "nama-nama ide" sebagai bagian dari teorinya tentang bentuk-bentuk ideal, sementara Aristoteles juga memberikan kontribusi signifikan dengan mempertimbangkan hubungan antara kata-kata dan konsep-konsep dalam karyanya tentang logika dan metafisika. Karya-karya mereka menjadi landasan penting dalam pemikiran tentang bahasa dan pemahaman manusia dalam tradisi filsafat Barat.
+
+2. **Tradisi Tata Bahasa Kuno**
+
+Tradisi tata bahasa kuno berkembang pada periode klasik, terutama di dunia Yunani dan Romawi. Pada masa ini, para sarjana dan ahli bahasa mulai upaya untuk mengklasifikasikan dan menganalisis struktur bahasa dalam budaya klasik seperti bahasa Latin dan Yunani. Mereka tertarik untuk memahami aturan-aturan pembentukan kata, sintaksis, dan tata bahasa lainnya dalam bahasa tersebut.
+
+Objek studi dalam tradisi tata bahasa kuno adalah struktur bahasa dan aturan-aturan penggunaan bahasa dalam budaya klasik seperti bahasa Latin dan Yunani. Para ahli bahasa melakukan analisis mendalam tentang berbagai aspek bahasa, termasuk fonologi, morfologi, sintaksis, dan semantik dalam bahasa-bahasa tersebut.
+
+Tujuan dari tradisi tata bahasa kuno ini adalah untuk mengembangkan sistem tatabahasa yang komprehensif dan mengklasifikasikan kategori-kategori gramatikal dalam bahasa Latin dan Yunani. Mereka juga bertujuan untuk memahami prinsip-prinsip dasar bahasa-bahasa tersebut dan menganalisis struktur kalimat untuk memahami cara bahasa-bahasa tersebut digunakan dalam komunikasi.
+
+--- Bagian 3 ---
+
+Dionysius Thrax adalah salah satu tokoh terkemuka dalam tradisi tata bahasa Yunani. Ia dikenal karena karyanya yang berjudul “Teknik Tatabahasa” (*Téchnē Grammatikḗ*), yang merupakan karya referensi penting dalam studi tatabahasa Yunani. Dalam karyanya, Dionysius Thrax memberikan penjelasan tentang kategori-kategori gramatikal, struktur kalimat, dan aspek-aspek lain dari bahasa Yunani klasik. Selain itu, Marcus Terentius Varro adalah seorang sarjana Romawi yang terkenal dengan karyanya yang berjudul “De Lingua Latina” (“Tentang Bahasa Latin”). Karya ini merupakan salah satu upaya pertama untuk mengklasifikasikan dan menganalisis tata bahasa Latin secara komprehensif. Varro mempertimbangkan struktur fonologi, morfoligi, dan sintaksis dalam bahasa Latin, serta memperkenalkan konsep-konsep tatabahasa yang menjadi dasar bagi studi linguistik di masa berikutnya. Dengan kontribusi dari tokoh-tokoh seperti Dionysius Thrax dan Varro, tradisi tatabahasa kuno membentuk dasar bagi pengembangan studi tata bahasa dan linguistik di dunia klasik, yang kemudian memengaruhi perkembangan linguistik di masa-masa selanjutnya.
+
+---
+
+**3. Tata Bahasa Universal**
+
+Tata Bahasa Universal merupakan sebuah teori dalam bidang linguistik yang berkembang pada abad ke-20, terutama di bawah pengaruh Noam Chomsky. Teori ini menyatakan bahwa ada struktur dan prinsip-prinsip dasar yang mendasari semua bahasa manusia di dunia. Pemahaman terhadap struktur ini dianggap penting karena dapat memberikan wawasan yang lebih dalam tentang sifat universal dari bahasa dan kemampuan bawaan manusia dalam memahaminya.
+
+Objek studi dalam tata bahasa universal adalah struktur dan prinsip-prinsip umum yang diyakini mendasari semua bahasa manusia. Fokusnya adalah pada elemen-elemen dasar seperti fonologi, morfoligi, sintaksis, dan semantik, serta kemungkinan adanya prinsip-prinsip umum yang mengatur struktur dan penggunaan bahasa di seluruh dunia.
+
+Tujuan utama dari tata bahasa universal adalah untuk mengidentifikasi dan memahami fitur-fitur yang universal dalam bahasa manusia. Dengan demikian, tujuan ini dapat memberikan dasar bagi pengembangan teori-teori linguistik yang lebih komprehensif dan mendasar. Melalui penelitian terhadap tata bahasa universal, ahli berharap dapat menjelaskan kemampuan bawaan manusia dalam memahami dan memproduksi bahasa serta memperkaya pemahaman kita tentang keragaman bahasa di dunia.
+
+--- Bagian 4 ---
+
+Chomsky adalah tokoh utama dalam pengembangan teori tata bahasa universal. Ia dikenal karena mengajukan gagasan tentang tata bahasa generatif, yang menekankan bahwa manusia lahir dengan kemampuan bawaan untuk memahami dan menghasilkan struktur bahasa. Konsep tata bahasa generatif ini telah memengaruhi perkembangan linguistik modern secara signifikan. Dengan kontribusi Noam Chomsky dan para ahli lainnya, tata bahasa universal telah menjadi salah satu bidang penting dalam studi linguistik modern. Teori ini tidak hanya membantu kita memahami sifat dasar bahasa manusia, tetapi juga memberikan dasar bagi pengembangan berbagai teori linguistik lainnya.
+
+---
+
+**4. Linguistik Perbandingan**
+
+Linguistik Perbandingan adalah cabang dari ilmu linguistik yang berkembang pada abad ke-19, terutama di bawah pengaruh Friedrich Schlegel dan Franz Bopp. Teori ini bertujuan untuk membandingkan bahasa-bahasa dari berbagai keluarga bahasa untuk mengidentifikasi hubungan kekerabatan, merekonstruksi bahasa nenek moyang, dan menjelaskan perubahan linguistik dalam sejarah.
+
+---
+
+* **Gambar 1.1** Noam Chomsky *Sumber: https://en.wikipedia.org/wiki/Noam_Chomsky*
+
+* **Gambar 1.2** Friedrich Schlegel *Sumber: https://en.wikipedia.org/wiki/Friedrich_Schlegel*
+
+* **Gambar 1.3** Franz Bopp *Sumber: https://en.wikipedia.org/wiki/Franz_Bopp*
+
+Objek studi dalam linguistik perbandingan adalah bahasa-bahasa dari berbagai keluarga bahasa di seluruh dunia. Para ahli bahasa melakukan perbandingan antara struktur fonologis, morfologis, sintaktis, dan semantik dari bahasa-bahasa ini untuk mengidentifikasi persamaan dan perbedaan antar mereka.
+
+Tujuan utama dari linguistik perbandingan adalah untuk merekonstruksi sejarah dan perkembangan bahasa-bahasa yang dibandingkan. Para ahli bahasa berusaha untuk menemukan bukti-bukti yang menunjukkan hubungan kekerabatan antara bahasa-bahasa tersebut, serta menjelaskan perubahan linguistik yang terjadi dalam sejarah. Dengan demikian, tujuan ini memberikan wawasan yang lebih dalam tentang asal-usul dan evolusi bahasa manusia.
+
+Friedrich Schlegel dikenal sebagai salah satu tokoh awal dalam pengembangan konsep bahasa Indo-Eropa. Ia mengemukakan gagasan bahwa bahasa-bahasa Indo-Eropa memiliki asal-usul yang sama dan dapat ditelusuri kembali ke satu bahasa nenek moyang. Kontribusi Schlegel membantu memperluas pemahaman kita tentang hubungan kekerabatan antara bahasa-bahasa di seluruh dunia.
+
+Franz Bopp adalah salah satu pendiri linguistik perbandingan-sejarah yang mengembangkan metode perbandingan untuk merekonstruksi bahasa Indo-Eropa. Dalam karyanya yang terkenal, "Comparative Grammar of the Sanskrit, Greek, Latin, Lithuanian, Old Slavic, Gothic, and Germanic Languages" (1816-1817), Bopp membandingkan struktur gramatikal dari berbagai bahasa Indo-Eropa untuk mengidentifikasi pola-pola umum dan hubungan kekerabatan di antara mereka.
+
+--- Bagian 5 ---
+
+Dengan kontribusi Friedrich Schlegel dan Franz Bopp, linguistik perbandingan telah menjadi salah satu cabang penting dalam studi linguistik yang membantu kita memahami keragaman bahasa manusia dan sejarah perkembangannya. Teori ini tidak hanya memberikan wawasan yang lebih dalam tentang hubungan antar bahasa, tetapi juga membantu merekonstruksi sejarah dan evolusi bahasa-bahasa di seluruh dunia.
+
+---
+
+**5. Linguistik Struktural**
+
+Linguistik Struktural adalah pendekatan dalam ilmu linguistik yang berkembang pada awal abad ke-20, terutama di bawah pengaruh Ferdinand de Saussure dan Leonard Bloomfield. Teori ini menekankan analisis struktur internal bahasa, termasuk fonologi, morfologi, sintaksis, dan semantik, serta bagaimana struktur-struktur ini membentuk dasar komunikasi manusia.
+
+---
+
+**Sumber:** * Gambar 1.4: Ferdinand de Saussure (Sumber: https://en.wikipedia.org/wiki/Ferdinand_de_Saussure) * Gambar 1.5: Leonard Bloomfield (Sumber: https://en.wikipedia.org/wiki/Leonard_Bloomfield)
+
+---
+
+Objek studi dalam linguistik struktural adalah struktur internal bahasa. Ini mencakup unsur-unsur seperti fonologi (suara dalam bahasa), morfologi (struktur kata), sintaksis (struktur kalimat), dan semantik (makna). Para ahli bahasa melakukan analisis mendalam tentang aturan-aturan dan pola-pola dalam bahasa, serta bagaimana unsur-unsur ini saling berinteraksi dalam penyampaian makna.
+
+Tujuan utama dari linguistik struktural adalah untuk menganalisis struktur bahasa secara sistematis. Para ahli bahasa berusaha untuk mengidentifikasi aturan-aturan yang mengatur penggunaan bahasa, pola-pola yang terjadi dalam bahasa, dan bagaimana bahasa digunakan dalam komunikasi sehari-hari. Dengan demikian, tujuan ini membantu memahami bagaimana manusia menggunakan bahasa untuk menyampaikan pesan dan berinteraksi satu sama lain.
+
+Ferdinand de Saussure dikenal sebagai salah satu tokoh utama dalam perkembangan linguistik struktural modern. Dalam karyanya yang terkenal, "Course in General Linguistics" (1916), Saussure mengemukakan konsep-konsep fundamental seperti perbedaan antara "bahasa" (*langue*) dan "logat" (*parole*), serta konsep "tanda" (*sign*) yang terdiri dari komponen bunyi dan makna.
+
+Selain itu, Bloomfield menjadi tokoh utama dalam pengembangan linguistik struktural di Amerika Serikat. Dalam karyanya yang berpengaruh, "Language" (1933), Bloomfield mengembangkan pendekatan atomistik dalam studi bahasa yang
+
+menekankan analisis struktur bahasa pada level terkecil. Ia menganggap bahwa bahasa terdiri dari serangkaian unit terkecil yang dapat diuraikan, dan penelitian linguistik harus fokus pada analisis struktur ini. Dengan kontribusi dari Ferdinand de Saussure dan Leonard Bloomfield, linguistik struktural telah menjadi salah satu pendekatan utama dalam studi linguistik modern. Teori ini memberikan dasar bagi pemahaman tentang struktur internal bahasa dan bagaimana struktur-struktur ini membentuk dasar komunikasi manusia.
+
+**6. Linguistik Sistemis Fungsional**
+
+--- Bagian 6 ---
+
+Linguistik sistemis fungsional, merupakan pendekatan dalam ilmu linguistik yang dikembangkan oleh Michael Halliday. Teori ini berakar dari karya-karya Halliday dalam analisis sistemik bahasa Inggris, yang kemudian berkembang menjadi kerangka kerja yang digunakan untuk menganalisis struktur bahasa sebagai sistem yang terdiri dari unsur-unsur yang saling berhubungan.
+
+Objek studi dalam linguistik sistemis adalah struktur bahasa sebagai sistem. Ini mencakup unsur-unsur seperti leksikon, tata bahasa, dan fonologi, serta bagaimana unsur-unsur ini saling berinteraksi untuk menyampaikan makna. Pendekatan sistemisini memandang bahasa sebagai sistem yang kompleks, di mana setiap unsur saling terkait dan berkontribusi dalam pembentukan makna.
+
+Tujuan utama dari linguistik sistemis adalah untuk menganalisis struktur bahasa secara holistik, dengan mempertimbangkan hubungan antarunsur-unsur dalam sistem bahasa. Para ahli bahasa berusaha untuk mengidentifikasi unsur-unsur utama dalam sistem bahasa, menganalisis bagaimana unsur-unsur ini berinteraksi, dan memahami bagaimana struktur bahasa digunakan untuk menyampaikan makna dalam konteks sosial dan budaya.
+
+Michael Halliday adalah tokoh utama dalam pengembangan sistemika fungsional. Melalui karyanya yang terkenal, *An Introduction to Functional Grammar* (1985), Halliday menggabungkan analisis sistemis dengan pendekatan fungsional dalam memahami bahasa. Ia mengembangkan kerangka kerja sistemis fungsional yang menekankan hubungan antara struktur bahasa dan penggunaan bahasa dalam berbagai konteks komunikatif. Dengan kontribusi dari Michael Halliday, linguistik sistemis telah menjadi salah satu pendekatan utama dalam studi linguistik modern. Teori ini membantu kita memahami bahasa sebagai sistem kompleks yang terdiri dari unsur-unsur yang saling berhubungan serta bagaimana struktur bahasa digunakan untuk menyampaikan makna dalam berbagai konteks komunikatif.
+
+---
+
+Sumber: https://en.wikipedia.org/wiki/Michael_Halliday
+
+Gambar 1.6 Michael Halliday
+
+**B. CABANG-CABANG ILMU LINGUISTIK**
+
+Meskipun berbagai teori linguistik memiliki fokus kajian yang berbeda, mereka semua menjadikan satuan bahasa sebagai fokus utama dalam analisis mereka. Ini berarti bahwa, meskipun pendekatan dan sudut pandangnya berbeda, semua teori berusaha untuk memahami dan menjelaskan fenomena bahasa dengan menggunakan bahasa sebagai objek kajiannya. Sebagai misal, Teori Penamaan dalam Filsafat Kuno dan Tradisi Tata Bahasa Kuno, fokus kajian cenderung lebih pada aspek semantik dan filosofis bahasa, dengan menyoroti konsep-konsep seperti makna, penamaan, dan penggunaan bahasa dalam konteks budaya dan pemikiran manusia pada masa kuno.
+
+--- Bagian 7 ---
+
+Di sisi lain, Tata Bahasa Universal lebih berfokus pada struktur dasar bahasa yang dianggap bawaan secara universal bagi manusia. Ini melibatkan aspek-aspek fonologis, morfologis, sintaktis, dan semantik dari bahasa yang dianggap bersifat universal di antara semua bahasa manusia. Sementara itu, Linguistik Perbandingan, termasuk cabang-cabangnya seperti Linguistik Historikar Komparatif, dan Tipologi Komparatif, lebih menekankan pada perbandingan antara berbagai bahasa dan pengidentifikasian hubungan kekerabatan di antara mereka. Ini melibatkan analisis struktur bahasa, perubahan sejarah, dan pola-pola linguistik yang saling berhubungan.
+
+Adapun, Linguistik Struktural dan Linguistik Sistemik Fungsional juga berfokus pada struktur bahasa, dengan penekanan khusus pada cara unsur-unsur dalam bahasa diatur dalam sistem yang kompleks. Ini melibatkan analisis sintaksis, fonologi, morfologi, dan semantik dalam konteks struktur dan organisasi bahasa. Dengan demikian, meskipun ada perbedaan dalam fokus kajian masing-masing teori linguistik, semuanya tetap memusatkan perhatian pada satuan bahasa sebagai objek utama analisis
+
+mereka. Beberapa teori mungkin lebih fokus pada perbandingan antara bahasa-bahasa, sedangkan yang lain lebih fokus pada aspek-aspek tertentu dari struktur atau makna bahasa, tetapi semuanya berkontribusi pada pemahaman yang lebih baik tentang fenomena bahasa manusia.
+
+Yang perlu dicatat adalah bahwa fenomena bahasa sangat kompleks dan melibatkan berbagai aspek yang berbeda, mulai dari produksi bunyi hingga penggunaan bahasa dalam konteks komunikatif. Oleh karena itu, untuk memahami fenomena bahasa secara menyeluruh, penting untuk memahami berbagai cabang ilmu linguistik yang terlibat. Berikut adalah beberapa cabang ilmu linguistik yang perlu dipahami untuk menggali dan menganalisis fenomena bahasa.
+
+1. **Fonetik** Fonetik adalah cabang ilmu linguistik yang mempelajari produksi, transmisi, dan persepsi bunyi dalam bahasa. Fonetik berfokus pada aspek fisik dan akustik bunyi bahasa, serta cara manusia mendengar dan memahami bunyi-bunyi tersebut. Fonetik yang berfokus pada aspek bunyi fisik disebut sebagai fonetik artikulatoris. Ini adalah subdisiplin fonetik yang mempelajari bagaimana bunyi-bunyi bahasa dihasilkan oleh alat ucap manusia. Ini mencakup analisis tentang bagaimana posisi lidah, bibir, gigi, dan organ-organ lain dalam mulut dan tenggorokan berubah untuk menghasilkan berbagai bunyi dalam bahasa.
+
+--- Bagian 8 ---
+
+Sementara itu, fonetik akustik mempelajari sifat akustik bunyi-bunyi bahasa, yaitu bagaimana bunyi-bunyi tersebut ditransmisikan melalui udara dan dicatat sebagai gelombang suara. Fonetik akustik melibatkan analisis tentang frekuensi, amplitudo, dan durasi bunyi, serta bagaimana sifat-sifat ini memengaruhi persepsi bunyi oleh pendengar. Adapun, Fonetik Auditif adalah subdisiplin yang mempelajari persepsi bunyi oleh pendengar. Fonetik auditif mencakup analisis tentang bagaimana manusia mendengar, memproses, dan memahami bunyi-bunyi bahasa, termasuk pengenalan dan interpretasi berbagai bunyi dan pola bunyi.
+
+Pemahaman fonetik sangat penting bagi pemelajaran bahasa (*language learners*) karena membantu mereka mempelajari dan menguasai pengucapan yang tepat dalam bahasa target. Dengan memahami bagaimana bunyi-bunyi bahasa dihasilkan dan diartikulasikan, pemelajar dapat meningkatkan kemampuan mereka untuk berbicara dengan jelas dan mudah dimengerti oleh penutur asli. Selain itu, pengetahuan fonetik juga membantu pemelajar memahami perbedaan bunyi antara bahasa asli dan bahasa target, yang dapat mengurangi kesalahan dalam pelafalan dan pemahaman.
+
+2. **Fonologi** Fonologi adalah cabang ilmu linguistik yang mempelajari pola-pola bunyi dalam bahasa dan aturan-aturan yang mengatur penggunaan bunyi-bunyi tersebut dalam sistem bahasa. Fonologi memeriksa bagaimana bunyi-bunyi tertentu dalam bahasa digunakan untuk membentuk kontras makna antara kata-kata, serta bagaimana aturan-aturan fonologisi ini diterapkan dalam pembentukan kata-kata dan kalimat.
+
+Ada beberapa objek kajian fonologi. Salah satunya adalah bunyi dalam bahasa, yaitu berbagai bunyi yang ada dalam bahasa dan bagaimana bunyi-bunyi ini diidentifikasi dan dibedakan dalam sistem bahasa. Selain itu, kontras fonemik juga menjadi bahan kajian dalam Fonologi. Kontras fonemik mengacu pada perbedaan bunyi yang dapat mengubah makna kata. Objek kajian fonologi mencakup identifikasi kontras fonemik dalam bahasa. Sebagai tambahan, Fonologi juga membahas kaidah yang mengatur penggunaan bunyi-bunyi dalam bahasa, seperti perubahan bunyi bergantung pada konteks, atau pembentukan klausa bunyi yang benar; dan juga struktur suara dalam bahasa, termasuk penggabungan bunyi-bunyi menjadi suku kata dan kata-kata, serta hubungan antara suara-suara tersebut.
+
+--- Bagian 9 ---
+
+Bagi pemelajar bahasa, termasuk *English learners*, Fonologi memberikan manfaat penting. Pertama, pemahaman aturan-aturan fonologi membantu pemelajar bahasa dalam menguasai pengucapan yang tepat. Dengan memahami bagaimana bunyi-bunyi dalam bahasa dihasilkan dan diorganisasi, pemelajar dapat menghindari kesalahan dalam pelafalan yang dapat mempengaruhi pemahaman mereka oleh penutur asli. Selain itu, memahami fonologi juga memungkinkan pemelajar untuk melihat pola-pola dalam pembentukan kata-kata, memperoleh intuisi yang lebih baik tentang bagaimana kata-kata baru dapat dibentuk, dan memahami hubungan antara bunyi-bunyi dalam kata-kata tersebut. Kemudian, pemahaman fonologi juga dapat meningkatkan kemampuan mendengar pemelajar.
+
+Dengan memahami perbedaan bunyi-bunyi yang mungkin sulit didengar dalam bahasa target, pemelajar menjadi lebih peka terhadap variasi dalam pengucapan dan dapat dengan lebih mudah membedakan antara bunyi yang serupa. Terakhir, fonologi membantu pemelajar bahasa dalam mengatasi masalah dialek. Dengan memahami perbedaan dalam pelafalan dan intonasi antara berbagai dialek dalam bahasa target, pemelajar dapat memperluas kemampuan komunikasi mereka dan lebih mudah beradaptasi dengan lingkungan linguistik yang beragam. Pembahasan tentang Fonologi Bahasa Inggris secara lengkap akan disajikan dalam Modul 2 buku ini.
+
+3. **Morfologi** Ilmu morfologi merupakan cabang ilmu linguistik yang mempelajari struktur dan pembentukan kata-kata dalam bahasa. Objek kajiannya meliputi unit-unit dasar bahasa yang disebut morfem, serta aturan-aturan yang mengatur cara morfem-morfem ini digabungkan untuk membentuk kata-kata. Morfologi menganalisis bagaimana kata-kata dalam bahasa terbentuk, baik melalui proses pembentukan kata baru (*derivation*) maupun proses pembentukan kata yang lebih kompleks (*infleksi*). Selain itu, morfologi juga memperhatikan variasi bentuk kata yang mungkin terjadi dalam berbagai konteks.
+
+Pentingnya morfologi bagi pemelajar bahasa sangatlah signifikan. Pertama, pemahaman tentang struktur dan pembentukan kata-kata membantu pemelajar dalam memperluas kosakata mereka. Dengan memahami bagaimana kata-kata dibentuk dari morfem-morfem, pemelajar dapat lebih mudah memahami makna kata-kata baru yang mereka temui dan mungkin juga dapat memprediksi makna kata-kata yang belum pernah
+
+mereka dengar sebelumnya. Kedua, morfologi membantu pemelajar dalam memahami hubungan antarkata dalam kalimat. Dengan memahami bentuk-bentuk dasar kata serta perubahan bentuk yang terjadi pada morfem-morfem tersebut, pemelajar dapat lebih baik dalam menganalisis struktur kalimat dan memahami peran setiap kata dalam konteks kalimat tersebut.
+
+--- Bagian 10 ---
+
+Terakhir, pemahaman morfologi juga dapat membantu pemelajar dalam memahami variasi bahasa yang terjadi dalam berbagai konteks dan dialek. Dengan memahami aturan-aturan morfologi, pemelajar dapat lebih mudah memahami variasi bentuk kata yang mungkin mereka temui dalam bahasa lisan ataupun tulisan. Dengan demikian, morfologi menjadi kunci penting dalam memahami struktur bahasa dan meningkatkan kemampuan komunikasi pemelajar dalam bahasa target. Pembahasan lengkap Morfologi akan disajikan dalam Modul 3 buku ini.
+
+**4. Sintaksis**
+
+Sintaksis merupakan cabang ilmu linguistik yang mempelajari struktur kalimat dalam bahasa. Objek kajiannya meliputi susunan kata-kata dalam kalimat, hubungan antara kata-kata tersebut, serta aturan-aturan yang mengatur bagaimana kata-kata tersebut diatur untuk membentuk kalimat yang bermakna. Sintaksis memperhatikan tata bahasa, termasuk kategori-kategori gramatikal seperti subjek, predikat, objek, dan modifikasi, serta aturan-aturan untuk membentuk kalimat yang gramatikal dan dapat dipahami.
+
+Pentingnya sintaksis bagi pemelajar bahasa sangatlah signifikan. Pertama, pemahaman sintaksis membantu pemelajar dalam memahami dan memproduksi kalimat yang benar secara gramatikal. Dengan memahami aturan-aturan sintaksis, pemelajar dapat menghindari kesalahan dalam tata bahasa dan meningkatkan kejelasan serta keakuratan komunikasi mereka. Kedua, sintaksis memainkan peran penting dalam pemahaman teks dan percakapan. Dengan memahami struktur kalimat, pemelajar dapat memahami hubungan antara kata-kata dalam sebuah kalimat dan menginterpretasikan makna yang terkandung dalam teks atau percakapan tersebut. Terakhir, pemahaman sintaksis membantu pemelajar dalam mempelajari bahasa secara lebih efektif.
+
+Dengan memahami aturan-aturan sintaksis, pemelajar dapat mengidentifikasi pola-pola yang umum dalam kalimat dan mempercepat proses belajar serta menguasai tata bahasa dalam bahasa target. Dengan demikian, sintaksis menjadi kunci penting dalam memahami struktur bahasa dan meningkatkan kemampuan komunikasi serta penguasaan tata bahasa pemelajar dalam bahasa target. Sintaksis bahasa Inggris disajikan dengan lengkap dalam Modul 4 buku ini.
+
+**5. Semantik**
+
+Semantik merupakan cabang ilmu linguistik yang mempelajari makna dalam bahasa. Objek kajiannya meliputi makna kata-kata, frasa, kalimat, dan teks secara keseluruhan. Semantik memperhatikan cara makna dibentuk, dipahami, dan digunakan dalam konteks komunikatif. Hal ini mencakup analisis tentang makna konseptual (denotatif) dan makna leksikal (konotatif), serta hubungan antara makna dan struktur bahasa.
+
+--- Bagian 11 ---
+
+Pemahaman semantik sangat penting bagi pemelajar bahasa karena berbagai alasan. Pertama, memahami makna kata-kata dan konstruksi kalimat membantu pemelajar dalam menginterpretasikan dan menghasilkan teks dengan benar. Dengan memahami makna kata-kata, pemelajar dapat menghindari penggunaan kata yang tidak sesuai konteks atau tidak sesuai dengan makna yang dimaksud. Kedua, semantik membantu pemelajar dalam memahami perbedaan makna antara kata-kata yang serupa. Dalam bahasa, kata-kata sering memiliki sinonim atau antonim, dan pemahaman semantik membantu pemelajar untuk memahami perbedaan makna antara kata-kata tersebut. Ketiga, pemahaman semantik membantu pemelajar dalam memahami konteks dan tujuan komunikatif. Dengan memahami makna kalimat dan teks secara keseluruhan, pemelajar dapat menginterpretasikan pesan yang disampaikan dengan benar dan meresponsnya sesuai dengan konteks komunikasi.
+
+Selain itu, pemahaman semantik juga penting untuk menghindari kesalahpahaman dalam komunikasi. Dengan memahami makna kata-kata dan kalimat secara tepat, pemelajar dapat memastikan bahwa pesan yang mereka sampaikan dapat dipahami dengan benar oleh lawan bicara mereka. Dengan demikian, semantik memainkan peran kunci dalam memahami dan menghasilkan teks yang akurat dan efektif dalam bahasa target, sehingga meningkatkan kemampuan komunikasi pemelajar dan memungkinkan mereka untuk berinteraksi dengan penutur asli secara lebih lancar dan efisien. Kajian Semantik yang lengkap dengan fokus pada Bahasa Inggris disajikan dalam Modul 5 buku ini.
+
+**6. Pragmatik**
+
+Pragmatik adalah cabang ilmu linguistik yang mempelajari penggunaan bahasa dalam konteks komunikatif. Berbeda dengan semantik yang memfokuskan pada makna kata, frasa, dan kalimat secara langsung, pragmatik memperhatikan bagaimana makna dipahami dan digunakan dalam situasi komunikasi yang nyata. Objek kajiannya meliputi aspek-aspek seperti implikatur, maksim kerja sama, konteks situasional, dan tujuan komunikatif. Pragmatik menganalisis bagaimana bahasa digunakan untuk mencapai tujuan komunikatif tertentu, serta bagaimana faktor-faktor kontekstual seperti latar belakang budaya, status sosial, dan pengetahuan bersama mempengaruhi interpretasi dan pemahaman makna bahasa.
+
+Perbedaan utama antara pragmatik dan semantik terletak pada fokus kajiannya. Semantik berkaitan dengan makna literal dari kata-kata, frasa, dan kalimat, sedangkan pragmatik menyoroti makna yang dapat dipahami dari konteks komunikasi, yang mungkin tidak selalu tersirat secara langsung dalam struktur bahasa. Pragmatik memperhatikan aspek pragmatis dalam komunikasi, seperti penggunaan ironi, eufemisme, dan implikatur percakapan, yang tidak sepenuhnya terkandung dalam makna literal kata-kata.
+
+--- Bagian 12 ---
+
+Bagi pemelajar bahasa, pemahaman pragmatik memiliki manfaat yang signifikan. Pertama, memahami pragmatik membantu pemelajar memahami makna yang tersirat dalam percakapan sehari-hari. Dalam interaksi sosial, sering terjadi bahwa makna tidak hanya terkandung dalam kata-kata yang diucapkan, tetapi juga dalam konteks komunikatif secara keseluruhan. Kedua, pemahaman pragmatik membantu pemelajar untuk menjadi penutur yang lebih efektif dan sopan. Dengan memahami norma-norma komunikatif, seperti maksim kerja sama, pemelajar dapat menghasilkan percakapan yang lebih lancar dan berkesan. Terakhir, pemahaman pragmatik membantu pemelajar dalam mengatasi kesalahpahaman dalam komunikasi. Dengan memahami implikatur dan konteks situasional, pemelajar dapat menginterpretasikan pesan dengan lebih tepat dan menghindari kesalahpahaman yang mungkin timbul dalam komunikasi. Dengan demikian, pemahaman pragmatik menjadi penting bagi pemelajar bahasa dalam mengembangkan kemampuan komunikasi yang efektif dan tepat dalam bahasa target. Secara lengkap pembahasan pragmatik disajikan dalam Modul 6 buku ini.
+
+**7. Sosiolinguistik**
+
+Sosiolinguistik adalah cabang ilmu linguistik yang mempelajari hubungan antara bahasa dan masyarakat. Objek kajiannya meliputi interaksi antara bahasa dan faktor-faktor sosial seperti status sosial, kekuatan, etnisitas, gender, dan faktor-faktor lainnya. Sosiolinguistik memperhatikan bagaimana faktor-faktor sosial ini memengaruhi penggunaan bahasa, serta bagaimana penggunaan bahasa tersebut mencerminkan dan membentuk identitas sosial dan kebudayaan dalam masyarakat. Penelitian dalam sosiolinguistik mencakup berbagai topik, mulai dari variasi bahasa dan dialek hingga pengaruh bahasa terhadap kesetaraan sosial dan pembentukan identitas kelompok.
+
+Manfaat sosiolinguistik bagi pemelajar bahasa sangat besar. Pertama, memahami sosiolinguistik membantu pemelajar dalam memahami variasi bahasa dan dialek. Dalam masyarakat yang multibahasa atau multikultural, sering terdapat variasi bahasa yang signifikan dalam penggunaan bahasa sehari-hari. Dengan memahami bagaimana faktor-faktor sosial memengaruhi variasi bahasa, pemelajar dapat lebih memahami dan menghargai berbagai varietas bahasa yang mereka temui dalam kehidupan sehari-hari. Kedua, pemahaman sosiolinguistik membantu pemelajar dalam mengembangkan kesadaran tentang keberagaman bahasa dan budaya.
+
+--- Bagian 13 ---
+
+Dengan memahami peran bahasa dalam membentuk identitas sosial dan kebudayaan, pemelajar dapat menjadi lebih sensitif terhadap perbedaan dan keunikan dalam penggunaan bahasa, serta dapat menghargai kekayaan bahasa dan budaya yang dimiliki oleh masyarakat yang berbeda. Terakhir, pemahaman sosiolinguistik membantu pemelajar dalam mengembangkan kemampuan komunikasi yang lebih efektif dalam berbagai konteks sosial. Dengan memahami bagaimana faktor-faktor sosial memengaruhi penggunaan bahasa, pemelajar dapat mengadaptasi gaya bahasa mereka sesuai dengan situasi komunikatif yang berbeda dan menjadi penutur yang lebih terampil dan berpengetahuan luas dalam bahasa target. Dengan demikian, pemahaman sosiolinguistik menjadi kunci penting dalam mengembangkan kemampuan komunikasi dan kesadaran lintas budaya bagi pemelajar bahasa. Secara lengkap kajian sosiolinguistik disajikan dalam Modul 7 buku ini.
+
+**8. Analisis Wacana**
+
+Analisis wacana adalah pendekatan dalam linguistik yang mempelajari teks atau wacana secara menyeluruh untuk memahami bagaimana bahasa digunakan dalam konteks sosial dan bagaimana teks tersebut memengaruhi pemikiran dan tindakan dalam masyarakat. Objek kajiannya meliputi teks-teks seperti percakapan, artikel berita, iklan, pidato, dan teks lainnya yang diproduksi dalam konteks komunikatif tertentu. Pendekatan ini memperhatikan berbagai aspek dalam teks, termasuk struktur teks, penggunaan kosakata, pola kalimat, serta unsur-unsur sosial dan budaya yang tertanam di dalamnya.
+
+Ada beberapa pendekatan dalam analisis wacana, termasuk pendekatan struktural, fungsional, kritis, dan sosial. Pendekatan struktural fokus pada analisis struktur teks dan pola-pola linguistik yang terdapat di dalamnya. Pendekatan fungsional memperhatikan bagaimana teks digunakan untuk mencapai tujuan komunikatif tertentu dan memengaruhi perilaku sosial yang di dalamnya juga tersedia teori *appraisal*. Pendekatan kritis menyoroti aspek-aspek kekuasaan, ideologi, dan konflik yang terkandung dalam teks. Sedangkan pendekatan sosial meneliti bagaimana konteks sosial dan budaya memengaruhi produksi dan interpretasi teks.
+
+Manfaat analisis wacana bagi pemelajar bahasa sangatlah signifikan. Pertama, memahami analisis wacana membantu pemelajar dalam mengembangkan kemampuan membaca dan memahami teks dengan lebih baik. Dengan memahami struktur dan konteks teks, pemelajar dapat menginterpretasikan makna teks secara lebih mendalam dan memahami hubungan antara bahasa dan konteks sosial. Kedua, analisis wacana membantu pemelajar dalam meningkatkan kemampuan menulis yang efektif. Dengan memahami strategi-strategi yang digunakan dalam teks-teks tertentu, pemelajar dapat belajar bagaimana menghasilkan teks yang sesuai dengan tujuan komunikatif mereka.
+
+--- Bagian 14 ---
+
+Terakhir, analisis wacana membantu pemelajar dalam mengembangkan kesadaran tentang variasi bahasa dan keberagaman budaya dalam penggunaan bahasa. Dengan memahami peran konteks sosial dalam produksi dan interpretasi teks, pemelajar dapat menjadi lebih sensitif terhadap perbedaan dan keunikan dalam penggunaan bahasa dan memahami makna yang mungkin terkandung dalam berbagai konteks komunikatif. Dengan demikian, pemahaman analisis wacana menjadi kunci penting dalam mengembangkan kemampuan komunikasi yang efektif dan memperluas pemahaman tentang bahasa dan budaya bagi pemelajar bahasa. Secara terinci penjelasan tentang analisis wacana akan disajikan dalam Modul 8.
+
+**9. Linguistik Komputasional**
+
+Linguistik komputasional adalah cabang ilmu linguistik interdisipliner yang memadukan ilmu bahasa dan ilmu komputer untuk mengembangkan sistem yang mampu memproses bahasa alami secara otomatis. Bidang ini mengkaji bagaimana
+
+bahasa manusia dapat direpresentasikan dalam bentuk formal sehingga dapat dianalisis, dipahami, dan diproduksi oleh komputer. Objek kajiannya meliputi berbagai satuan bahasa, mulai dari bunyi (fonetik dan fonologi), kata (morfologi), kalimat (sintaksis), makna (semantik), hingga konteks penggunaan bahasa (pragmatik). Dengan demikian, linguistik komputasional tidak hanya membahas struktur bahasa, tetapi juga bagaimana struktur tersebut diimplementasikan dalam sistem komputasi untuk membangun interaksi antara manusia dan mesin.
+
+Secara konseptual, linguistik komputasional mencakup beberapa subbidang utama. Fonetik dan fonologi komputasional berfokus pada pemrosesan tuturan, seperti pengenalan tuturan (*speech recognition*) dan pemaduan tuturan (*speech synthesis*). Morfologi komputasional membahas cara komputer menganalisis dan membangkitkan bentuk kata berdasarkan struktur morfologisnya. Sintaksis komputasional berkaitan dengan proses *parsing* dan pembangkitan kalimat secara gramatikal dengan memanfaatkan kaidah struktur frasa. Semantik komputasional mengembangkan teknik representasi makna melalui sistem formal seperti *first-order logic* agar komputer mampu melakukan inferensi. Sementara itu, pragmatik komputasional memperluas kemampuan sistem dengan mempertimbangkan konteks, implikatur, serta aspek-aspek percakapan yang memungkinkan interpretasi yang lebih mendekati kemampuan manusia.
+
+--- Bagian 15 ---
+
+Linguistik komputasional memiliki berbagai aplikasi, baik dalam ranah akademik maupun dalam kehidupan sehari-hari. Dalam bidang linguistik teoretis, sistem komputasional dapat digunakan untuk menguji teori gramatika dan menganalisis frekuensi, kolokasi, serta konkordansi melalui korpus digital. Dalam praktik sehari-hari, penerapannya dapat ditemukan dalam mesin penerjemah, program pemeriksa ejaan, mesin pencari informasi (*information retrieval*), sistem peringkas dokumen, hingga teknologi pengenalan suara dan asisten virtual. Kehadiran teknologi ini menunjukkan bahwa linguistik komputasional berperan penting dalam menjembatani kebutuhan komunikasi manusia dengan kecanggihan teknologi digital.
+
+Manfaat linguistik komputasional bagi pemelajar bahasa sangat signifikan. Pertama, pemahaman tentang cara kerja sistem pemrosesan bahasa alami membantu pemelajar memahami struktur bahasa secara lebih sistematis dan formal. Kedua, teknologi berbasis linguistik komputasional, seperti mesin penerjemah dan pemeriksa tata bahasa, dapat menjadi alat bantu pembelajaran yang efektif apabila digunakan secara kritis dan reflektif. Ketiga, pemahaman bidang ini mendorong pemelajar untuk mengembangkan literasi digital dan kesadaran terhadap batasan teknologi bahasa, sehingga mereka tidak hanya menjadi pengguna, tetapi juga mampu mengevaluasi kualitas keluaran sistem secara linguistik.
+
+Linguistik komputasional menjadi bidang yang strategis dalam era digital karena mengintegrasikan teori linguistik dengan praktik teknologi. Pemahaman yang mendalam terhadap bidang ini tidak hanya memperkaya wawasan kebahasaan, tetapi juga membuka peluang pengembangan inovasi dalam teknologi bahasa yang semakin relevan dengan kebutuhan masyarakat modern. Penjelasan lebih rinci mengenai setiap subbidang linguistik komputasional akan diuraikan dalam Modul 9 ini.
+
+Kegiatan Belajar 1
+
+**Fonetik Bahasa Inggris**
+
+Mahasiswa yang luar biasa, dalam mempelajari bahasa, bunyi merupakan unsur paling dasar yang menjadi pintu masuk untuk memahami bagaimana bahasa bekerja dalam komunikasi. Setiap bahasa memiliki sistem bunyi yang khas, dan perbedaan bunyi inilah yang sering menjadi tantangan utama bagi pemelajar bahasa Inggris, terutama karena hubungan antara ejaan dan pengucapan dalam bahasa Inggris tidak selalu transparan. Oleh karena itu, pada Kegiatan Belajar 1 ini kita akan mempelajari fonetik sebagai cabang linguistik yang membahas bunyi bahasa secara fisik—mulai dari definisi fonetik, cabang-cabang fonetik, organ artikulatoris, hingga klasifikasi bunyi vokal dan konsonan. Melalui pembahasan ini, mahasiswa diharapkan memperoleh dasar yang kuat untuk memahami dan mempraktikkan pengucapan bahasa Inggris secara lebih akurat serta meningkatkan kepekaan terhadap perbedaan bunyi antara bahasa Inggris dan bahasa Indonesia.
+
+**A. DEFINISI FONETIK**
+
+--- Bagian 16 ---
+
+Fonetik adalah cabang ilmu linguistik yang mempelajari bunyi fisik dalam bahasa *(language sounds)*, termasuk produksi, transmisi, dan penerimaan bunyi bahasa yang dihasilkan manusia atau sering disebut sebagai *speech sound*. Kajian dalam fonetik melibatkan analisis bunyi-bunyi dalam bahasa dari sudut pandang fisik, akustik, dan artikulatori. Kaitannya dengan linguistik sangat erat, karena fonetik memberikan dasar untuk memahami bagaimana bunyi-bunyi ini diproduksi, ditransmisikan, dan dipahami dalam bahasa, yang merupakan elemen kunci dalam studi linguistik. Dengan kata lain, fonetik membantu menjelaskan bagaimana kita manusia itu menghasilkan bunyi-bunyi bahasa melalui gerakan organ-organ bicara seperti lidah, bibir, dan pita suara. Selain itu, pemahaman fonetik tentang ciri-ciri bunyi-bunyi dalam bahasa membantu linguistik dalam mengenali dan mengklasifikasikan bunyi-bunyi dalam sistem fonologi bahasa tertentu. Ini memungkinkan linguistik untuk mempelajari aturan-aturan dan pola-pola fonologis dalam bahasa.
+
+Dengan mempelajari fonetik, kita sebagai *English language learners* dapat membandingkan bunyi-bunyi dalam bahasa-bahasa yang berbeda—dalam hal ini paling tidak bunyi bahasa yang dimiliki oleh bahasa Indonesia dan bunyi bahasa yang ada dalam bahasa Inggris, baik secara segmental (individu bunyi) maupun suprasegmental (fitur-fitur yang melintasi batas-batas bunyi). Ini membantu dalam pemahaman tentang hubungan genetik dan historis antarbahasa satu dengan bahasa yang lain.
+
+Sebagai tambahan, studi fonetik bisa membantu kita memahami perbedaan dalam bahasa lisan dan tulisan. Ini membantu linguistik dalam memahami bagaimana bunyi-bunyi direpresentasikan dalam sistem penulisan dan bagaimana perbedaan-perbedaan ini memengaruhi pemahaman dan interpretasi bahasa. Pemahaman ini sangat penting, terutama bagi kita pemelajar bahasa Inggris. Hal ini berkaitan dengan kenyataan bahwa tata ejaan dan pengucapan dalam bahasa Inggris itu sangat unik dan kurang transparan bagi kita sebagai pemelajar bahasa ini. Sebagai misal, huruf /u/ dalam kata *but*, kata *butcher*, dan kata *curtain* memiliki pengucapan yang berbeda. Kata pertama terbaca secara fonetis sebagai [bʌt], kata butcher dibaca secara fonetis sebagai [ˈbʊtʃər], dan kata curtain terbaca secara fonetis sebagai ['k3r.tən]. Dengan demikian, huruf yang tertulis sebagai /u/ tersebut di dalam konteks yang berbeda bisa terbaca sebagai [ʌ], sebagai [ʊ], atau sebagai [3]. Oleh karena itu, pengetahuan fonetik seperti ini memainkan peran penting dalam penerjemahan dan pengucapan yang akurat, karena memungkinkan pemahaman yang lebih baik tentang perbedaan bunyi-bunyi antara bahasa sumber dan bahasa sasaran.
+
+--- Bagian 17 ---
+
+Apa yang dijelaskan tentang bunyi yang berbeda dari sebuah huruf yang sama di atas berkaitan dengan istilah *phone*. Dalam linguistik, istilah “phone” merujuk pada unit bunyi yang diucapkan dalam bahasa, terlepas dari statusnya dalam sistem fonologi bahasa tertentu. Ini adalah representasi fisik dari bunyi yang dihasilkan oleh manusia, yang dapat diamati dan didokumentasikan secara objektif. *Phone* ini dapat dikategorikan menjadi bunyi bunyi vokal *(vowel)*, bunyi bunyi konsonan, dan lain yang dihasilkan oleh berbagai organ wicara manusia, seperti bunyi *dhiphtong*, *triphtong*, dan sebagainya. Dalam analisis fonetik, phone adalah unit dasar yang diamati dan didokumentasikan. Ini mencakup deskripsi karakteristik akustik dan artikulatori dari bunyi-bunyi yang diucapkan. Perlu diperhatikan bahwa dalam penulisan, representasi fonetik sering kali ditempatkan dalam tanda kurung kotak, seperti [p], [t], [æ], untuk menunjukkan suara-suara tersebut sebagai *phones*, terlepas dari perannya dalam sistem fonologi bahasa tertentu.
+
+**B. CABANG-CABANG FONETIK**
+
+Pada garis besarnya, ada tiga cabang ilmu fonetik, yaitu fonetik akustik, fonetik auditori, dan fonetik artikulatori. Cabang yang pertama mempelajari sifat fisik dari bunyi-bunyi bahasa, termasuk gelombang bunyi yang dihasilkan oleh pembicara. Ini melibatkan analisis frekuensi, amplitudo, durasi, dan bentuk gelombang bunyi. Fonetik akustik juga memeriksa bagaimana sifat-sifat ini memengaruhi persepsi bunyi oleh pendengar.
+
+teknologi penerjemahan bunyi, dan aplikasi lainnya yang bergantung pada analisis bunyi manusia, termasuk di dalamnya adalah aplikasi medis dalam bidang kedokteran yang bisa digunakan dalam diagnosis dan penanganan gangguan bicara dan pendengaran.
+
+Fonetik cabang kedua adalah fonetik auditori. Di dalam cabang fonetik ini, bunyi-bunyi yang diterima oleh telinga dalam dan yang kemudian diproses oleh otak untuk membentuk persepsi bunyi dipelajari. Kajian ini melibatkan analisis tentang bagaimana pendengar mendeteksi, mengenali, dan membedakan antara berbagai bunyi dalam bahasa yaitu bunyi bunyi vokal, bunyi konsonan, dan bunyi-bunyi lain. Selain itu, cabang fonetik ini juga mempelajari kemampuan pendengar beradaptasi dengan perubahan lingkungan akustik, seperti perubahan dalam tingkat kebisingan atau kualitas suara, untuk tetap memahami bahasa dengan efektif; serta mempelajari berbagai fenomena persepsi bunyi, seperti persepsi kategoris (*categorical perception*), persepsi pemusatan (*perceptual constancy*), dan efek konteks dalam pengenalan bunyi.
+
+--- Bagian 18 ---
+
+Dengan mempelajari fonetik auditori, kita bisa memperdalam pemahaman tentang proses komunikasi manusia dan interaksi linguistik. Lebih jauh, pengetahuan tentang persepsi auditori manusia digunakan dalam pengembangan teknologi suara, seperti sistem pengenalan ucapan, pemrosesan bahasa alami, dan aplikasi pengenalan suara lainnya. Sementara itu, dalam pendidikan bahasa, pemahaman tentang bagaimana pendengar memahami suara-suara bahasa dapat membantu dalam pengajaran pengucapan yang akurat dan pemahaman mendengarkan yang lebih baik. Adapun, dalam bidang kedokteran, fonetik auditori membantu dalam pemahaman tentang gangguan pendengaran dan strategi rehabilitasi yang sesuai.
+
+Fonetik artikulatoris adalah cabang fonetik yang mempelajari produksi bunyi bunyi dalam bahasa dengan memeriksa posisi, bentuk, dan gerakan dari organ-organ bicara manusia, seperti lidah, bibir, gigi, langit-langit, dan pita suara. Ini melibatkan analisis gerakan artikulator dan posisi yang diperlukan untuk menghasilkan berbagai suara dalam bahasa. Dengan demikian, fonetik artikulatoris mempelajari produksi dari kedua jenis bunyi dalam bahasa: bunyi konsonan dan bunyi vokal. Untuk bunyi konsonan, analisis termasuk bagaimana bunyi konsonan-bunyi konsonan dihasilkan dengan menghambat aliran udara melalui saluran bunyi vokal. Sedangkan untuk bunyi vokal, fokusnya adalah pada posisi lidah dan bentuk rongga mulut yang membentuk bunyi.
+
+Adapun, kajian fonetik artikulatoris bisa membantu dalam memahami mekanisme fisik yang digunakan oleh pembicara untuk menghasilkan bunyi-bunyi bahasa. Ini penting untuk memahami bagaimana suara-suaranya dihasilkan dan bagaimana variasi dalam produksi suara dapat terjadi. Dengan demikian, dalam pendidikan bahasa, fonetik artikulatoris bisa memberikan manfaat dalam mengajarkan pengucapan yang akurat kepada pembelajar bahasa. Dengan memahami posisi dan gerakan artikulator yang diperlukan untuk menghasilkan berbagai bunyi bahasa, pembelajar dapat memperbaiki pengucapan mereka. Selain itu, memahami fonetik artikulatoris juga membantu dalam pemahaman variasi dialektal dalam bahasa. Hal ini dikaitkan dengan fakta bahwa variasi dalam posisi dan gerakan artikulator dapat menyebabkan perbedaan dalam pengucapan
+
+antara dialek-dialek yang berbeda. Berkaitan dengan proses pembelajaran bahasa Inggris, modul ini hanya akan membahas fonetik artikulatoris secara lebih detail.
+
+**C. ORGAN ARTIKULATORIS**
+
+--- Bagian 19 ---
+
+Organ-organ artikulator yang digunakan untuk menghasilkan bunyi vokal dan bunyi konsonan berbeda tergantung pada jenis bunyi yang dihasilkan. Berikut adalah penjelasan tentang organ-organ artikulator yang umumnya terlibat dalam produksi bunyi vokal dan bunyi konsonan. Organ yang pertama adalah lidah. Lidah memainkan peran utama dalam pembentukan bunyi vokal. Posisi dan bentuk lidah membentuk resonansi dalam rongga mulut, yang menghasilkan berbagai bunyi vokal. Misalnya, lidah mungkin dinaikkan atau diturunkan, maju atau mundur, dan dipersempit atau diperlebar untuk menghasilkan berbagai bunyi vokal. Organ artikulatoris kedua adalah bibir. Organ ini juga berperan dalam membentuk resonansi bunyi vokal dengan membuka atau menutup mulut dan merubah bentuk lubang bibir. Misalnya, pembulatan bibir (seperti pada bunyi vokal [u]) dapat menghasilkan bunyi vokal yang berbeda dari ketika bibir terbuka (seperti pada bunyi vokal [a]).
+
+Selain berfungsi sebagai organ artikulatoris untuk menghasilkan bunyi vokal, lidah dan bibir juga memiliki peran dalam mengakomodasi produksi bunyi konsonan. Berbagai gerakan lidah, seperti naik turunnya, maju mundurnya, dan posisinya terhadap langit-langit atau gigi, menghasilkan berbagai bunyi konsonan. Misalnya, untuk bunyi konsonan [t], lidah diposisikan di belakang gigi atas. Adapun, bibir juga berperan dalam produksi bunyi konsonan, terutama bunyi konsonan-bunyi konsonan bibir. Bunyi konsonan seperti [p], [b], [m], [f], dan [v] melibatkan gerakan bibir untuk menghambat aliran udara.
+
+Sementara itu, rongga mulut berperan sebagai resonator utama untuk bunyi vokal. Bentuk dan volume rongga mulut mempengaruhi karakteristik akustik dari bunyi vokal. Misalnya, volume rongga mulut yang lebih besar dapat menghasilkan bunyi vokal dengan kualitas yang berbeda dari volume yang lebih kecil. Organ di dalam rongga mulut, seperti gigi dan langit-langit juga memiliki peran di dalam proses menghasilkan bunyi konsonan. Gigi dapat berfungsi sebagai titik hambatan untuk beberapa bunyi konsonan. Misalnya, untuk bunyi konsonan [θ] dan [ð], lidah berada di belakang gigi atas untuk menghasilkan hambatan aliran udara; sedangkan langit-langit (palatum) dapat berkontribusi pada pembentukan beberapa bunyi konsonan, seperti bunyi konsonan langit-langit dan bunyi konsonan uvular. Misalnya, bunyi konsonan [k] dan [g] melibatkan kontak antara langit-langit dan bagian belakang lidah.
+
+**D. BUNYI VOKAL**
+
+--- Bagian 20 ---
+
+Bunyi vokal (atau *vowel*), dalam konteks linguistik, merujuk kepada salah satu dari dua kategori bunyi dalam fonologi bahasa, yang lainnya adalah bunyi konsonan. Bunyi vokal dihasilkan tanpa adanya hambatan dalam aliran udara di saluran vokal, sehingga udara dapat mengalir bebas melalui rongga mulut tanpa adanya hambatan yang signifikan. Ciri utama dari bunyi vokal adalah resonansi yang dihasilkan oleh rongga mulut ketika udara melewati saluran vokal tanpa hambatan yang signifikan. Perbedaan antara berbagai bunyi vokal biasanya ditentukan oleh posisi dan bentuk lidah, bibir, dan rongga mulut saat bunyi tersebut dihasilkan.
+
+Dalam bahasa Inggris dan banyak bahasa lainnya, bunyi vokal sering menjadi inti atau nukleus dari suku kata. Mereka sering membawa informasi penting dalam proses pengenalan kata dan makna dalam bahasa. Bunyi vokal juga dapat memengaruhi ritme dan intonasi kalimat. Dalam pemetaan fonetik, bunyi vokal direpresentasikan dalam simbol-simbol IPA (*International Phonetic Alphabet*), seperti /i:/, /ɪ/, /e/, /æ/, /ɑ:/, /ɔ:/, /ʊ/, dan /u:/, yang mewakili bunyi-bunyi vokal yang berbeda dalam bahasa Inggris.
+
+Seperti yang dijabarkan di atas, bunyi vokal dihasilkan dengan mengeksplotasi organ artikulatoris lidah dan bibir. Berkaitan dengan organ yang terlibat ini, maka bunyi vokal dapat diklasifikasikan berdasarkan posisi lidah saat bunyi tersebut dihasilkan. Posisi lidah memainkan peran penting dalam membentuk resonansi dan karakteristik akustik dari bunyi vokal. Berdasarkan posisi lidah, bunyi vokal dapat dibagi menjadi tiga kategori utama: tinggi, tengah, dan rendah.
+
+Bunyi vokal tinggi dihasilkan dengan lidah dinaikkan ke posisi yang tinggi dalam rongga mulut. Lidah mendekati langit-langit mulut atau arah gigi atas. Bunyi vokal tinggi memiliki resonansi yang tinggi dalam rongga mulut. Sebagai contoh, bunyi vokal tinggi dalam bahasa Inggris termasuk /i:/ (seperti dalam "see") dan /u:/ (seperti dalam "blue").
+
+Sementara itu, bunyi vokal tengah dihasilkan dengan lidah berada di posisi menengah di dalam rongga mulut. Lidah biasanya diletakkan di antara posisi yang sangat tinggi dan sangat rendah. Bunyi vokal tengah memiliki resonansi di tengah-tengah rongga mulut. Di dalam bahasa Inggris, bunyi vokal jenis ini dapat dicontohkan dengan bunyi /ɪ/ (seperti dalam “sit”) dan /ʊ/ (seperti dalam “put”).
+
+Adapun, bunyi vokal rendah dihasilkan dengan lidah turun ke posisi yang rendah di dalam rongga mulut. Lidah dapat diletakkan di bagian bawah mulut atau dekat dengan langit-langit mulut yang rendah. Bunyi vokal rendah memiliki resonansi yang rendah dalam rongga mulut. Contoh bunyi vokal rendah dalam bahasa Inggris adalah bunyi /æ/ (seperti dalam "cat") dan /ɑ:/ (seperti dalam "father").
+
+--- Bagian 21 ---
+
+Selain karena posisi tinggi rendahnya, bunyi vokal dapat diklasifikasikan berdasarkan posisi bagian belakang atau depan lidah yang berperan dalam membentuk resonansi. Klasifikasi ini dikenal sebagai “backness” dan mencakup tiga kategori utama: vokal depan, vokal tengah, dan vokal belakang.
+
+Bunyi vokal depan dihasilkan dengan lidah berada di posisi depan atau mendekati gigi depan. Resonansi utama terjadi di bagian depan rongga mulut. Contoh bunyi vokal depan dalam bahasa Inggris adalah bunyi /i:/ (seperti dalam “see”) dan /ɪ/ (seperti dalam “sit”). Sementara itu, bunyi vokal tengah dihasilkan dengan lidah berada di posisi tengah di dalam rongga mulut, tidak terlalu depan atau terlalu belakang. Resonansi utama terjadi di bagian tengah rongga mulut. Sebagai contoh, bunyi /ə/ (seperti dalam
+
+“sofa”) dan /ʌ/ (seperti dalam “cup”) di dalam bahasa Inggris dapat diklasifikasikan sebagai bunyi vokal tengah. Adapun, bunyi vokal belakang dihasilkan dengan lidah berada di posisi belakang atau mendekati langit-langit belakang. Resonansi utama terjadi di bagian belakang rongga mulut. Contoh bunyi vokal belakang dalam bahasa Inggris adalah bunyi /u:/ (seperti dalam “blue”) dan bunyi /ɑ:/ (seperti dalam “father”). Posisi tinggi/ rendah, dan depan/ belakang dari bunyi vokal dapat dilihat dalam bagan di bawah ini.
+
+Klasifikasi bunyi vokal *rounded* dan *unrounded* dapat dilihat di dalam bagan di bawah ini.
+
+Gambar 2.2 Posisi Lidah untuk Bunyi Vokal
+
+Selain itu, bunyi vokal juga bisa diklasifikasikan sesuai dengan bentuk bibir. Terdapat dua kategori utama dalam klasifikasi ini, yaitu *rounded* (bibir bulat) dan *unrounded* (bibir rata). Bibir bulat diatur dalam bentuk melengkung atau tertutup sedikit saat menghasilkan bunyi vokal. Ini menghasilkan resonansi yang berbeda dan sering kali memberikan kualitas suara yang berbeda pula. Bunyi vokal yang dibentuk dengan bibir tertutup sering disebut sebagai “bulat”. Contoh bunyi vokal dengan bibir bulat adalah: - /u:/ seperti dalam “food” - /oo/ seperti dalam “go” - /ʊ/ seperti dalam “book”
+
+Sementara itu, bibir rata dibentuk secara terbuka atau tersebar sedikit saat menghasilkan bunyi vokal. Hal ini dapat menghasilkan resonansi yang berbeda dan kualitas suara yang berbeda pula. Bunyi vokal yang dibentuk dengan bibir rata sering disebut sebagai “unrounded”. Adapun beberapa contoh bunyi vokal *unrounded* di dalam bahasa Inggris adalah sebagai berikut. - /i:/ seperti dalam “see” - /eɪ/ seperti dalam “say” - /æ/ seperti dalam “cat”
+
+Gambar 2.3 Bentuk Bibir untuk Bunyi Vokal
+
+--- Bagian 22 ---
+
+Mahasiswa yang budiman, bunyi vokal erat berkaitan dengan konsep *monophthongs*, *diphthongs*, dan *triphthongs*. *Monophthongs* adalah bunyi vokal yang kualitasnya tidak berubah selama durasi bunyi tersebut. Ini berarti lidah dan bibir mempertahankan posisinya tanpa perubahan signifikan selama produksi suara. *Monophthongs* sering disebut sebagai “pure” atau “stable” *vowels* atau bunyi vokal murni atau bunyi vokal stabil, karena kualitas suaranya tetap konsisten. Di dalam bahasa Inggris, bunyi vokal seperti /ɪ/ dalam kata “sit”, /æ/ dalam kata “cat”, dan /ɑ:/ dalam kata “father” adalah contoh *monophthongs*. Sementara itu, *diphthongs* adalah bunyi vokal yang *glid* dari satu kualitas ke kualitas lainnya selama produksi suara. Ini berarti posisi lidah dan bibir berubah secara gradual dari awal hingga akhir bunyi. *Diphthongs* sering disebut sebagai “gliding” *vowels*. Di dalam bahasa Inggris, bunyi vokal seperti /aɪ/ dalam kata “price” dan /ɔɪ/ dalam kata “boy” adalah contoh *diphthongs*; sedangkan *triphthongs* adalah bunyi vokal yang *glid* melalui tiga kualitas suara yang berbeda secara berturut-turut selama produksi suara. Ini merupakan bentuk yang lebih kompleks dari *diphthongs*. Dalam bahasa Inggris, contoh *triphthongs* termasuk bunyi vokal dalam kata seperti “fire” (diucapkan /ˈfaɪər/), di mana suara bergerak dari /aɪ/ ke /ə/ dan kemudian ke /r/.
+
+Ada tiga kelompok *diphthong*, yaitu disebut sebagai *fronting, centring*, dan *backing dhiphtongs*. *Fronting* adalah sebuah proses fonologis di mana bunyi-bunyi vokal yang biasanya diucapkan dengan posisi lidah yang lebih belakang dipindahkan ke posisi yang lebih depan di dalam rongga mulut. Sebagai contoh, kata *bide* diucapkan
+
+sebagai /baɪd/ dengan fronting diphptong /aɪ/, sedangkan kata *wake* diucapkan sebagai /weɪk/ dengan fronting diphptong /eɪ/.
+
+Sementara itu, *centring diphthongs* adalah jenis diphthong di mana posisi lidah bergerak dari posisi tinggi atau rendah ke posisi tengah selama produksi suara. Secara fonetis, *centring diphthongs* terdiri dari kombinasi vokal tengah dan vokal depan atau belakang yang diucapkan secara berurutan tanpa dipisahkan oleh konsonan. Contoh dari *centring diphthongs* dalam bahasa Inggris adalah diphthong /ɪə/ dalam kata *here*, dan /ʊə/ dalam kata *pure*. Dalam kedua kasus ini, terdapat perubahan dari vokal depan atau belakang ke vokal tengah selama produksi suara.
+
+--- Bagian 23 ---
+
+Adapun, *backing diphthongs* adalah jenis diphthong di mana posisi lidah bergerak dari posisi depan ke posisi belakang selama produksi suara. Ini berarti bahwa *diphthong* dimulai dengan vokal depan dan berakhir dengan vokal belakang. Secara fonetis, *backing diphthongs* adalah kombinasi dari vokal depan dan belakang yang diucapkan secara berurutan tanpa dipisahkan oleh konsonan. Contoh dari *backing diphthongs* dalam bahasa Inggris adalah diphthong /oʊ/ dalam kata *go*, dan /aʊ/ dalam kata *house*. Ketika mengucapkan kata *go*, lidah dimulai dengan posisi depan dan bergerak ke belakang untuk menghasilkan kombinasi vokal depan (/o/) dan belakang (/ʊ/), sedangkan ketika mengatakan kata *house*, lidah dimulai dengan posisi depan dan bergerak ke belakang untuk menghasilkan kombinasi vokal depan (/a/) dan belakang (/ʊ/).
+
+---
+
+## E. BUNYI KONSONAN
+
+Bunyi konsonan adalah jenis bunyi yang dihasilkan oleh penghalang atau hambatan yang tercipta dalam aliran udara saat keluar dari mulut atau hidung. Konsonan biasanya memiliki karakteristik berupa penghalang atau hambatan yang tercipta oleh lidah, bibir, gigi, langit-langit, atau bagian lain dari rongga mulut atau hidung. Berbeda dengan bunyi vokal yang dihasilkan tanpa hambatan yang signifikan dalam aliran udara, bunyi konsonan melibatkan interupsi atau pembatasan aliran udara oleh salah satu bagian dari rongga mulut atau hidung. Ini menghasilkan berbagai jenis suara yang membentuk dasar dari sistem konsonan dalam bahasa.
+
+Ada dua hal yang bisa digunakan untuk mengklasifikasikan konsonan bahasa Inggris, yaitu *Place of Articulation*, dan *Manner of Articulation*. Yang pertama mengacu pada lokasi di rongga mulut atau saluran vokal di mana hambatan dibuat saat mengucapkan bunyi konsonan. Ini menentukan bagian mana dari mulut atau hidung yang terlibat dalam pembentukan bunyi konsonan. Dalam bahasa Inggris, ada beberapa tempat atau "*place* of articulation" yang umum digunakan. Bibir atas dan bibir bawah adalah organ yang bisa membentuk hambatan aliran udara untuk menghasilkan bunyi bilabial seperti bunyi /p/, /b/, /m/. Bunyi bilabial dihasilkan menggunakan kedua bibir. Pertama, bibir saling merapat untuk menghambat aliran udara. Kemudian kedua bibir dibuka untuk meletupkan dan menghasilkan bunyi /p/ atau /b/ misalnya dalam kata “pat” atau “bat.” Untuk suara seperti “m,” udara keluar melalui hidung saat bibir masih tertutup.
+
+---
+
+--- Bagian 24 ---
+
+Sementara itu, bunyi /f/ seperti dalam kata *flower* dan /v/ seperti dalam kata *vase* dihasilkan dengan merapatkan bibir bawah dan ujung gigi atas sebagai bunyi labiodental. Untuk kedua bunyi ini, bibir bawah ditekan sedikit ke atas bibir atas. Ketika aliran udara dari paru-paru ditekan melalui celah kecil yang terbentuk antara bibir atas dan gigi bawah, terciptalah bunyi *fricative*. Untuk bunyi /f/ (*voiceless*), tidak ada getaran pita suara, sehingga suara tersebut adalah suara “murni” yang dihasilkan oleh gesekan aliran udara melalui celah. Namun, untuk bunyi /v/ (*voiced*), selain gesekan aliran udara, pita suara juga bergetar. Jadi, perbedaan utama antara keduanya adalah keberadaan atau ketiadaan getaran pita suara.
+
+Selain itu, bahasa Inggris memiliki dua bunyi yang dihasilkan dengan membuat kontak antara ujung lidah dan ujung gigi atas, yaitu bunyi /θ/ seperti dalam kata *think* dan /ð/ seperti dalam kata *the*, yang disebut sebagai bunyi *dental*. Untuk kedua bunyi ini, lidah diletakkan di depan gigi-gigi atas, sehingga terjadi hambatan yang memperhalus aliran udara saat keluar dari mulut. Perbedaan antara keduanya terletak pada keberadaan atau ketiadaan getaran pita suara. Untuk bunyi /θ/ (*voiceless*), tidak ada getaran pita suara. Saat aliran udara dipaksa melewati celah sempit antara lidah dan gigi depan atas, terciptalah suara frikatif yang bersifat *voiceless* atau tanpa getaran pita suara. Sementara untuk bunyi /ð/ (*voiced*), pita suara bergetar saat menghasilkan suara. Ini berarti saat aliran udara dipaksa melewati celah yang sama, pita suara bergetar, memberikan bunyi yang terdengar lebih bergetar dan sonor.
+
+Tempat artikulasi yang lain adalah ujung lidah dengan bagian depan langit-langit. Kontak dua organ artikulasi ini menghasilkan bunyi berjenis *alveolar*, seperti bunyi /t/, /d/, /n/, /s/, /z/. Dengan kata lain, bunyi *alveolar* terjadi melalui kerja sama antara lidah dan *alveolar ridge*, bagian depan langit-langit mulut. Ketika menghasilkan bunyi *alveolar*, lidah diletakkan di dekat atau menekan bagian depan langit-langit mulut. Hal ini menciptakan hambatan yang memperhalus aliran udara saat keluar dari mulut. Dengan lidah yang berada di dekat *alveolar ridge*, udara dapat keluar melalui celah sempit antara lidah dan *alveolar ridge*, menciptakan suara frikatif atau *stop*. Untuk bunyi *stop* alveolar seperti /t/ seperti dalam kata *top* dan /d/ seperti dalam kata *dog*, aliran udara dihentikan sepenuhnya untuk sejenak dengan bibir membentuk posisi untuk bunyi tersebut, lalu dilepaskan secara tiba-tiba untuk membuat bunyi pendek dan tajam.
+
+--- Bagian 25 ---
+
+Adapun kontak antara ujung lidah dengan langit-langit keras akan menghasilkan bunyi *palatal* seperti bunyi /ʃ/, /ʒ/, /tʃ/, /dʒ/, /j/. Bunyi *palatal* terjadi ketika lidah bergerak ke arah langit-langit tengah (*palatal*) untuk menciptakan hambatan atau penyempitan dalam aliran udara. Dalam pembentukan bunyi *palatal*, lidah ditempatkan dekat dengan langit-langit tengah, menciptakan celah sempit yang memungkinkan udara untuk melewati dengan gesekan. Bunyi *palatal*, seperti /ʃ/ dalam kata *she* atau /ʒ/ dalam kata *measure*, memiliki karakteristik yang lebih halus daripada bunyi *alveolar*, karena lidah berada lebih dekat dengan langit-langit. Proses ini membutuhkan koordinasi yang tepat antara lidah dan langit-langit untuk menghasilkan bunyi yang jelas dan terartikulasi. Bunyi *palatal* memiliki peran penting dalam pengucapan kata-kata dalam bahasa-bahasa seperti bahasa Inggris, dan sering digunakan dalam pembentukan konsonan kompleks seperti *affricate* (/tʃ/ seperti dalam kata *church*, dan /dʒ/ seperti dalam kata *judge*).
+
+Dua jenis bunyi yang lain adalah bunyi velar dan bunyi glotal. Bunyi velar terjadi ketika udara dikeluarkan dari paru-paru dan dialirkan melalui rongga mulut, sementara lidah diletakkan atau mendekati langit-langit belakang (velum). Posisi ini menciptakan hambatan atau penyempitan dalam aliran udara, yang mempengaruhi karakteristik bunyi yang dihasilkan. Untuk bunyi plosif velar, seperti /k/ seperti dalam kata *cat* dan /g/ seperti dalam kata *goat*, lidah diletakkan di dekat atau menekan bagian belakang langit-langit, menciptakan hambatan yang sepenuhnya menutupi saluran udara sebelum dilepaskan secara tiba-tiba, menghasilkan bunyi yang pendek dan tajam. Selain dua bunyi di atas, bunyi /ŋ/ adalah bunyi velar yang terjadi ketika udara dikeluarkan dari paru-paru dan dialirkan melalui rongga mulut, sementara lidah diletakkan di belakang langit-langit lunak (velum) sehingga menutupi jalur udara melalui rongga mulut, tetapi mengizinkan udara untuk mengalir melalui rongga hidung. Posisi ini menciptakan hambatan yang memblokir aliran udara melalui rongga mulut dan mengarahkannya ke rongga hidung. Jadi, bunyi /ŋ/ adalah bunyi nasal velar, di mana udara dialirkan melalui rongga hidung dan lidah diletakkan di belakang langit-langit lunak untuk menutupi jalur udara melalui rongga mulut. Ini menciptakan karakteristik suara nasal yang khas. Contoh kata dengan bunyi /ŋ/ adalah “sing” (/sɪŋ/) dalam bahasa Inggris.
+
+--- Bagian 26 ---
+
+Sementara itu, bunyi glotal terjadi ketika terjadi penyempitan atau hambatan aliran udara di glotis, yang merupakan rongga di antara pita suara di tenggorokan. Ketika udara dikeluarkan dari paru-paru, pita suara bersentuhan atau mendekati satu sama lain secara sempurna, menutupi lubang di glotis. Kemudian, udara dilepaskan dengan cara yang membuat pita suara bergetar ketika melewati glotis yang sempit. Bunyi yang dihasilkan sangat singkat dan memiliki kualitas yang sering disebut sebagai “pembukaan pita suara.” Bunyi glotal sering terjadi pada awal atau di tengah kata, terutama dalam bahasa-bahasa seperti bahasa Inggris, dan dapat memberikan pengaruh pada artikulasi dan intonasi kalimat. Bunyi glotal dalam bahasa Inggris umumnya direpresentasikan oleh simbol fonetik [ʔ]. Contoh kata dalam bahasa Inggris yang mengandung bunyi glotal adalah: 1. "Button" (/ˈbʌtn/) - Tombol 2. "Cat" (/kæt/) - Kucing 3. "Bottle" (/ˈbɒtəl/) - Botol 4. "Mitten" (/ˈmɪtən/) - Sarung tangan
+
+Dalam kata-kata ini, bunyi glotal muncul sebagai hambatan atau pemutusan singkat dalam aliran udara. Misalnya, dalam kata “button,” bunyi [ʔ] terjadi setelah bunyi [t] dan sebelum bunyi [ə], sehingga ada hambatan singkat dalam aliran udara antara kedua suku kata tersebut.
+
+Pada sisi yang lain, *manner of articulation* mengacu pada cara bunyi konsonan dihasilkan atau diartikulasikan oleh mulut dan saluran vokal. Ini menentukan bagaimana aliran udara diperlakukan saat keluar dari mulut atau hidung ketika menghasilkan suara konsonan. Dalam bahasa Inggris, ada beberapa cara umum di mana konsonan diartikulasikan, seperti bunyi plosif atau *stop*. Untuk bunyi ini, aliran udara sepenuhnya dihentikan dan kemudian dilepaskan secara tiba-tiba. Ini terjadi ketika dua organ artikulatoris bertemu untuk menutup saluran vokal. Ada dua jenis bunyi *stop*, yaitu *voiced* dan *voiceless stop*. Jenis pertama adalah jenis konsonan plosif di mana aliran udara dihentikan sepenuhnya untuk sejenak, dan pada saat yang sama, pita suara bergetar. Contohnya adalah /b/, /d/, dan /g/. Ketika kita mengucapkan bunyi /b/ dalam kata *bat*, bunyi /d/ dalam *dog*, dan bunyi /g/ dalam *goat*, pita suara bergetar ketika aliran udara dihentikan oleh bibir. Sebaliknya, *voiceless stop* adalah jenis konsonan plosif di mana aliran udara dihentikan sepenuhnya untuk sejenak, tetapi pita suara tidak bergetar. Contohnya adalah /p/, /t/, dan /k/. Ketika kita mengucapkan bunyi /p/ dalam kata *pat*, bunyi /t/ dalam kata *top*, dan bunyi /k/ dalam kata *cat*, pita suara tidak bergetar karena tidak ada getaran suara saat menghentikan aliran udara.
+
+--- Bagian 27 ---
+
+*Manner* yang kedua adalah *fricative*. Untuk bunyi ini, aliran udara diperhalus melalui celah sempit antara organ artikulatoris, menciptakan friksi atau gesekan. Ini terjadi ketika dua organ artikulatoris mendekat satu sama lain tanpa sepenuhnya menutup saluran vokal. Ada dua jenis bunyi *fricative*, yaitu *voiced* dan *voiceless fricative*. Jenis yang pertama adalah jenis konsonan *fricative* di mana aliran udara terhambat oleh gesekan yang terjadi antara organ artikulatoris, dan pada saat yang sama, pita suara bergetar. Contohnya adalah /v/, /ð/, dan /z/. Ketika kita mengucapkan bunyi /z/ dalam kata *zoo*, pita suara kita bergetar saat lidah dan langit-langit menghasilkan gesekan. Sebaliknya, bunyi *voiceless fricative* adalah jenis konsonan *fricative* di mana aliran udara terhambat oleh gesekan yang terjadi antara dua organ artikulatoris, tetapi pita suara tidak bergetar. Contohnya adalah /f/, /θ/, dan /s/. Ketika kita mengucapkan bunyi /s/ dalam kata *sit*, pita suara kita tidak bergetar karena aliran udara terhambat tanpa getaran pita suara.
+
+Sementara itu bunyi *affricative* merupakan kombinasi antara plosif dan frikatif, di mana aliran udara dihentikan dan kemudian dilepaskan secara perlahan melalui celah sempit, menciptakan friksi. *Voiced affricative* adalah konsonan yang dimulai sebagai plosif dan berlanjut sebagai *fricative*, dan pada saat yang sama, pita suara bergetar. Contohnya adalah /dʒ/ (seperti dalam “judge”) dan /dʒ/ (seperti dalam “jam”). Ketika Anda mengucapkan bunyi /dʒ/, pita suara Anda bergetar saat lidah bergerak dari posisi plosif ke *fricative*. Sementara itu, *voiceless affricative* adalah konsonan yang dimulai sebagai plosif dan berlanjut sebagai *fricative*, tetapi pita suara tidak bergetar. Contohnya adalah /tʃ/ (seperti dalam “church”) dan /ʃ/ (seperti dalam “chat”). Ketika Anda mengucapkan bunyi /tʃ/, pita suara Anda bergetar saat aliran udara terhambat oleh lidah dan langit-langit.
+
+Untuk menghasilkan bunyi nasal, aliran udara keluar melalui hidung. Ini terjadi ketika velum menurunkan diri untuk membuka saluran vokal ke hidung, sementara organ artikulatoris lainnya menghambat aliran udara melalui mulut. Contohnya adalah bunyi /m/, /n/, dan /ŋ/.
+
+Adapun, bunyi *liquid* adalah konsonan yang dihasilkan dengan mengatur aliran udara sedemikian rupa sehingga aliran udara bisa melalui rongga mulut tanpa hambatan yang signifikan. Namun, ada sedikit konstriksi yang menghasilkan efek gelombang atau
+
+getaran pada aliran udara. Contohnya adalah bunyi /l/ (lateral) dan /ɹ/ (alveolar). Dalam bunyi /l/, aliran udara keluar dari sisi lidah, sementara dalam bunyi /ɹ/, lidah mendekati langit-langit dan terjadi sedikit konstriksi, tetapi aliran udara tetap relatif lancar.
+
+--- Bagian 28 ---
+
+Bunyi yang terakhir adalah *glide* yang juga dikenal sebagai *semivowel*. Bunyi ini adalah konsonan yang dihasilkan dengan lidah bergerak lancar dari satu posisi ke posisi lainnya dalam pembentukan bunyi, tanpa adanya hambatan yang signifikan dalam aliran udara. *Glides* sering memiliki sifat yang mirip dengan vokal karena aliran udara tidak terlalu terhalang. Contohnya adalah bunyi /j/ (disebut juga "yod" dalam bahasa Inggris) dan /w/. Dalam bunyi /j/, lidah bergerak dari posisi depan ke posisi tengah, mirip dengan pembentukan bunyi vokal /i/, sedangkan dalam bunyi /w/, lidah bergerak dari posisi depan ke posisi belakang, mirip dengan pembentukan bunyi vokal /u/. *Place of Articulation* dan *Manner of Articulation* untuk bunyi konsonan dalam bahasa Inggris dalam dilihat dalam sajian tabel di bawah ini.
+
+Kegiatan Belajar 1
+
+Kata dan Jenis-jenisnya
+
+Mahasiswa Universitas Terbuka yang luar biasa, dalam mempelajari bahasa, kata merupakan salah satu satuan yang paling dekat dengan pengalaman kita sehari-hari—karena lewat kata-katalah manusia menamai benda, menyatakan tindakan, menggambarkan sifat, dan menyusun pesan dalam komunikasi. Namun, kata tidak hanya penting karena maknanya, melainkan juga karena jenis dan fungsinya dalam kalimat. Setiap bahasa memiliki sistem pengelompokan kata yang membantu penutur memahami bagaimana kata bekerja secara gramatikal, dan perbedaan sistem ini sering menjadi tantangan bagi pemelajar bahasa Inggris, terutama ketika harus membandingkan struktur bahasa Inggris dengan bahasa Indonesia.
+
+Oleh karena itu, pada Kegiatan Belajar 1 ini mahasiswa akan mempelajari konsep words beserta jenis-jenisnya (parts of speech), seperti noun, verb, adjective, adverb, pronoun, conjunction, article, preposition, interjection, dan number. Pembahasan juga diarahkan pada pembedaan kata leksikal dan kata gramatikal, termasuk ciri-cirinya, fungsinya dalam kalimat, serta fenomena bahwa kata leksikal cenderung bersifat “terbuka” (mudah bertambah/berubah), sedangkan kata gramatikal cenderung “tertutup” (lebih stabil). Melalui kegiatan belajar ini, mahasiswa diharapkan mampu mengenali kelas kata, memahami perbedaannya dalam dua bahasa, serta memiliki bekal yang lebih kuat untuk menganalisis struktur kalimat dan mendukung kemampuan penerjemahan secara lebih tepat dan berterima.
+
+A. KATA (WORDS)
+
+Mahasiswa Universitas Terbuka yang budiman, setiap bahasa akan memiliki satuan kata dengan berbagai jenis dan berbagai bentuk. Adapun, jenis dan bentuk kata tersebut dapat dilihat dari beberapa aspek. Sebagai misal, pakar tata bahasa tradisional membagi kata menjadi 10 sesuai dengan kelas atau kategorinya—dan pengklasifikasian ini bisa berlaku untuk setiap bahasa di dunia, termasuk bahasa Inggris. Adapun sepuluh kelas/kategori kata tersebut adalah sebagai berikut.
+
+--- Bagian 29 ---
+
+1. Kata Benda (Noun) Kata benda, Noun, atau juga disebut sebagai nomina adalah satuan bahasa dalam bentuk kata yang merepresentasikan atau merujuk pada benda atau objek, baik itu benda hidup atau benda mati, benda konkrit atau benda abstrak, benda dapat dihitung atau benda tak dapat dihitung, dan sebagainya. Sebuah kata benda atau noun bisa merepresentasikan lebih dari satu jenis kata benda ini. Sebagai misal, kata cat adalah kata benda bahasa Inggris yang merepresentasikan benda hidup, benda konkrit, dan benda dapat dihitung, sedangkan kata water merujuk benda mati, benda konkrit, dan benda tak dapat dihitung. Sementara itu, kata happiness adalah kata benda Bahasa Inggris yang merepresentasikan benda abstrak dan benda tak dapat dihitung, dan sebagainya. Sementara itu, Bahasa Indonesia juga memiliki kosa kata yang dicontohkan dalam Bahasa Inggris di atas—Bahasa Indonesia memiliki kata kucing, kata air, dan kata kebahagiaan sebagai pasangan dari masing-masing contoh itu.
+
+2. Kata Kerja (Verb) Kata kerja adalah kata yang merepresentasikan sebuah tindakan atau sebuah peristiwa/ kejadian. Jenis yang pertama adalah kata-kata kerja Bahasa Inggris yang berkaitan dengan tindakan atau aksi fisik seperti to eat, to sleep, to read, dan sebagainya. Sementara itu, kata kerja yang merepresentasikan kejadian atau peristiwa dapat dicontohkan dengan kata to fall, to flow dan sebagainya. Kata kerja jenis pertama menunjukkan ada agen yang melakukannya, sedangkan kata kerja jenis kedua menunjukkan ada agen yang mengalaminya. Seperti dalam bahasa Inggris, bahasa Indonesia juga memiliki jenis-jenis kata kerja seperti ini, misalnya makan, tidur, membaca sebagai kata kerja yang sifatnya tindakan fisik, dan kata jatuh, mengalir sebagai kata kerja kejadian.
+
+3. Kata Sifat (Adjective) Kata sifat, adjective, atau juga diistilahkan sebagai adjektiva digunakan untuk merepresentasikan sifat, keadaan, atau state of affair dari sebuah benda atau seseorang. Berkaitan dengan karakternya ini, maka sebuah kata sifat atau adjective dalam bahasa Inggris hanya berfungsi untuk menjadi determiner sebuah kata benda, dan bukan kata jenis lain—karena kata bendalah yang merepresentasikan sebuah benda. Frase seperti long tail dan big boss menunjukkan kalau kata yang bercetak tebal adalah kata sifat yang dalam konstruksi gramatika berfungsi sebagai determiner dari kata benda tail dan boss. Kasus yang sama terjadi juga dengan kata sifat dalam bahasa Indonesia. Jenis kata ini digunakan untuk memberikan pesan tambahan untuk sebuah kata benda seperti kata panjang dan besar, hanya saja sintaktik posisi kata sifat ini berbeda—dalam bahasa Inggris kata sifat cenderung berada sebelum kata benda, seperti contoh di atas, sedangkan dalam bahasa Indonesia kata sifat berada di belakang kata benda, seperti ekor panjang, dan bos besar.
+
+--- Bagian 30 ---
+
+4. Kata Keterangan (Adverb) Berbeda dengan kata sifat, kata keterangan atau adverb dalam bahasa Inggris adalah kata yang digunakan untuk menerangkan sebuah tindakan, atau sebuah peristiwa, atau sebuah keadaan atau sebuah sifat di dalam konstruksi kalimat. Berkaitan dengan
+
+fungsinya ini, maka ada beberapa jenis kata keterangan, yaitu kata keterangan waktu, kata keterangan tempat, kata keterangan cara, kata keterangan derajat, dan kata keterangan frekuensi. Kata keterangan waktu bisa dicontohkan dengan kata *now*, *yesterday*, dan sebagainya; kata keterangan tempat dengan kata *here*, *there*, dan sebagainya, kata keterangan cara dengan kata *slowly*, *rapidly*, dan sebagainya; kata keterangan derajat dengan kata *very*, *totally*, *enough*, dan sebagainya; dan kata keterangan frekuensi dengan kata *always*, *usually*, dan sebagainya. Contoh-contoh kata keterangan di atas juga tersedia dalam bahasa Indonesia, seperti sekarang, kemarin, di sini, di sana, pelan-pelan, segera, sangat, cukup, selalu, dan biasanya.
+
+5. **Kata Bilangan (*Number*)** Kata bilangan, atau *numbers* dalam bahasa Inggris adalah kata-kata yang merepresentasikan jumlah atau urutan. Biasanya kata-kata ini berbentuk ungkapan kata ordinal, seperti *first*, *second*, dan sebagainya; atau dalam bentuk kata kardinal, seperti *ten*, *million*, dan sebagainya. Kata jenis ini tentu saja juga ada dalam bahasa Indonesia, seperti pertama, kedua, sepuluh dan sejuta.
+
+6. **Kata Ganti (*Pronoun*)** Kata ganti dalam bahasa Inggris disebut sebagai *pronoun* atau pronomina. Kata-kata ini digunakan untuk menggantikan sebuah kata benda atau *noun*—itulah mengapa kata-kata ini disebut sebagai *pronoun*. Berbeda dengan kata ganti yang ada dalam bahasa Indonesia, kata ganti dalam bahasa Inggris lebih bervariasi dan lebih banyak jumlahnya, sehingga ada beberapa jenis kata ganti, yaitu kata ganti personal, kata ganti posesif, kata ganti resiprokal, kata ganti indefinit, dan sebagainya. Selain itu, sebagian bentuk-bentuk kata ganti dalam bahasa Inggris juga dikaitkan dengan posisinya dalam konstruksi gramatika. Sebagai misal, untuk merujuk seseorang bernama Jane, bahasa Inggris menyediakan kata ganti *she*, *her*, *her*, dan *hers* dalam contoh kalimat di bawah ini. - *Jane is a loving mother. She loves **her** children much.* - *Jane's father loves **her** much.* - *When John finished his test, Jane would finish **hers** too.*
+
+--- Bagian 31 ---
+
+Kata ***she*** dalam contoh di atas adalah kata ganti bahasa Inggris yang menggantikan kata *Jane* yang berposisi sebagai Subjek dari sebuah kalimat; kata ***her*** dalam ***her* children** menggantikan *Jane* dalam posisi sebagai *possessive adjective*; kata ***her*** dalam kalimat *“Jane's father loves **her** much”* menggantikan *Jane* yang berposisi sebagai Objek kalimat, dan kata ***hers*** di kalimat terakhir menggantikan *Jane* sebagai kata ganti pemilik. Kasus perubahan kata ganti ini akan berbeda jika entitas atau orang yang digantikan adalah *John*, atau *John and Jane*, atau *John and I* (the speaker), dan lain sebagainya. Bentuk-bentuk kata ganti tersebut dapat dilihat dalam tabel di bawah ini.
+
+---
+
+Tabel 3.1 Bentuk-Bentuk Kata Ganti (*Pronoun*) dalam Bahasa Inggris
+
+| Subject | Object | Possessive Adjective | Possessive Pronoun | | :---: | :---: | :---: | :---: | | I | me | my | mine | | you | you | your | yours | | she | her | her | hers | | he | him | his | his | | it | it | its | - | | we | us | our | ours | | they | them | their | theirs |
+
+---
+
+Sementara itu, kata ganti resiprokal dalam bahasa Inggris digunakan untuk mengekspresikan kalau ada dua atau lebih orang yang melakukan yang sama atau saling melakukan hal yang sama, misalnya saling mencintai, saling menolong dan sebagainya. Sebagai misal, dalam kalimat *“John and Jane loves each other.”* atau *“They sent gifts one another.”*, maka kata *each other* dan *one another* adalah dua contoh kata ganti jenis ini.
+
+Selain itu, bahasa Inggris juga memiliki apa yang disebut sebagai kata ganti indefinit—kata ganti yang rujukannya tidak jelas. Adapun, beberapa kata ganti jenis ini adalah sebagai berikut.
+
+---
+
+Tabel 3.2 Contoh Kata Ganti Jenis dalam Bahasa Inggris
+
+| | | | | | :---: | :---: | :---: | :---: | | *anybody* | *everybody* | *nobody* | *somebody* | | *anyone* | *everyone* | *noone* | *someone* | | *anything* | *everything* | *nothing* | *something* |
+
+---
+
+Dalam bahasa Indonesia, tentu saja pilihan kosa kata untuk kata ganti ini berbeda. Kalau kata ganti bahasa Inggris mengalami pergantian bentuk yang disebabkan oleh perannya dalam konstruksi gramatika, seperti sebagai Subjek atau Objek kalimat—kata ganti bahasa Indonesia tidak mengalami kasus seperti ini, seperti contoh di bawah ini: - Joko **memarahi** murid-muridnya. - **Dia perlu mengingatkan mereka**, karena **mereka tidak menghormati dia**.
+
+--- Bagian 32 ---
+
+Perbedaan lain adalah adanya kata ganti di bahasa Inggris yang tidak ada dalam bahasa Indonesia, atau sebaliknya. Misal, bahasa Inggris membedakan kata ganti orang ketiga tunggal berdasarkan gendernya menjadi *she* dan *he*, sementara itu bahasa Indonesia hanya memiliki kata *dia* untuk kata ganti orang ketiga tunggal tanpa melihat gendernya. Sebaliknya, bahasa Indonesia membedakan kata ganti orang kedua berdasarkan jumlahnya menjadi *kamu* (tunggal) dan *kalian* (jamak), sedangkan bahasa Inggris hanya memiliki *you* untuk kata ganti orang kedua tanpa melihat jumlahnya. Demikian pula, bahasa Indonesia memiliki kata ganti orang pertama jamak *kami* dan
+
+kata ganti yang melibatkan orang pertama dan orang kedua kita—yang dalam bahasa Inggris kami dan kita tersebut hanya diungkapkan dengan satu kata ganti, yaitu *we*.
+
+Selain itu, fungsi kata ganti dalam dua bahasa itu juga bisa berbeda. Kata ganti *they* adalah kata ganti orang ketiga jamak dalam bahasa Inggris bisa berfungsi untuk menggantikan *animate* atau *inanimate being*, seperti menggantikan manusia, hewan, atau benda. Dalam bahasa Indonesia, kata ganti orang ketiga jamak adalah *mereka*—dan kata ini hanya bisa menggantikan manusia, dan tidak bisa digunakan untuk menggantikan benda mati—bahkan untuk menggantikan binatang saja, kata ganti *mereka* itu juga dianggap kurang berterima. Tentu saja, masih banyak perbedaan jenis dan fungsi kata ganti dalam bahasa Inggris dan bahasa Indonesia—hal yang perlu dan yang penting adalah kita harus memahami dan mampu menggunakan berbagai jenis kata ganti baik dalam bahasa Inggris dan bahasa Indonesia.
+
+**7. Kata Sambung (*Conjunction*)**
+
+--- Bagian 33 ---
+
+Ada dua jenis kata sambung atau *conjunction* dalam bahasa Inggris, yaitu kata sambung koordinatif dan kata sambung subordinatif. Jenis kata ini digunakan untuk menggabungkan dua kalimat sederhana menjadi sebuah kalimat yang bersifat majemuk atau kompleks. Jika dua kalimat sederhana (atau lebih) yang digabungkan tersebut masing-masing masih bisa berdiri sendiri, maka gabungan tersebut akan menjadi kalimat majemuk setara atau koordinatif—dan kata sambung yang digunakan adalah kata yang berjenis koordinatif seperti: *and, but, or, so*, atau kata *dan, tetapi, atau, dan sehingga* dalam bahasa Indonesia, seperti dalam contoh di bawah ini. Dengan demikian, kalimat-kalimat di bawah ini adalah kalimat majemuk/ kompleks berjenis koordinatif/ setara, dan setiap klausa yang digabungkannya bersifat mandiri. - *John is smart, **and** he is rich.* - *Jane is good in drawing, **but** she gets problem in calculating.* - *They were very hungry, **so** they ate much.* - *We can go to school by bus, **or** we can just go there on foot.* - Joko terkenal anak yang soleh, **dan** dia juga dermawan. - Tinton itu anak kota, **tetapi** dia terlihat gaptek. - Mahasiswa merasa kurang menguasai Bahasa Inggris, **sehingga** mereka merasa perlu ambil kursus malam. - Bu Widi memberikan tugas tambahan untuk Kelas A, **atau** mereka harus mengulang matakuliah beliau.
+
+Pada sisi yang lain, kata sambung subordinatif akan membuat konstruksi kalimat majemuk/ kompleks yang sifatnya tidak setara. Dalam konstruksi seperti ini akan ada sebuah yang bersifat *bebas/ independent*, dan ada klausa yang bersifat *terikat/ dependent*, seperti yang ditunjukkan dalam kalimat-kalimat di bawah ini. - *John studied mathematics **when** he was in Australia.* - *Jane did not eat the noodle **because** she did not like it.*
+
+Kata *when* dan *because* dalam contoh di atas adalah kata sambung dalam bahasa Inggris yang bersifat subordinatif. Klausa yang diawali dengan kata sambung jenis ini akan bersifat terikat dan menjadi anak kalimat dari konstruksi tersebut. Adapun, contoh yang lain dari kata sambung jenis ini di antaranya adalah: *although, as, after, where, unless, since, while, whereas, though*, dan sebagainya; atau kata sambung bahasa Indoneisa: *ketika, karena, meskipun, saat, setelah, dimana, sejak, pada saat, sedangkan*, dan sebagainya.
+
+**8. Kata Sandang (*Article*)**
+
+--- Bagian 34 ---
+
+Dalam bahasa Inggris terdapat tidak kata sandang, yaitu *a, an, dan the* yang digunakan sebagai pengantar sebuah kata benda. Artikel *a* dan *an* bersifat *indefinit*, dan digunakan untuk mengindikasikan bahwa sebuah benda yang diantarkan itu belum atau tidak diketahui oleh mitra wicara; sedangkan artikel *the* bersifat *definit*, dan digunakan untuk mengindikasikan kalau benda yang diantarkan oleh artikel ini sudah diketahui oleh mitra wicara. Sebagai misal, jika kita mengatakan *Jane will bring a book for the seminar*, maka penggunaan artikel *a* dalam *a book* itu mengindikasikan kalau orang yang kita ajak bicara itu belum atau tidak tahu yang akan dibawa Jane ke seminar. Sementara itu, kalau kita mengatakan *Jane will bring the book for the seminar*, maka kehadiran artikel *the* ini mengindikasikan kalau orang yang diajak bicara itu sudah tahu buku apa yang akan dibawa oleh Jane. Yang perlu dicatat adalah bahwa kata sandang ini tidak ada dalam bahasa Indonesia. Kalau ada kata *si* misalnya dalam ungkapan *Si Kancil*, atau kata *sang* dalam ungkapan *Sang Buaya*, maka hanya kata *si* dan kata *sang* ini lah kata sandang yang dimiliki oleh bahasa Indonesia, dan dua kata ini sebenarnya adalah warisan dari bahasa Melayu.
+
+**9. Kata Depan (*Preposition*)**
+
+Ada banyak jenis kata depan atau preposisi dalam bahasa Inggris. Kata ini ini biasanya diposisikan sebelum sebuah kata benda di dalam penggunaannya—yang biasanya akan membentuk sebuah frase preposisi, seperti *on the table, in the room, up the hill*, dan sebagainya. Kata depan atau preposisi ini merupakan jenis kata aturan penggunaannya kurang mudah dipahami, khususnya bagi pembelajar bahasa Inggris. Sebagai misal, bagi pembelajar kata depan on sering dipahami sebagai kata depan dengan makna di atas, seperti dalam konstruksi *The book is on the table*. Padahal, kata depan ini juga digunakan dalam kalimat sebagai berikut: *The mirror is on the wall* dan *The fan is on the ceiling*. Untuk dua kalimat ini, kata on tidak bisa dimaknai sebagai di atas—oleh karena itu, sebenarnya makna kata depan ini tidak selalu di atas, tetapi lebih pada posisi yang menempel. Inilah salah satu kerumitan memahami penggunaan kata depan bahasa Inggris, dan kata depan bahasa Inggris juga memiliki perilaku yang berbeda dan harus dipahami oleh para pembelajar. Sebagai misal, penyebutan alamat bisa menggunakan preposisi *on* jika kita hanya menggunakan nama jalan saja seperti *I live on Herring Road*; tetapi jika kita melengkapinya dengan nomor rumah, maka kata *at* yang digunakan seperti *I live at Herring Road number 5*. Sementara itu, bahasa
+
+Indonesia memiliki kata depan *di, di atas, di depan, di dalam, di belakang, pada, dalam*, dan sebagainya.
+
+--- Bagian 35 ---
+
+**10. Kata Seru (*Interjection*)** Kata seru adalah jenis kata yang digunakan untuk mengungkapkan emosi atau perasaan. Kata-kata ini bersifat mandiri dan biasanya diletakkan di awal atau di akhir sebuah kalimat sebuah kalimat. Beberapa contoh kata seru bahasa Inggris di antaranya adalah *Oops, Jeez, Hmm*, dan sebagainya. Sementara itu, bahasa Indonesia juga memiliki kosa kata berjenis ini, misalnya kata *waduh, ups, walah, preet*, dan sebagainya.
+
+Mahasiswa yang budiman, yang perlu dicatat adalah bahwa ada teori lain yang menyatakan bahwa kata kerja dalam bahasa Inggris itu ada 9. Para ahli bahasa yang mendukung teori ini menggabungkan kata sandang (*article*) dan kata bilangan (*number*) menjadi satu kelas dengan nama *Determiner*. Dengan demikian maka kata yang bercetak tebal di bawah ini disebut sebagai *determiner*, meskipun menurut teori lain kata-kata tersebut sebagian diklasifikasikan Kata Sandang atau Kata Bilangan. - *a book* - *the book* - *my book* - *two books* - *one book*
+
+Mahasiswa yang luar biasa, jika kita ingin melakukan pengalihbahasaan dari bahasa Inggris ke dalam bahasa Indonesia, maka jenis-jenis kata yang disajikan di atas harus kita kuasai dan kita pahami dengan baik. Hal ini berkait dengan kenyataan bahwa setiap bahasa itu memiliki aturan dan sistem yang berlainan. Selain itu, tentu saja khasanah kosa kata yang ada dalam satu bahasa dengan bahasa yang lain juga berbeda. Untuk itu, jika kita ingin melakukan tugas penerjemahan, maka pemahaman atau penguasaan berbagai jenis kata dalam bahasa Inggris maupun dalam bahasa Indonesia harus benar-benar dikuasai.
+
+Untuk lebih mematangkan pemahaman dan penguasaan kita tentang konsep kata dan jenis kata, khususnya dalam bahasa Inggris, maka silakan berlatih dengan beberapa soal di bawah ini.
+
+**Aktivitas 3.1** Silakan identifikasi kategori dari setiap kata yang bercetak tebal dan bergaris bawah di dalam kalimat-kalimat di bawah ini. Lihat contoh.
+
+*Contoh:* *The man in the* **room** *is sleeping hard.* a. *Noun* b. *Verb* c. *Adjective* d. *Adverb*
+
+1. *New Zealand* **lies** *in the Pasific Ocean, 1,600 km to the east of Australia.* a. *Noun* b. *Verb* c. *Adjective* d. *Adverb*
+
+2. *It consists of* **two** *large islands and a number of smaller ones.* a. *number* b. *article* c. *noun* d. *interjection*
+
+3. *It's similar in size* **to** *the United Kingdom but it only has a population of about 3.8 million people.* a. *article* b. *conjunction* c. *interjection* d. *preposition*
+
+4. *Most of them live in the North Islan and over one million in Auckland,* **which** *is the country's largest city.* a. *preposition* b. *noun* c. *conjunction* d. *verb*
+
+5. **Gee!** *New Zealanders are very friendly.* a. *noun* b. *interjection* c. *conjunction* d. *adjective*
+
+6. *They are* **absolutely** *helpful.* a. *adverb* b. *adjective* c. *verb* d. *interjection*
+
+--- Bagian 36 ---
+
+7. *The South Island is a little larger than the North Island and is* **famous** *for its Southern Alps.* a. *interjection* b. *noun* c. *adjective* d. *article*
+
+8. **You** *might think you were in Switzerland, not New Zealand.* a. *noun* b. *conjunction* c. *pronoun* d. *verb*
+
+9. *The eastern side of the Alps is dry but the west coast has a lot of* **rainfall** *and magnificent forests, lakes, mountains and glaciers.* a. *noun* b. *adjective* c. *preposition* d. *adverb*
+
+10. *Christchurch is* **the** *largest city in the South Island.* a. *article* b. *noun* c. *adjective* d. *preposition*
+
+**Sumber: Dubicka & O'Keeffe (2003)**
+
+**Aktivitas 3.2** Setelah mengenal berbagai jenis kata dalam bahasa Inggris, silakan mahasiswa mencoba menerjemahkan kalimat-kalimat di bawah ini ke dalam bahasa Indonesia, fokuskan dan pilih jawaban untuk menerjemahkan kata yang bercetak tebal dan bergaris bawah.
+
+Lihat contoh. Contoh: *The man in the room is sleeping hard.* a. Meja b. kamar c. area d. sela
+
+1. *New Zealand lies in the Pasific Ocean, 1,600 km to the east of Australia.* a. berbohong b. merebahkan c. terletak d. telentang
+
+2. *It consists of two large islands and a number of smaller ones.* a. dua kali b. dua-duanya c. kedua d. dua
+
+3. *It's similar in size to the United Kingdom but it only has a population of about 3.8 million people.* a. kepada b. dengan c. ke d. terhadap
+
+4. *Most of them live in the North Island and over one million in Auckland, which is the country's largest city.* a. hidup b. Langsung c. tinggal d. kehidupan
+
+5. *Gee! New Zealanders are very friendly.* a. Sialan! b. Astaga! c. Ya Tuhan! d. Aduh!
+
+6. *They are absolutely helpful.* a. hampir b. tidak pernah c. sungguh d. selalu
+
+7. *The South Island is a little larger than the North Island and is famous for its Southern Alps.* a. menang b. unggul c. andalan d. terkenal
+
+8. *You might think you were in Switzerland, not New Zealand.* a. Memikirkan b. berpendapat c. menggagas d. mengira
+
+9. *The eastern side of the Alps is dry but the west coast has a lot of rainfall and magnificent forests, lakes, mountains and glaciers.* a. hujan b. curah hujan c. hujan jatuh d. tetesan hujan
+
+10. *Christchurch is the largest city in the South Island.* a. terbesar b. terluas c. terlebar d. termasyhur
+
+Untuk memastikan jawaban Anda benar, berikut kunci jawaban aktivitas 3.1 dan 3.2.
+
+Jawaban aktivitas 3.1 1) b 6) a 2) a 7) c 3) d 8) c 4) c 9) a 5) b 10) a
+
+Jawaban aktivitas 3.2 1) c 6) c 2) d 7) d 3) b 8) d 4) c 9) b 5) c 10) a
+
+**B. KATA LEKSIKAL DAN GRAMATIKAL *(LEXICAL AND GRAMMATICAL WORDS)***
+
+--- Bagian 37 ---
+
+Mahasiswa Universitas Terbuka yang luar biasa, setelah memahami jenis-jenis atau kategori kata yang dijelaskan di atas, maka masalah selanjutnya yang perlu dimengerti adalah tentang konsep **kata leksikal dan kata gramatikal**—sering juga disebut sebagai **kata konten dan kata gramatikal**. Jika diklasifikasikan ke dalam dua kategori ini, maka dari sepuluh jenis kata di atas ada empat jenis kata yang bersifat leksikal, yaitu kata benda *(noun)*, kata kerja *(verb)*, kata sifat *(adjective)*, dan kata keterangan *(adverb)*. Enam sisa jenis kata itu semuanya bersifat gramatikal.
+
+Apa yang dimaksud dengan kata leksikal/ kata konten dan kata gramatikal? Kata leksikal adalah sebuah kata yang memiliki makna di dalam dirinya sendiri, sedangkan kata gramatikal akan memunculkan makna ketika kata tersebut digunakan dalam sebuah konstruksi gramatika. Untuk memberikan gambaran yang lebih jelas, maka contoh kalimat di bawah ini dapat dikaji.
+
+*The boy quickly sent gifts to his charming teacher.*
+
+Kata-kata yang bercetak tebal dalam kalimat di atas adalah kata leksikal, sedangkan kata-kata yang bergaris bawah adalah kata gramatikal. Jenis kata yang pertama akan tetap memiliki makna, baik ketika kata-kata itu digunakan dalam sebuah konstruksi gramatika maupun ketika kata itu berdiri sendiri. Selain itu, ketika kata leksikal itu digunakan dalam konteks konstruksi gramatika apapun, makna dari setiap kata leksikal itu akan tetap sama. Contoh berikut ini memberikan gambaran kasus ini.
+
+1. *A boy hit John.* 2. *Do not hit a boy on his head.*
+
+Kata boy yang digunakan dalam dua kalimat yang berbeda tersebut menyajikan makna yang konsisten yang tidak berubah—demikian pula dengan makna yang disajikan oleh kata kerja *hit*. Pada sisi lain, kata *his* adalah kata gramatikal. Di dalam Kalimat 2, kata *his* ini hanya menyumbangkan makna rujukan yang merepresentasikan *a boy*. Makna gramatikal yang disumbangkan oleh kata *his* ini akan berubah-ubah jika kata tersebut digunakan dalam konstruksi gramatika yang berbeda, seperti contoh di bawah ini.
+
+3. *John sold his bike.* 4. *Bob sold his bike.*
+
+Kata *his* dalam *Kalimat 3* merujuk dan merepresentasikan *John*, sedangkan dalam *Kalimat 4* tersebut merujuk dan merepresentasikan *Bob*. Inilah perbedaan kata leksikal dan kata gramatikal. Kasus penyajian makna oleh kata *his* dalam contoh di atas terjadi dan berlaku pula untuk semua jenis kata gramatikal, tentunya dengan konteks dan fungsi yang berlainan.
+
+--- Bagian 38 ---
+
+Selain itu, ada karakteristik lain yang membedakan antara kata leksikal dan kata gramatikal. Pada umumnya, bentuk kata leksikal itu ada dua, yaitu kata leksikal bentuk asli dan kata leksikal yang sifatnya *formatted* atau terbentuk melalui proses morfologis (yang akan dibahas secara lebih detil di bagian lain dari buku ini). Dengan demikian, maka setiap jenis kata leksikal, yaitu kata benda (*noun*), kata kerja (*verb*), kata sifat sifat (*adjective*), dan kata keterangan (*adverb*) itu ada yang bentuk asli dan ada pula yang terbentuk karena proses morfologis. Beberapa kalimat di bawah ini bisa memberikan gambaran tentang dua bentuk kata leksikal ini.
+
+5. *Swimming is good for your body.* 6. *Happiness comes from heart.* 7. *My teacher loves music.*
+
+Kata benda yang bercetak tebal dalam tiga kalimat di atas merepresentasikan contoh kata benda (*noun*) yang terbentuk melalui proses morfologi dalam bahasa Inggris—dan proses bentukan morfologis ini bisa terus terjadi dan bisa berlaku untuk menghasilkan kata-kata benda bahasa Inggris yang lain dan yang baru. Bentuk seperti *swimming* bisa terjadi dan diterapkan untuk kata kerja apapun dalam bahasa Inggris—kata kerja diberi imbuhan *-ing* untuk membuatnya menjadi kata benda, seperti kata *drinking* dan *kata dancing* dalam kalimat "*Drinking alcohol is dangerous*, atau kalimat *Dancing needs talent*, dan sebagainya. Demikian pula, bentukan kata *happiness* bisa terjadi untuk menghasilkan kata lain seperti *weakness*, *smartness*, dan sebagainya; dan ada kata *dancer*, *singer* yang mengalami proses yang sama dengan kata *teacher*—yang semua adalah kata kerja kemudian diberikan akhiran *-er* untuk menjadi sebuah kata benda. Pada sisi lain, kata *body*, *heart*, dan *music* dalam tiga contoh di atas adalah contoh kata benda asli dalam bahasa Inggris. Sebagai asli, tiga kata benda ini hadir tanpa melewati proses morfologi. Keadaan yang terjadi pada kata benda (*noun*) dalam bahasa Inggris tersebut juga menimpa tiga kata leksikal lain seperti yang disajikan dalam tabel di bawah ini.
+
+**Tabel 3.3** **Dua Kategori Kata Leksikal**
+
+| Jenis Kata | Asli | Bentukan | | :--- | :--- | :--- | | Kata Benda | *body, heart, music* | *swimming, teacher* | | Kata Kerja | *eat, drink* | *enlarge, broaden* | | Kata Sifat | *charming, tall* | *helpful, motherly* | | Kata Keterangan | *hard, never, now* | *slowly, carefully* |
+
+--- Bagian 39 ---
+
+Meskipun begitu, kata leksikal asli dalam bahasa Inggris juga mengalami perubahan—dalam pengertian bahwa ada kemungkinan kata-kata tersebut hilang dari kosa kata bahasa Inggris, atau sebaliknya beberapa kata baru muncul dalam bahasa Inggris. Sebagai contoh, dalam karya Shakespeare, misalnya *Romeo and Juliet*, ada beberapa kata seperti *beseem* "cocok", *mammet* "boneka", *wot* "mengetahui", *fain* "dengan senang hati"—yang masing-masing mewakili kata leksikal, sudah tidak ditemukan dalam bahasa Inggris modern (Fromkin, et.al., 2011). Sementara itu, muncul banyak kosa kata baru dalam bahasa Inggris seperti *Twitter, Whatsapp, Facebook, to text, cute*, dan sebagainya. Fenomena ini menunjukkan bahwa kosa kata yang berjenis leksikal ini akan cenderung bersifat *open* atau terbuka. Istilah ini menunjukkan bahwa setiap bahasa itu sangat berpotensi untuk terjadi penambahan kosa kata baru untuk kata jenis *noun, verb, adjective, dan adverb*—dan pada saat yang sama kata-kata dalam setiap kelas tersebut juga berpotensi hilang dari bahasa yang sama. Sebagai contoh, dalam bahasa Indonesia, kata *unyu-unyu* adalah kata sifat, dan *dimari* adalah kata keterangan yang muncul tahun 2000-an; sementara itu kata *asoy* adalah juga kata sifat yang digunakan di tahun 1980-an dan di tahun 2000-an kata *asoy* ini sudah hilang dari bahasa Indonesia.
+
+Pada sisi lain, kosa kata yang bersifat gramatikal tidak banyak mengalami perubahan, baik itu karena hadirnya kata-kata baru atau karena hilangnya kata-kata lama. Kalaupun ada perubahan, maka jumlahnya akan sangat terbatas. Sebagai misal, dalam bahasa Inggris dulu ada kata penghubung *who* dan *whom* dengan fungsi dan kegunaan sebagai berikut. Kata *who* digunakan sebagai penghubung yang menggantikan kata benda orang yang berposisi sebagai subjek kalimat, seperti contoh di bawah ini.
+
+a. *John is my best friend* b. *John has the blue car.*
+
+Jika dua kalimat sederhana di atas digabungkan, maka konstruksi *grammar* akan menjadi *John who has the blue car is my best friend*. Kata *who* dalam kalimat ini digunakan karena menggantikan kata *John* yang berposisi sebagai subjek kalimat (b). Sementara itu, apabila *John* berada pada posisi objek kalimat seperti contoh di bawah ini.
+
+c. *Jane loves John.*
+
+--- Bagian 40 ---
+
+Maka gabungan dua kalimat (a + c) akan menjadi sebagai berikut: *John whom Jane loves is my best friend*. Penggunaan kata hubung *whom* ini sebenarnya sudah tidak lagi digunakan saat ini, karena aturan *grammar* bahasa Inggris saat sekarang memperbolehkan penggunaan kata *who* baik itu menggantikan kata benda yang berposisi sebagai subjek maupun yang berposisi sebagai objek dalam konstruksi kalimat majemuk. Dengan demikian, gabungan kalimat (a) baik dengan kalimat (b) atau dengan kalimat (c) akan menghasilkan *John who has the blue car is my best friend* dan *John who Jane loves is my best friend*. Kedua gabungan itu menggunakan kata hubung yang sama *who*. Fenomena ini akhirnya membuat kata *whom* hilang dari kosa kata gramatikal bahasa Inggris. Kasus seperti ini hanya terbatas jumlahnya, sehingga dapat dikatakan kalau kosa kata gramatikal itu bersifat tertutup—tidak banyak berubah yang disebabkan oleh hadirnya kata baru ataupun hilangnya kosa kata dari penggunaan.
+
+Untuk jenis kata gramatika ini, bahasa Indonesia juga menunjukkan kasus yang tidak banyak. Hanya ada beberapa jenis kata gramatika yang hilang dalam kosa kata bahasa Indonesia, seperti kata sambung *hatta, syahdan*, dan sebagainya. Selain itu, akhir-akhir ini muncul kata *secara* yang merepresentasikan kata sambung *karena*, seperti dalam kalimat “Dia sih harus korupsi banyak *secara* dia harus bayar upeti ke partai pendukungnya.”
+
+*Mahasiswa yang budiman*, kelas kata atau jenis kata yang dijabarkan di atas sering disebut sebagai *parts of speech*, dan dari jenis atau kelas kata yang ada tersebut ada yang bersifat leksikal dan ada pula yang bersifat gramatikal. Untuk menambah wawasan tentang konsep kata dan jenis-jenisnya ini, maka mahasiswa disilakan melihat video dengan tautan di bawah ini.
+

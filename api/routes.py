@@ -12,7 +12,8 @@ from api.schemas import (
     ExtractScreenshotRequest, ExtractScreenshotResponse,
     ParseQuestionDocRequest, ParseQuestionDocResponse,
     TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse,
-    ParseReadingDocResponse, PublicationLookupRequest, PublicationLookupResponse
+    ParseReadingDocResponse, PublicationLookupRequest, PublicationLookupResponse,
+    SavedModuleItem, SavedModuleListResponse, LoadSavedModuleRequest
 )
 from tools.academic_search import search_openalex_papers
 from tools.pdf_downloader import download_paper_pdf
@@ -24,6 +25,7 @@ from tools.reading_doc_reader import read_reading_doc, split_marked_pages, MAX_R
 from tools.content_chunker import chunk_paragraphs
 from tools.publication_lookup import lookup_publication
 from tools.gemini_client import get_ai_status
+from tools.module_library import list_saved_modules, load_saved_module, save_module_to_library
 from agents.generator import generate_academic_draft, rewrite_section
 from exporters.docx_builder import create_assignment_docx
 from exporters.pdf_builder import create_assignment_pdf
@@ -204,6 +206,110 @@ async def add_manual_module(payload: ManualModuleRequest):
         abstract=item_data["abstract"],
         scholar_url=item_data["scholar_url"],
         is_ut_bmp=is_ut_bmp,
+    )
+
+
+@router.get("/saved-modules", response_model=SavedModuleListResponse)
+async def get_saved_modules():
+    """Mengambil daftar modul dan naskah yang tersimpan di direktori saved_modules."""
+    modules = list_saved_modules()
+    return SavedModuleListResponse(
+        success=True,
+        total=len(modules),
+        modules=[SavedModuleItem(**m) for m in modules]
+    )
+
+
+@router.post("/saved-modules/load", response_model=PaperItem)
+async def load_saved_module_endpoint(payload: LoadSavedModuleRequest):
+    """Memuat modul tersimpan ke memori aktif CACHED_PAPERS agar siap disitir."""
+    target_id = payload.module_id.strip()
+    if not target_id:
+        raise HTTPException(status_code=400, detail="ID atau nama modul wajib diisi.")
+
+    data = load_saved_module(target_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Modul tersimpan tidak ditemukan.")
+
+    mod_id = data.get("id") or f"bmp_{uuid.uuid4().hex[:8]}"
+    pages_content = data.get("pages_content") or []
+    is_ut_bmp = data.get("is_ut_bmp", True)
+
+    item_data = {
+        "id": mod_id,
+        "title": data.get("title", "Buku Materi Pokok"),
+        "authors": data.get("authors") or [],
+        "year": data.get("year"),
+        "venue": data.get("venue") or "",
+        "doi": data.get("doi", ""),
+        "pdf_url": data.get("pdf_url", ""),
+        "all_pdf_urls": data.get("all_pdf_urls", []),
+        "abstract": data.get("abstract", "")[:400],
+        "scholar_url": data.get("scholar_url", ""),
+        "has_full_pdf": True,
+        "is_manual_module": True,
+        "is_ut_bmp": is_ut_bmp,
+        "source_status": data.get("source_status", "Buku Materi Pokok UT"),
+        "page_info": data.get("page_info", ""),
+        "pages_content": pages_content,
+    }
+    CACHED_PAPERS[mod_id] = item_data
+    return PaperItem(
+        id=mod_id,
+        title=item_data["title"],
+        authors=item_data["authors"],
+        year=item_data["year"],
+        venue=item_data["venue"],
+        doi=item_data["doi"],
+        pdf_url=item_data["pdf_url"],
+        abstract=item_data["abstract"],
+        scholar_url=item_data["scholar_url"],
+        is_ut_bmp=item_data["is_ut_bmp"],
+    )
+
+
+@router.post("/saved-modules/save", response_model=PaperItem)
+async def save_saved_module_endpoint(payload: ManualModuleRequest):
+    """Menyimpan naskah/modul ke repositori fisik saved_modules sekaligus mendaftarkannya sebagai rujukan aktif."""
+    content = payload.content_text.strip()
+    if len(content) < 15:
+        raise HTTPException(status_code=400, detail="Isi naskah minimal 15 karakter.")
+
+    module_title = payload.module_title.strip()
+    if len(module_title) < 3:
+        raise HTTPException(status_code=400, detail="Judul naskah minimal 3 huruf.")
+
+    lookup = lookup_ut_course(module_title)
+    is_ut_bmp = bool(lookup.get("found") and lookup.get("exact") and lookup.get("course"))
+    if is_ut_bmp:
+        module_title = lookup["course"]["formatted_title"]
+
+    author = (payload.author or "").strip()
+    venue = (payload.publisher_or_venue or "").strip()
+    page_ref = (payload.page_or_ref or "").strip()
+
+    saved_data = save_module_to_library(
+        title=module_title,
+        author=author,
+        year=payload.year,
+        venue=venue,
+        page_info=page_ref,
+        content_text=content,
+        is_ut_bmp=is_ut_bmp,
+    )
+    mod_id = saved_data["id"]
+    CACHED_PAPERS[mod_id] = saved_data
+    return PaperItem(
+        id=mod_id,
+        title=saved_data["title"],
+        authors=saved_data["authors"],
+        year=saved_data["year"],
+        venue=saved_data["venue"],
+        doi="",
+        pdf_url="",
+        abstract=saved_data["abstract"],
+        scholar_url=saved_data["scholar_url"],
+        is_ut_bmp=saved_data["is_ut_bmp"],
     )
 
 

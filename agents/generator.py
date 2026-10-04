@@ -143,6 +143,50 @@ def robust_json_dict_parse(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+# Aturan setia teks untuk analisis bacaan apa pun: cerpen, novel, drama, kasus hukum, atau artikel.
+# Ditulis sebagai prinsip umum, bukan daftar contoh dari satu cerita, supaya berlaku untuk naskah mana saja.
+TEXT_FIDELITY_RULES = """
+    ATURAN SETIA PADA TEKS SUMBER (BERLAKU SAAT MENGANALISIS BACAAN, KASUS, ATAU DIALOG):
+    - Bedakan suara narator dari suara tokoh. Kalimat di luar tanda petik dialog adalah narasi pengarang, jadi perkenalkan sebagai narasi, misal 'narator menggambarkan' atau 'pengarang menuliskan'. Frasa 'tokoh berkata', 'ia berkata pada dirinya sendiri', atau 'ia menyatakan' hanya boleh dipakai untuk kalimat yang di teks memang diucapkan atau dipikirkan tokoh itu.
+    - Saat mengutip dialog, sebut pembicaranya sesuai teks. Jika teks tidak jelas siapa yang berbicara, jangan menebak nama pembicaranya.
+    - Sebut tokoh dengan nama yang dipakai teks. Nama samaran, julukan, gelar, atau panggilan yang disebut teks sebagai nama palsu DILARANG digabung dengan nama asli menjadi nama lengkap baru. Jika tokoh punya nama samaran, sebut nama aslinya dan jelaskan samarannya sebagai samaran.
+    - DILARANG menambah fakta tokoh yang tidak tertulis, seperti nama keluarga, umur, pekerjaan, hubungan, atau kejadian.
+    - Jenis tindakan tokoh harus sama dengan teks. Pertanyaan tidak boleh ditulis sebagai tuntutan, permintaan sebagai perintah, dugaan sebagai kepastian, atau keinginan sebagai tindakan yang benar-benar terjadi.
+    - Kata sifat untuk watak tokoh harus berdasar deskripsi atau tindakan di teks. Jika itu tafsiranmu, tandai sebagai tafsiran, misal 'terkesan' atau 'dapat dibaca sebagai'.
+"""
+
+
+def format_sources_text(papers: List[Dict[str, Any]]) -> str:
+    """Isi naskah rujukan berlabel halaman. Dipakai saat menulis naskah dan saat menulis ulang satu bagian."""
+    sources_text = ""
+    for idx, p in enumerate(papers, 1):
+        authors = ", ".join(p.get("authors", ["Anonim"]))
+        year = p.get("year") or "n.d."
+        title = p.get("title", "")
+        pages_content = p.get("pages_content", [])
+        if p.get("is_ut_bmp"):
+            status_label = "Buku Materi Pokok (BMP) UT"
+        elif p.get("is_manual_module"):
+            status_label = "Bahan Bacaan dari Dosen"
+        else:
+            status_label = "Naskah Fisik PDF" if p.get("has_full_pdf") else "Abstrak Resmi Terverifikasi"
+
+        sources_text += f"\n--- SUMBER {idx} [{status_label}] ---\n"
+        sources_text += f"Judul: {title}\n"
+        sources_text += f"Penulis: {authors}\n"
+        sources_text += f"Tahun: {year}\n"
+        sources_text += f"Publikasi: {p.get('venue') or 'Jurnal Ilmiah'}\n"
+        sources_text += f"DOI: {p.get('doi') or '-'}\n"
+        sources_text += "Isi Teks Berkas:\n"
+
+        for page in pages_content:
+            page_num = page.get("page_number", 1)
+            # Bahan dosen dibaca utuh per bagian, naskah jurnal cukup cuplikan per halaman
+            text_snippet = page.get("text", "")[:3000 if p.get("is_manual_module") else 1500]
+            sources_text += f"[{page_num}]: {text_snippet}\n"
+    return sources_text
+
+
 DIRECT_ANSWER_LABELS = {
     "terjemahan": "terjemahan teks",
     "jawaban_singkat": "jawaban singkat, isian, benar salah, pemahaman bacaan, atau hitungan",
@@ -514,32 +558,7 @@ async def generate_academic_draft(
             """
 
     # Siapkan bahan bacaan berlabel untuk Gemini dengan isi teks lebih kaya
-    sources_text = ""
-    for idx, p in enumerate(papers_with_content, 1):
-        authors = ", ".join(p.get("authors", ["Anonim"]))
-        year = p.get("year") or "n.d."
-        title = p.get("title", "")
-        pages_content = p.get("pages_content", [])
-        if p.get("is_ut_bmp"):
-            status_label = "Buku Materi Pokok (BMP) UT"
-        elif p.get("is_manual_module"):
-            status_label = "Bahan Bacaan dari Dosen"
-        else:
-            status_label = "Naskah Fisik PDF" if p.get("has_full_pdf") else "Abstrak Resmi Terverifikasi"
-
-        sources_text += f"\n--- SUMBER {idx} [{status_label}] ---\n"
-        sources_text += f"Judul: {title}\n"
-        sources_text += f"Penulis: {authors}\n"
-        sources_text += f"Tahun: {year}\n"
-        sources_text += f"Publikasi: {p.get('venue') or 'Jurnal Ilmiah'}\n"
-        sources_text += f"DOI: {p.get('doi') or '-'}\n"
-        sources_text += "Isi Teks Berkas:\n"
-
-        for page in pages_content:
-            page_num = page.get("page_number", 1)
-            # Bahan dosen dibaca utuh per bagian, naskah jurnal cukup cuplikan per halaman
-            text_snippet = page.get("text", "")[:3000 if p.get("is_manual_module") else 1500]
-            sources_text += f"[{page_num}]: {text_snippet}\n"
+    sources_text = format_sources_text(papers_with_content)
 
     if is_en:
         lang_instruction = """
@@ -692,6 +711,7 @@ async def generate_academic_draft(
     - Baca setiap angka dan simbol di soal persis seperti tertulis. DILARANG menafsirkan ulang angka sebagai salah ketik, misalnya membaca 142 sebagai 14², kecuali gambar dan teks jelas bertentangan.
     - Abaikan petunjuk waktu pengerjaan seperti 'Waktu: 30 menit'. Batas waktu tidak menentukan panjang, kedalaman, atau isi jawaban.
     """
+    length_rules += TEXT_FIDELITY_RULES
 
     if is_math:
         length_rules += """
@@ -925,7 +945,10 @@ async def rewrite_section(
             f"- {', '.join(p.get('authors') or ['Anonim'])} ({p.get('year') or 'n.d.'}). {p.get('title', '')}"
             for p in papers
         )
-        citation_rule = f"Pertahankan sitasi yang ada. Sitasi hanya boleh merujuk daftar ini:\n{ref_lines}"
+        citation_rule = (
+            f"Pertahankan sitasi yang ada. Sitasi hanya boleh merujuk daftar ini:\n{ref_lines}\n"
+            "    - Kutipan langsung dalam tanda petik wajib disalin persis dari BAHAN SUMBER, dengan nomor halaman sesuai label halamannya. DILARANG mengubah isi kutipan atau mengarang halaman."
+        )
     else:
         citation_rule = "Tugas ini tanpa rujukan. DILARANG menulis sitasi atau mengarang sumber."
     limit_rule = f"Bagian ini maksimal {word_limit} kata." if word_limit else "Panjang kurang lebih sama dengan versi sekarang kecuali arahan meminta lain."
@@ -943,6 +966,7 @@ async def rewrite_section(
     - {signer_rule}
     - Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading.
     - DILARANG memakai em dash, en dash, atau LaTeX. Pisahkan paragraf dengan \n\n.
+    {TEXT_FIDELITY_RULES}
     FORMAT KELUARAN (JSON MURNI): {{"content": "..."}}
     """
     user_prompt = f"""
@@ -957,6 +981,9 @@ async def rewrite_section(
 
     ARAHAN REVISI DARI MAHASISWA: {instruction.strip() or 'Tulis ulang dengan kalimat yang lebih baik dan tetap setia pada soal.'}
     """
+    # Tanpa isi naskah, model tidak bisa mengecek kutipan, halaman, dan siapa yang berbicara saat menulis ulang
+    if papers:
+        user_prompt += f"\n    BAHAN SUMBER:\n{format_sources_text(papers)}\n"
 
     response = await generate_with_fallback(
         "generation",

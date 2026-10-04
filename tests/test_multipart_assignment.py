@@ -126,3 +126,43 @@ async def test_reading_pdf_keeps_physical_page_numbers():
     assert [p["page_number"] for p in pages] == ["Halaman 1", "Halaman 2"]
     assert "Ajo Sidi" in pages[1]["text"] and "[Halaman" not in pages[1]["text"]
     assert "[Halaman" not in res.json()["abstract"]
+
+
+@pytest.mark.anyio
+async def test_text_fidelity_rules_are_general_for_any_reading(monkeypatch):
+    import agents.generator as gen
+    # Aturan berupa prinsip umum, tidak menyebut tokoh atau judul cerita tertentu
+    for name in ("William", "Crawford", "Helen", "Burglar", "Navis", "Ajo Sidi"):
+        assert name not in gen.TEXT_FIDELITY_RULES
+    for principle in ("narator", "nama samaran", "Pertanyaan tidak boleh ditulis sebagai tuntutan", "tafsiran"):
+        assert principle in gen.TEXT_FIDELITY_RULES
+
+    # Berlaku di soal sastra, kasus hukum, maupun soal tanpa rujukan
+    gen_mod, captured = _capture(monkeypatch, '{"title": "T", "sections": [{"heading": "1. A", "content": "x"}]}')
+    for topic, papers in [
+        ("1. Analisis watak tokoh utama dalam drama berikut.", []),
+        ("Uraikan posisi para pihak dalam kasus berikut beserta bunyi pasalnya.", [{"title": "Putusan", "authors": ["MA"], "year": 2020, "pages_content": [{"page_number": 2, "text": "Isi."}]}]),
+    ]:
+        await gen_mod.generate_academic_draft(topic, papers, answer_spec={"answer_type": "uraian"})
+        assert "ATURAN SETIA PADA TEKS SUMBER" in captured["system"]
+
+
+@pytest.mark.anyio
+async def test_rewrite_section_sees_source_text_and_fidelity_rules(monkeypatch):
+    import agents.generator as gen
+    captured = {}
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        captured["system"], captured["user"] = config.system_instruction, contents
+        return type("Res", (), {"text": '{"content": "baru"}'})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    paper = {"title": "Cerpen", "authors": ["Penulis Contoh"], "year": 1900, "is_manual_module": True,
+             "pages_content": [{"page_number": "Halaman 3", "text": "Kalimat asli di halaman tiga."}]}
+    sections = [{"heading": "1. A", "content": "lama"}]
+    result = await gen.rewrite_section("1. Analisis tokoh.", sections, 0, papers=[paper])
+
+    assert result["content"] == "baru"
+    assert "ATURAN SETIA PADA TEKS SUMBER" in captured["system"]
+    assert "disalin persis dari BAHAN SUMBER" in captured["system"]
+    assert "[Halaman 3]: Kalimat asli di halaman tiga." in captured["user"]

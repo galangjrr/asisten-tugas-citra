@@ -129,6 +129,8 @@ async def rewrite_task_section(task_id: str, index: int, payload: SectionRewrite
             papers=task["references"],
             guidelines=task["guidelines"],
             student_name=task["student_name"],
+            # Tugas lama dibuat sebelum ada pilihan ini dan selalu bersitasi, jadi gayanya dipertahankan
+            quote_citations=task.get("quote_citations", True),
         )
     except Exception as e:
         print(f"Error tulis ulang bagian: {e}")
@@ -453,6 +455,7 @@ async def generate_task(payload: GenerateRequest):
             answer_spec=payload.answer_spec.model_dump() if payload.answer_spec else None,
             student_name=payload.student_name.strip(),
             course_name=payload.course_name.strip(),
+            quote_citations=payload.quote_citations,
         )
     except Exception as e:
         print(f"Error pada generasi Gemini: {e}")
@@ -481,6 +484,7 @@ async def generate_task(payload: GenerateRequest):
         "topic": payload.topic,
         "guidelines": payload.custom_instructions or "",
         "answer_spec": payload.answer_spec.model_dump() if payload.answer_spec else {},
+        "quote_citations": payload.quote_citations,
         "course_name": payload.course_name,
         "student_name": payload.student_name,
         "student_id": payload.student_id,

@@ -71,6 +71,8 @@ class GenerateRequest(BaseModel):
     student_name: str = Field(default="", max_length=100)
     student_id: str = Field(default="", max_length=30)
     course_name: str = Field(default="", max_length=150)
+    # False: kutipan langsung cukup bertanda petik tanpa sitasi kurung, misal (Cather, 1896, hlm. 5)
+    quote_citations: bool = False
 
 
 class EvidenceItem(BaseModel):

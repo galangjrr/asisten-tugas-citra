@@ -187,6 +187,17 @@ def format_sources_text(papers: List[Dict[str, Any]]) -> str:
     return sources_text
 
 
+# Sitasi dalam kurung yang menempel di tanda petik penutup, misal '"..." (Cather, 1896, hlm. 5)'
+QUOTE_CITATION = re.compile(r'(["”])[ \t]*\((?=[^()]*(?:\b\d{4}\b|n\.d\.))[^()]*\)')
+
+
+def strip_quote_citations(text: str) -> str:
+    """Membuang sitasi kurung tepat setelah kutipan langsung. Sitasi parafrase di tengah kalimat tidak disentuh."""
+    text = QUOTE_CITATION.sub(r"\1", text)
+    # '...loves?".' jadi '...loves?"' karena kutipan sudah punya tanda baca penutup sendiri
+    return re.sub(r'([?!.])(["”])\.', r"\1\2", text)
+
+
 DIRECT_ANSWER_LABELS = {
     "terjemahan": "terjemahan teks",
     "jawaban_singkat": "jawaban singkat, isian, benar salah, pemahaman bacaan, atau hitungan",
@@ -204,8 +215,12 @@ async def generate_academic_draft(
     answer_spec: Optional[Dict[str, Any]] = None,
     student_name: str = "",
     course_name: str = "",
+    quote_citations: bool = False,
 ) -> Dict[str, Any]:
-    """Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh."""
+    """
+    Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh.
+    quote_citations False berarti kutipan langsung cukup bertanda petik tanpa sitasi kurung setelahnya.
+    """
     # Spesifikasi jawaban sudah dicek pengguna, jadi nilainya mengalahkan tebakan otomatis
     spec = answer_spec or {}
     answer_type = spec.get("answer_type")
@@ -727,6 +742,19 @@ async def generate_academic_draft(
     - Pakai simbol Unicode seperti ², ³, ⁻¹, √, ∑, ∫, ≤, ≥, ×, ÷, π, μ, ε, λ, Ω. DILARANG KERAS LaTeX seperti \\frac, \\sqrt, \\begin{matrix}, atau tanda $.
     """
 
+    # Pengguna memilih apakah kutipan langsung diikuti sitasi kurung. Halaman tetap dicatat di evidence_log untuk dicek.
+    if quote_citations:
+        quote_rule = (
+            "Setiap kutipan langsung dalam tanda petik WAJIB diikuti sitasi dengan halaman naskah asli sesuai label halaman di bahan bacaan, "
+            "misal (NamaBelakang, Tahun, hlm. 12). Jika label bahan berbentuk 'Bagian n', tulis (NamaBelakang, Tahun) tanpa nomor halaman. DILARANG mengarang nomor halaman."
+        )
+    else:
+        quote_rule = (
+            "Kutipan langsung cukup ditulis di dalam tanda petik ganda TANPA sitasi dalam kurung setelahnya, misal (NamaBelakang, Tahun, hlm. 12) DILARANG ditempel setelah kutipan. "
+            "Jika memakai lebih dari satu sumber, sebut nama penulis di kalimat pengantar kutipan supaya jelas asalnya, misal 'NamaBelakang menuliskan, \"...\"'. "
+            "Tetap catat halaman setiap kutipan di 'evidence_log' sesuai label halaman, dan DILARANG mengarang nomor halaman."
+        )
+
     if papers_with_content:
         # Sitasi dibuat seperti tulisan mahasiswa biasa. Aturan lama yang serba wajib membuat tiap kalimat menyebut sumber dan terbaca lebay.
         citation_rules = f"""
@@ -736,7 +764,8 @@ async def generate_academic_draft(
     - Sumber adalah pendukung argumen, bukan pusat kalimat. Tulis gagasan dengan kalimatmu sendiri, lalu taruh sitasi singkat di akhir kalimat yang memakai ide sumber itu.
     - Setiap sumber cukup disitir satu atau dua kali di tempat yang paling relevan. Paling banyak satu sitasi per paragraf, dan banyak paragraf memang tidak perlu sitasi sama sekali, terutama pembuka dan refleksi atau pendapat pribadi.
     - Kesimpulan atau penutup DILARANG berisi sitasi atau menyebut sumber. Tulis dengan suara sendiri dari hasil pembahasan.
-    - Format sitasi pendek dalam kurung: (NamaBelakang, Tahun). Tambahkan halaman hanya jika mengutip kalimat persis dalam tanda petik, misal (NamaBelakang, Tahun, hlm. 12). Untuk modul BMP UT cukup (NamaBelakang, Tahun) atau (Universitas Terbuka, Tahun).
+    - Format sitasi pendek dalam kurung untuk parafrase: (NamaBelakang, Tahun). Untuk modul BMP UT cukup (NamaBelakang, Tahun) atau (Universitas Terbuka, Tahun).
+    - Format kutipan langsung: {quote_rule}
     - DILARANG menyebut judul artikel, nama jurnal, kode atau nama mata kuliah, nomor modul, 'materi ...', 'Sumber 1', atau 'penelitian yang dilakukan oleh ... dalam jurnal berjudul ...' di badan naskah.
     - DILARANG frasa pengantar sumber yang berlebihan seperti 'Sebagaimana ditegaskan dalam ...', 'diperkuat oleh pemikiran ...', 'Hal ini sejalan dengan ...', 'Berdasarkan penelitian ...', atau 'Penelitian menunjukkan ...'. 'Menurut NamaBelakang (Tahun)' boleh dipakai paling banyak sekali di seluruh naskah.
     - Contoh buruk: 'Sebagaimana ditegaskan dalam materi MKWN4101 dan diperkuat oleh pemikiran Prakosa (2022, hlm. 51-52), menjalankan kewajiban agama ...'
@@ -749,7 +778,7 @@ async def generate_academic_draft(
             citation_rules += """
     ATURAN KUTIPAN LANGSUNG (MENGALAHKAN SARAN PARAFRASE DI ATAS UNTUK BAGIAN YANG MENUNTUT BUKTI TEKS):
     - Bagian yang meminta bukti, kutipan, analisis tokoh, tema, atau bunyi pasal WAJIB memuat kutipan langsung yang disalin persis kata per kata dari bahan bacaan, di dalam tanda petik ganda "...".
-    - Setiap kutipan langsung WAJIB diikuti sitasi dengan halaman naskah asli sesuai label halaman di bahan bacaan, misal (Navis, 1956, hlm. 3). Jika label bahan berbentuk 'Bagian n', tulis (NamaBelakang, Tahun) tanpa nomor halaman karena halaman aslinya tidak diketahui. DILARANG mengarang nomor halaman.
+    - Format kutipan langsung mengikuti aturan 'Format kutipan langsung' di atas.
     - Di luar tanda petik, uraikan dengan kalimatmu sendiri bagaimana kutipan itu menjawab pertanyaan.
     - Bagian lain yang tidak menuntut bukti teks tetap memakai parafrase biasa.
     """
@@ -885,6 +914,10 @@ async def generate_academic_draft(
         for sec in parsed.get("sections") or []
         if isinstance(sec, dict)
     ]
+    # Model kadang tetap menempel sitasi setelah kutipan walau pengguna tidak memintanya
+    if not quote_citations:
+        for sec in sections:
+            sec["content"] = strip_quote_citations(sec["content"])
     # Heading bagian wajib dikunci persis sesuai tulisan dosen, model sering menambah nomor atau kata BAB
     if format_type == "wajib" and len(sections) == len(required_sections):
         for name, sec in zip(required_sections, sections):
@@ -907,6 +940,7 @@ async def generate_academic_draft(
                     topic, sections, index, language=language,
                     instruction=f"Persingkat bagian ini jadi sekitar {round(limit * 0.9)} kata tanpa membuang poin yang diminta soal.",
                     word_limit=limit, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
+                    quote_citations=quote_citations,
                 )
             except Exception as e:
                 print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
@@ -929,6 +963,7 @@ async def rewrite_section(
     papers: Optional[List[Dict[str, Any]]] = None,
     guidelines: str = "",
     student_name: str = "",
+    quote_citations: bool = True,
 ) -> Dict[str, str]:
     """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
     if not 0 <= index < len(sections):
@@ -946,8 +981,11 @@ async def rewrite_section(
             for p in papers
         )
         citation_rule = (
-            f"Pertahankan sitasi yang ada. Sitasi hanya boleh merujuk daftar ini:\n{ref_lines}\n"
-            "    - Kutipan langsung dalam tanda petik wajib disalin persis dari BAHAN SUMBER, dengan nomor halaman sesuai label halamannya. DILARANG mengubah isi kutipan atau mengarang halaman."
+            f"Pertahankan sitasi parafrase yang ada. Sitasi hanya boleh merujuk daftar ini:\n{ref_lines}\n"
+            "    - Kutipan langsung dalam tanda petik wajib disalin persis dari BAHAN SUMBER. DILARANG mengubah isi kutipan atau mengarang halaman.\n"
+            + ("    - Setiap kutipan langsung diikuti sitasi dengan nomor halaman sesuai label halamannya."
+               if quote_citations else
+               "    - Kutipan langsung cukup bertanda petik TANPA sitasi dalam kurung setelahnya. Buang sitasi kurung yang menempel setelah kutipan.")
         )
     else:
         citation_rule = "Tugas ini tanpa rujukan. DILARANG menulis sitasi atau mengarang sumber."
@@ -1007,4 +1045,5 @@ async def rewrite_section(
     if not isinstance(parsed, dict) or not str(parsed.get("content") or "").strip():
         raise RuntimeError("Gemini tidak mengembalikan bagian yang bisa dipakai.")
     # Heading dipertahankan apa adanya supaya nomor butir tidak hilang. Pengguna bisa mengubahnya lewat Edit.
-    return {"heading": target.get("heading", ""), "content": clean_output_text(str(parsed["content"]))}
+    content = clean_output_text(str(parsed["content"]))
+    return {"heading": target.get("heading", ""), "content": content if quote_citations else strip_quote_citations(content)}

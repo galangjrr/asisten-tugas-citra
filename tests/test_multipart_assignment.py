@@ -81,11 +81,11 @@ async def test_direct_quotation_synthesis(monkeypatch):
     }
     questions = COMPOUND_SHEET.split("Soal:\n", 1)[1]
     spec = {"answer_type": "jawaban_bernomor", "question_count": 2}
-    result = await gen.generate_academic_draft(questions, [paper], target_words=800, answer_spec=spec)
+    result = await gen.generate_academic_draft(questions, [paper], target_words=800, answer_spec=spec, quote_citations=True)
 
     system = captured["system"]
     assert "TEPAT 2 bagian" in system and "DILARANG menggabung dua nomor" in system
-    assert "ATURAN KUTIPAN LANGSUNG" in system and "hlm. 3" in system
+    assert "ATURAN KUTIPAN LANGSUNG" in system and "sesuai label halaman" in system
     assert "Pertanyaan di ujung kalimat soal sama wajibnya" in system
     assert "[Halaman 3]" in captured["user"]
     # Bahan bacaan sastra bukan soal hitungan
@@ -166,3 +166,36 @@ async def test_rewrite_section_sees_source_text_and_fidelity_rules(monkeypatch):
     assert "ATURAN SETIA PADA TEKS SUMBER" in captured["system"]
     assert "disalin persis dari BAHAN SUMBER" in captured["system"]
     assert "[Halaman 3]: Kalimat asli di halaman tiga." in captured["user"]
+
+
+def test_strip_quote_citations_keeps_quotes_and_paraphrase_citations():
+    from agents.generator import strip_quote_citations
+    text = (
+        'Ia berkata, "I am a common thief!" (Cather, 1896, hlm. 5). '
+        'Ibunya menjawab, "they are all yours" (Cather, 1896, hlm. 5). '
+        'Lalu "love has nothing to do with pardon?" (Cather, 1896/2024, hlm. 7) menutup dialog. '
+        'Teori ini umum dipakai (Wellek & Warren, 1949). Kutipan daring "tanpa tahun" (Anonim, n.d.).'
+    )
+    assert strip_quote_citations(text) == (
+        'Ia berkata, "I am a common thief!" '
+        'Ibunya menjawab, "they are all yours". '
+        'Lalu "love has nothing to do with pardon?" menutup dialog. '
+        'Teori ini umum dipakai (Wellek & Warren, 1949). Kutipan daring "tanpa tahun".'
+    )
+
+
+@pytest.mark.anyio
+async def test_quote_citations_are_optional_and_off_by_default(monkeypatch):
+    output = '{"title": "T", "sections": [{"heading": "1. A", "content": "Ia berkata, \\"Aku pulang\\" (Navis, 1956, hlm. 3). Itu tandanya (Navis, 1956)."}]}'
+    gen, captured = _capture(monkeypatch, output)
+    paper = {"title": "Cerpen", "authors": ["A.A. Navis"], "year": 1956, "is_manual_module": True,
+             "pages_content": [{"page_number": "Halaman 3", "text": "Aku pulang."}]}
+
+    result = await gen.generate_academic_draft("1. Analisis tokoh dengan kutipan.", [paper], answer_spec={"answer_type": "jawaban_bernomor"})
+    assert "TANPA sitasi dalam kurung" in captured["system"]
+    # Kutipan tetap bertanda petik, sitasi kurung setelah kutipan dibuang, sitasi parafrase dibiarkan
+    assert result["sections"][0]["content"] == 'Ia berkata, "Aku pulang". Itu tandanya (Navis, 1956).'
+
+    result = await gen.generate_academic_draft("1. Analisis tokoh dengan kutipan.", [paper], answer_spec={"answer_type": "jawaban_bernomor"}, quote_citations=True)
+    assert "WAJIB diikuti sitasi dengan halaman" in captured["system"]
+    assert "(Navis, 1956, hlm. 3)" in result["sections"][0]["content"]

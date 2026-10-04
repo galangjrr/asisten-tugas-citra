@@ -276,6 +276,59 @@ function setBusy(button, busy, label) {
   button.innerHTML = busy ? `<span class="spinner" aria-hidden="true"></span>${escapeHtml(label)}` : button.dataset.label;
 }
 
+function formatAuthorsAPA(authors) {
+  if (!authors || !authors.length) return "Anonim";
+  const institutional = ["universitas", "kementerian", "badan", "lembaga", "organisasi", "bureau", "department", "ministry", "organization", "institute", "university", "press", "who", "unesco", "anonim"];
+  const formatted = authors.map((a) => {
+    if (!a || !a.trim()) return "Anonim";
+    const clean = a.trim();
+    if (institutional.some((k) => clean.toLowerCase().includes(k))) return clean;
+    if (clean.includes(",")) {
+      const parts = clean.split(",");
+      const surname = parts[0].trim();
+      const initials = (parts[1] || "").trim().split(/\s+/).filter(Boolean).map((n) => n[0].toUpperCase() + ".").join(" ");
+      return initials ? `${surname}, ${initials}` : surname;
+    }
+    const tokens = clean.split(/\s+/);
+    if (tokens.length === 1) return clean;
+    const surname = tokens[tokens.length - 1];
+    const initials = tokens.slice(0, -1).map((n) => n[0].toUpperCase() + ".").join(" ");
+    return initials ? `${surname}, ${initials}` : surname;
+  });
+  if (formatted.length === 1) return formatted[0];
+  if (formatted.length === 2) return `${formatted[0]}, & ${formatted[1]}`;
+  return `${formatted.slice(0, -1).join(", ")}, & ${formatted[formatted.length - 1]}`;
+}
+
+function formatAcademicReferenceText(ref, isEnDoc) {
+  const authorStr = formatAuthorsAPA(ref.authors);
+  const year = ref.year || "n.d.";
+  const title = (ref.title || "Tanpa Judul").trim().replace(/\.+$/, "");
+  const venue = (ref.venue || "").trim().replace(/\.+$/, "");
+  let doi = (ref.doi || "").trim();
+  if (doi && !doi.startsWith("http")) doi = `https://doi.org/${doi.replace(/^\/+/, "")}`;
+
+  let pubDetails = "";
+  const vol = (ref.volume || "").trim();
+  const iss = (ref.issue || "").trim();
+  const pgs = (ref.pages || "").trim();
+  const pageInfo = (ref.page_info || "").trim().replace(/\.+$/, "");
+
+  if (vol && iss && pgs) pubDetails = `${vol}(${iss}), ${pgs}`;
+  else if (vol && pgs) pubDetails = `${vol}, ${pgs}`;
+  else if (vol && iss) pubDetails = `${vol}(${iss})`;
+  else if (pgs) pubDetails = `${isEnDoc ? "pp. " : "hlm. "}${pgs}`;
+  else if (pageInfo) pubDetails = pageInfo;
+
+  const parts = [`${authorStr}. (${year}). ${title}.`];
+  if (venue && pubDetails) parts.push(`${venue}, ${pubDetails}.`);
+  else if (venue) parts.push(`${venue}.`);
+  else if (pubDetails) parts.push(`${pubDetails}.`);
+  if (doi) parts.push(doi);
+
+  return { authorStr, year, title, venue, pubDetails, doi, fullText: parts.join(" ") };
+}
+
 // ---------- Alert, toast, konfirmasi ----------
 const UI = {
   showAlert(title, message, { type = "error", retry = null, retryLabel = "Coba lagi" } = {}) {
@@ -857,59 +910,6 @@ const UI = {
     item.classList.add("is-flash");
     setTimeout(() => item.classList.remove("is-flash"), 1600);
   },
-
-function formatAuthorsAPA(authors) {
-  if (!authors || !authors.length) return "Anonim";
-  const institutional = ["universitas", "kementerian", "badan", "lembaga", "organisasi", "bureau", "department", "ministry", "organization", "institute", "university", "press", "who", "unesco", "anonim"];
-  const formatted = authors.map((a) => {
-    if (!a || !a.trim()) return "Anonim";
-    const clean = a.trim();
-    if (institutional.some((k) => clean.toLowerCase().includes(k))) return clean;
-    if (clean.includes(",")) {
-      const parts = clean.split(",");
-      const surname = parts[0].trim();
-      const initials = (parts[1] || "").trim().split(/\s+/).filter(Boolean).map((n) => n[0].toUpperCase() + ".").join(" ");
-      return initials ? `${surname}, ${initials}` : surname;
-    }
-    const tokens = clean.split(/\s+/);
-    if (tokens.length === 1) return clean;
-    const surname = tokens[tokens.length - 1];
-    const initials = tokens.slice(0, -1).map((n) => n[0].toUpperCase() + ".").join(" ");
-    return initials ? `${surname}, ${initials}` : surname;
-  });
-  if (formatted.length === 1) return formatted[0];
-  if (formatted.length === 2) return `${formatted[0]}, & ${formatted[1]}`;
-  return `${formatted.slice(0, -1).join(", ")}, & ${formatted[formatted.length - 1]}`;
-}
-
-function formatAcademicReferenceText(ref, isEnDoc) {
-  const authorStr = formatAuthorsAPA(ref.authors);
-  const year = ref.year || "n.d.";
-  const title = (ref.title || "Tanpa Judul").trim().replace(/\.+$/, "");
-  const venue = (ref.venue || "").trim().replace(/\.+$/, "");
-  let doi = (ref.doi || "").trim();
-  if (doi && !doi.startsWith("http")) doi = `https://doi.org/${doi.replace(/^\/+/, "")}`;
-
-  let pubDetails = "";
-  const vol = (ref.volume || "").trim();
-  const iss = (ref.issue || "").trim();
-  const pgs = (ref.pages || "").trim();
-  const pageInfo = (ref.page_info || "").trim().replace(/\.+$/, "");
-
-  if (vol && iss && pgs) pubDetails = `${vol}(${iss}), ${pgs}`;
-  else if (vol && pgs) pubDetails = `${vol}, ${pgs}`;
-  else if (vol && iss) pubDetails = `${vol}(${iss})`;
-  else if (pgs) pubDetails = `${isEnDoc ? "pp. " : "hlm. "}${pgs}`;
-  else if (pageInfo) pubDetails = pageInfo;
-
-  const parts = [`${authorStr}. (${year}). ${title}.`];
-  if (venue && pubDetails) parts.push(`${venue}, ${pubDetails}.`);
-  else if (venue) parts.push(`${venue}.`);
-  else if (pubDetails) parts.push(`${pubDetails}.`);
-  if (doi) parts.push(doi);
-
-  return { authorStr, year, title, venue, pubDetails, doi, fullText: parts.join(" ") };
-}
 
   buildReferencesBlock() {
     const sample = (State.doc.title + " " + (State.doc.sections[0] ? State.doc.sections[0].content : "")).toLowerCase().split(/\s+/);

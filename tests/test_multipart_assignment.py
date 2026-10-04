@@ -46,6 +46,14 @@ def test_letter_numbering_counts_when_no_digits():
     assert count_numbered_questions("1. Soal satu\na. bagian a\nb. bagian b\n2. Soal dua") == 2
 
 
+def test_roman_numbering_counts_when_no_digits():
+    assert count_numbered_questions("I. Jelaskan A.\nII. Uraikan B.\nIII. Bandingkan C.\nIV. Simpulkan D.") == 4
+    # Sub-soal huruf di bawah nomor romawi tidak ikut dihitung
+    assert count_numbered_questions("I. Soal satu\na. bagian a\nb. bagian b\nII. Soal dua") == 2
+    # Nomor angka tetap lebih kuat dari romawi
+    assert count_numbered_questions("I. Kasus\n1. Jelaskan A.\n2. Uraikan B.\n3. Analisis C.") == 3
+
+
 def _capture(monkeypatch, sections_json):
     import agents.generator as gen
     captured = {}

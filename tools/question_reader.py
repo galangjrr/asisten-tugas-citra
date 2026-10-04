@@ -495,6 +495,9 @@ def split_questions_and_guidelines(text: str) -> Dict[str, str]:
 ANSWER_TYPES = {"uraian", "terjemahan", "jawaban_singkat", "esai", "makalah", "jawaban_bernomor"}
 
 
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
+
 def _sequential_count(numbers: list) -> int:
     # Nomor yang mulai lagi dari 1 berarti soal terdiri dari beberapa bagian, jumlah section tidak bisa dikunci
     if numbers.count(1) > 1:
@@ -513,6 +516,10 @@ def count_numbered_questions(topic: str) -> int:
     ]
     if numbers:
         return _sequential_count(numbers)
+    # Romawi hanya huruf besar, karena 'i.' kecil bisa jadi butir huruf biasa
+    romans = [ROMAN.index(m.group(1)) + 1 for m in re.finditer(r'(?m)^\s*(X|IX|IV|V?I{0,3})\s*[.)]\s+\S', topic) if m.group(1)]
+    if romans:
+        return _sequential_count(romans)
     # Huruf hanya dihitung jika tidak ada nomor angka, karena 'a. b.' di bawah nomor biasanya sub-soal
     letters = [ord(m.group(1).lower()) - 96 for m in re.finditer(r'(?m)^\s*([a-hA-H])\s*[.)]\s+\S', topic)]
     return _sequential_count(letters)

@@ -20,24 +20,11 @@ def create_app_icon(output_dir: str):
     box = [margin, margin, size - margin, size - margin]
     radius = 210
     
-    # Bayangan lembut luar (subtle drop shadow)
-    shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.rounded_rectangle(
-        [margin, margin + 20, size - margin, size - margin + 20],
-        radius=radius,
-        fill=(0, 0, 0, 110)
-    )
-    
     # Background utama Deep Obsidian
     draw.rounded_rectangle(box, radius=radius, fill=(28, 25, 23, 255)) # #1c1917
     
     # Border halus Stone-700
     draw.rounded_rectangle(box, radius=radius, outline=(68, 64, 60, 255), width=10) # #44403c
-    
-    # Subtle inner highlight di bagian atas
-    highlight_box = [margin + 8, margin + 8, size - margin - 8, margin + 40]
-    draw.rounded_rectangle(highlight_box, radius=16, fill=(255, 255, 255, 12))
     
     # 3. Elemen Visual: Naskah / Buku Akademik Terbuka & Bukti Sitasi Emerald
     # Gambar buku terbuka yang simetris dan elegan
@@ -144,6 +131,11 @@ def create_app_icon(output_dir: str):
     root_ico = os.path.abspath("app.ico")
     img.save(root_ico, format="ICO", sizes=ico_sizes)
     print(f"Root ICO saved: {root_ico}")
+
+    # Favicon halaman web ikut diperbarui supaya ikon jendela dan tab sama
+    favicon = os.path.abspath(os.path.join("static", "favicon.ico"))
+    img.save(favicon, format="ICO", sizes=ico_sizes)
+    print(f"Favicon saved: {favicon}")
 
 if __name__ == "__main__":
     create_app_icon("assets")

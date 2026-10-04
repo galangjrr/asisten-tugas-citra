@@ -49,6 +49,8 @@ class AnswerSpec(BaseModel):
     needs_citations: Optional[bool] = None
     answer_language: Optional[Literal["id", "en"]] = None
     word_limit: Optional[int] = Field(None, ge=50, le=10000)
+    # Batas bawah total dari dosen, misal 'minimal 800 kata'. Jawaban yang kurang dikembangkan otomatis.
+    word_min: Optional[int] = Field(None, ge=50, le=10000)
     # Batas kata tiap butir sesuai urutan soal. word_limit berisi totalnya.
     # None berarti butir itu tanpa batas atas, misal dosen hanya menulis 'at least 200 words'
     item_word_limits: Optional[List[Optional[Annotated[int, Field(ge=10, le=5000)]]]] = Field(None, max_length=50)

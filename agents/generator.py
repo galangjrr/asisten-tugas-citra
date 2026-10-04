@@ -234,8 +234,14 @@ async def generate_academic_draft(
     # Bukti teks diminta eksplisit di soal, jadi kutipan langsung wajib muncul walau aturan sitasi biasanya menyarankan parafrase
     wants_quotes = bool(EVIDENCE_HINT.search(f"{topic} {custom_instructions}"))
     word_limit = spec.get("word_limit")
+    word_min = spec.get("word_min")
     if word_limit:
         target_words = min(target_words, word_limit)
+    # Model cenderung menulis lebih pendek dari target, jadi target dinaikkan 10 persen di atas batas minimal dosen
+    if word_min:
+        target_words = max(target_words, round(word_min * 1.1))
+        if word_limit:
+            target_words = min(target_words, word_limit)
     if format_type == "otomatis" and answer_type in ("esai", "makalah"):
         format_type = answer_type
 
@@ -295,6 +301,12 @@ async def generate_academic_draft(
             "Heading memuat nomor dan topik butirnya, misal '1. PERUBAHAN KARAKTER UTAMA' dan '2. ANALISIS TEMA UTAMA'. "
             "DILARANG menggabung dua nomor dalam satu bagian, melewatkan nomor mana pun, atau menambah bagian pendahuluan, penutup, kesimpulan, atau nomor lain di luar butir soal."
         )
+        # Tanpa target per butir, model menjawab tiap nomor sependek mungkin dan total naskah jauh di bawah target
+        if not is_direct_answer:
+            section_req += (
+                f" Panjang tiap butir rata-rata sekitar {words_per_sec} kata. Butir yang menanyakan lebih banyak hal boleh lebih panjang "
+                "dan butir sederhana lebih pendek, asal total naskah tercapai."
+            )
 
     # Format penulisan yang ditulis dosen, misal Pendahuluan, Pembahasan, Refleksi, Kesimpulan, mengalahkan semua format bawaan
     required_sections = None if is_direct_answer else (
@@ -692,7 +704,16 @@ async def generate_academic_draft(
     - Uraikan butir analitis dengan ketebalan argumentasi yang cukup agar naskah mendekati target, tetapi JANGAN menebalkan butir faktual demi mengejar jumlah kata.
     """
     if word_limit:
-        length_rules += f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini.\n"
+        length_rules += (
+            f"    - Batas kata dari dosen: maksimal {word_limit} kata untuk seluruh jawaban. DILARANG melebihi batas ini. "
+            f"Usahakan total antara {max(word_min or 0, round(word_limit * 0.9))} dan {word_limit} kata, jangan jauh di bawahnya.\n"
+        )
+    if word_min:
+        length_rules += (
+            f"    - Batas minimal dari dosen: seluruh jawaban WAJIB paling sedikit {word_min} kata, tidak termasuk judul, dengan target sekitar {target_words} kata. "
+            "Aturan ini MENGALAHKAN anjuran menjawab singkat dan larangan memperpanjang: butir faktual tetap diberi penjelasan, contoh, dan alasan yang relevan "
+            "sampai total terpenuhi. DILARANG mengulang kalimat, berputar-putar, atau mengarang fakta untuk menambah panjang.\n"
+        )
     item_limits = spec.get("item_word_limits") or []
     if len(item_limits) == 1 and item_limits[0]:
         length_rules += f"    - Batas kata per butir dari dosen: setiap butir maksimal {item_limits[0]} kata. DILARANG melebihi batas ini di butir mana pun.\n"
@@ -948,6 +969,32 @@ async def generate_academic_draft(
                 )
             except Exception as e:
                 print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
+
+    # Model sering berhenti di bawah batas minimal dosen. Bagian terpendek dikembangkan dulu sampai total terpenuhi,
+    # sisa kekurangan dibagi rata ke bagian yang belum dikembangkan.
+    # ponytail: satu panggilan Gemini per bagian yang dikembangkan, berhenti begitu total sudah cukup
+    if word_min and sections:
+        goal = round(word_min * 1.05)
+        order = sorted(range(len(sections)), key=lambda i: len(sections[i]["content"].split()))
+        for step, index in enumerate(order):
+            total = sum(len(s["content"].split()) for s in sections)
+            if total >= word_min:
+                break
+            current = len(sections[index]["content"].split())
+            want = current + -(-(goal - total) // (len(order) - step))
+            item_cap = limits_per_section[index] if len(limits_per_section) == len(sections) else None
+            try:
+                sections[index] = await rewrite_section(
+                    topic, sections, index, language=language,
+                    instruction=(
+                        f"Kembangkan bagian ini menjadi sekitar {want} kata dengan penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. "
+                        "Pertahankan semua poin, kutipan, dan sitasi yang sudah ada. DILARANG mengulang kalimat atau mengarang fakta."
+                    ),
+                    word_limit=item_cap, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
+                    quote_citations=quote_citations,
+                )
+            except Exception as e:
+                print(f"Peringatan: gagal mengembangkan butir {index + 1} ke batas minimal: {e}")
     return {
         "title": clean_output_text(str(parsed.get("title") or topic.title())),
         "sections": sections,

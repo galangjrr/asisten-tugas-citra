@@ -164,6 +164,7 @@ const dom = {
   specLanguage: $("spec-language"),
   specWordLimit: $("spec-word-limit"),
   specWordScope: $("spec-word-scope"),
+  specWordKind: $("spec-word-kind"),
   specWordSummary: $("spec-word-summary"),
   formatWrapper: $("format-wrapper"),
   lengthWrapper: $("length-target-wrapper"),
@@ -555,6 +556,10 @@ const UI = {
     } else if (State.detectedItemLimits && !dom.specWordLimit.value) {
       const list = State.detectedItemLimits.map((n, i) => `soal ${i + 1}: ${n ? `maksimal ${formatNumber(n)} kata` : "tanpa batas atas"}`).join(", ");
       text = `Batas dari dosen berbeda tiap soal, ${list}.${total ? ` Total ${formatNumber(total)} kata.` : ""}`;
+    } else if (isMinLimit() && total) {
+      text = `Minimal ${formatNumber(total)} kata untuk seluruh jawaban. Jika hasilnya kurang, bagian terpendek dikembangkan otomatis.`;
+    } else if (isMinLimit() && items) {
+      text = "Isi jumlah soal supaya batas minimal totalnya bisa dihitung.";
     } else if (items && items.length > 1) {
       text = `${items.length} soal kali ${formatNumber(items[0])} kata, total ${formatNumber(total || items[0] * items.length)} kata. Tiap soal dijaga tidak lewat batas.`;
     } else if (items) {
@@ -1213,10 +1218,16 @@ function readAnswerSpec() {
     answer_type: dom.specAnswerType.value || null,
     needs_citations: State.mode !== "forum",
     answer_language: dom.specLanguage.value || null,
-    word_limit: total,
-    item_word_limits: items,
+    // Batas paling sedikit dikirim sebagai word_min, supaya server tidak membacanya sebagai batas atas
+    word_limit: isMinLimit() ? null : total,
+    item_word_limits: isMinLimit() ? null : items,
+    word_min: isMinLimit() ? total : null,
     required_sections: State.detectedSections
   };
+}
+
+function isMinLimit() {
+  return dom.specWordKind.value === "min";
 }
 
 function targetWords() {
@@ -1381,6 +1392,13 @@ function applyAnswerSpec(spec, source) {
     dom.specWordScope.value = "total";
     dom.specWordLimit.value = spec.word_limit || "";
   }
+  // Dosen menulis batas bawah seperti 'minimal 800 kata', jadi isian ditandai sebagai batas paling sedikit
+  dom.specWordKind.value = "max";
+  if (spec.word_min && !spec.word_limit && !items) {
+    dom.specWordKind.value = "min";
+    dom.specWordScope.value = "total";
+    dom.specWordLimit.value = spec.word_min;
+  }
 
   State.detectedSections = Array.isArray(spec.required_sections) && spec.required_sections.length ? spec.required_sections : null;
   State.specSource = source;
@@ -1397,6 +1415,7 @@ function resetAnswerSpec() {
   dom.specWordLimit.value = "";
   dom.specWordLimit.placeholder = "Tidak ada";
   dom.specWordScope.value = "total";
+  dom.specWordKind.value = "max";
   State.detectedItemLimits = null;
   State.detectedSections = null;
   State.specSource = null;
@@ -2143,7 +2162,7 @@ function init() {
     UI.renderTopicMeta();
     saveDraft();
   });
-  [dom.instructions, dom.specQuestionCount, dom.specAnswerType, dom.specLanguage, dom.specWordLimit, dom.specWordScope]
+  [dom.instructions, dom.specQuestionCount, dom.specAnswerType, dom.specLanguage, dom.specWordLimit, dom.specWordScope, dom.specWordKind]
     .forEach((input) => input.addEventListener("input", saveDraft));
 
   // Tab soal dengan navigasi panah kiri kanan
@@ -2168,7 +2187,7 @@ function init() {
     if (dom.specWordLimit.value) State.detectedItemLimits = null;
     UI.renderSpecVisibility();
   });
-  [dom.specWordScope, dom.specAnswerType, dom.selectLength].forEach((node) => node.addEventListener("change", UI.renderSpecVisibility));
+  [dom.specWordScope, dom.specWordKind, dom.specAnswerType, dom.selectLength].forEach((node) => node.addEventListener("change", UI.renderSpecVisibility));
   dom.specQuestionCount.addEventListener("input", UI.renderSpecVisibility);
   UI.renderSpecNote();
   UI.renderSpecVisibility();

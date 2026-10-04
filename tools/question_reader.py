@@ -590,7 +590,13 @@ def extract_required_sections(text: str) -> Optional[list]:
     return None
 
 
-WORD_LIMIT = r'\b(\d{2,5})(?:\s*[-–]\s*(\d{2,5}))?\s*(?:kata|words?)\b'
+# Angka boleh memakai pemisah ribuan seperti 1.000 atau 1,500. Tanpa itu '1.000 kata' terbaca 0 kata.
+NUMBER = r'(?:\d{1,2}[.,]\d{3}|\d{2,5})'
+WORD_LIMIT = rf'\b({NUMBER})(?:\s*[-–]\s*({NUMBER}))?\s*(?:kata|words?)\b'
+
+
+def _word_number(text: str) -> int:
+    return int(re.sub(r'[.,]', '', text))
 # Batas yang berlaku per butir, misal '150 kata per soal', '100 words for each question', 'tiap soal maksimal 200 kata'
 ITEM_SCOPE = r'(?:per|untuk\s+(?:setiap|tiap|masing-masing)|setiap|tiap|masing-masing|for\s+each|each)\s+(?:soal|nomor|butir|pertanyaan|jawaban|questions?|items?|answers?)'
 ITEM_WORD_LIMIT = re.compile(rf'(?i){WORD_LIMIT}\s*{ITEM_SCOPE}|{ITEM_SCOPE}\D{{0,30}}?{WORD_LIMIT}')
@@ -606,7 +612,22 @@ def extract_word_limit(text: str) -> Optional[int]:
     for match in re.finditer(rf'(?i){WORD_LIMIT}', text):
         if not match.group(2) and MIN_WORDS_PREFIX.search(text[max(0, match.start() - 25):match.start()]):
             continue
-        return int(match.group(2) or match.group(1))
+        return _word_number(match.group(2) or match.group(1))
+    return None
+
+
+ITEM_SCOPE_AFTER = re.compile(rf'(?i)^\W{{0,5}}{ITEM_SCOPE}')
+
+
+def extract_word_min(text: str) -> Optional[int]:
+    """Mencari batas bawah total seperti 'minimal 800 kata' atau 'at least 300 words'.
+    Batas bawah per soal seperti 'minimal 100 kata per soal' dilewati karena bukan batas total."""
+    for match in re.finditer(rf'(?i){WORD_LIMIT}', text):
+        if match.group(2) or not MIN_WORDS_PREFIX.search(text[max(0, match.start() - 25):match.start()]):
+            continue
+        if ITEM_SCOPE_AFTER.search(text[match.end():match.end() + 40]):
+            continue
+        return _word_number(match.group(1))
     return None
 
 
@@ -616,7 +637,7 @@ def extract_item_word_limit(text: str) -> Optional[int]:
     if not match:
         return None
     numbers = [g for g in match.groups() if g]
-    return max(int(n) for n in numbers)
+    return max(_word_number(n) for n in numbers)
 
 
 def resolve_word_limits(total: Optional[int], items: Optional[list], question_count: Optional[int]) -> tuple:
@@ -687,6 +708,7 @@ def guess_answer_spec(questions: str, guidelines: str = "") -> Dict[str, Any]:
         "answer_language": language,
         "word_limit": total,
         "item_word_limits": items,
+        "word_min": extract_word_min(combined),
         "required_sections": extract_required_sections(combined),
         "is_mathematical": answer_type not in ("esai", "makalah", "terjemahan") and is_stem_question(questions),
     }
@@ -724,6 +746,10 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
     valid = items and len(items) <= 50 and all(n is not None for v, n in zip(raw_items, items) if v is not None)
     items = items if valid else guess["item_word_limits"]
     total, items = resolve_word_limits(as_int(raw.get("word_limit"), 50, 10000), items, question_count)
+    word_min = guess["word_min"] or as_int(raw.get("word_min"), 50, 10000)
+    # AI kadang menaruh angka 'minimal 800 kata' juga di word_limit. Batas atas yang sama dengan batas bawah itu salah baca.
+    if word_min and total == word_min:
+        total = None
     sections = raw.get("required_sections")
     if isinstance(sections, list):
         sections = [_section_name(str(n)) for n in sections if n]
@@ -735,8 +761,10 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
         "answer_type": answer_type or guess["answer_type"],
         "needs_citations": needs_citations if isinstance(needs_citations, bool) else guess["needs_citations"],
         "answer_language": language if language in ("id", "en") else guess["answer_language"],
-        "word_limit": total if items else (total or guess["word_limit"]),
+        "word_limit": total if items or word_min else (total or guess["word_limit"]),
         "item_word_limits": items,
+        # Pola teks didahulukan karena frasa 'minimal 800 kata' jelas, sedangkan AI kadang mengisinya ke word_limit
+        "word_min": word_min,
         "required_sections": sections,
         "is_mathematical": (answer_type or guess["answer_type"]) not in ("esai", "makalah", "terjemahan") and is_stem_question(questions),
     }
@@ -767,6 +795,7 @@ Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
    - "needs_citations": true jika dosen meminta sitasi, referensi, atau daftar pustaka; false jika tugas jelas tidak butuh rujukan seperti terjemahan, hitungan, atau menjawab dari teks bacaan yang sudah disediakan; null jika tidak jelas.
    - "answer_language": "id" atau "en", yaitu bahasa yang harus dipakai untuk MENULIS JAWABAN. Untuk soal terjemahan, ini bahasa sasaran terjemahan, bukan bahasa teks soal. null jika tidak jelas.
    - "word_limit": batas atas kata untuk SELURUH jawaban jika tertulis sebagai batas total (jika rentang seperti 250-300 kata, isi angka terbesar), atau null. Batas minimal seperti 'at least 300 words' bukan batas atas, isi null. Jika dosen hanya menulis batas per soal, isi null.
+   - "word_min": batas BAWAH kata untuk SELURUH jawaban jika dosen menulis 'minimal 800 kata', 'paling sedikit 500 kata', atau 'at least 300 words', atau null. Batas bawah TIDAK boleh diisi ke word_limit.
    - "item_word_limits": daftar batas kata per butir soal sesuai urutan nomor, jika dosen menulis batas per soal. Contoh 'maksimal 150 kata per soal' untuk 3 soal menjadi [150, 150, 150], sedangkan 'Soal 1 (200 kata), Soal 2 (300 kata)' menjadi [200, 300]. Batas minimal seperti 'at least 200 words' atau 'minimal 200 kata' BUKAN batas, jadi butir itu diisi null, misal 'Soal 1 at least 200 words, Soal 2 200-250 words' menjadi [null, 250]. Rentang seperti 200-250 memakai angka terbesar. Isi null untuk seluruh daftar jika tidak ada batas atas per soal.
    - "required_sections": daftar nama bagian yang WAJIB ada di jawaban sesuai urutan, jika dosen menulis format, sistematika, atau struktur penulisan. Contoh 'Format Penulisan: Judul, Pendahuluan, Pembahasan, Refleksi, Kesimpulan' menjadi ["Pendahuluan", "Pembahasan", "Refleksi", "Kesimpulan"]. Buang Judul dan Daftar Pustaka. Isi null jika dosen tidak menulis format bagian.
 
@@ -781,6 +810,7 @@ Format Keluaran (JSON murni):
     "needs_citations": null,
     "answer_language": null,
     "word_limit": null,
+    "word_min": null,
     "item_word_limits": null,
     "required_sections": null
   }IMAGES_FORMAT

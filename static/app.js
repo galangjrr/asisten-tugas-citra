@@ -1,242 +1,982 @@
-let currentPapers = [];
-let selectedPaperIds = new Set();
-let currentTaskId = null;
-let progressInterval = null;
-let pendingManualModule = null;
+/* Asisten Tugas Citra. Tiga lapis terpisah: State aplikasi, Api (HTTP service), dan UI (render DOM).
+   Event listener hanya memanggil fungsi alur di bagian bawah, tidak memanggil fetch langsung. */
 
+// =====================================================================
+// 1. STATE APLIKASI
+// =====================================================================
+const STORAGE = {
+  theme: "atc-theme",
+  tone: "atc-user-tone",
+  name: "atc-student-name",
+  nim: "atc-student-id",
+  draft: "atc-question-draft",
+  mode: "atc-mode"
+};
 
-// DOM Elements
-const apiStatusBadge = document.getElementById("api-status-badge");
-const globalAlert = document.getElementById("global-alert");
-const formSearch = document.getElementById("form-search");
-const inputTopic = document.getElementById("input-topic");
-const selectFormat = document.getElementById("select-format");
-const selectLength = document.getElementById("select-length");
-const customWordsWrapper = document.getElementById("custom-words-wrapper");
-const inputCustomWords = document.getElementById("input-custom-words");
-const selectDepth = document.getElementById("select-depth");
-const selectTone = document.getElementById("select-tone");
-const inputInstructions = document.getElementById("input-instructions");
-const inputStudentName = document.getElementById("input-student-name");
-const inputStudentId = document.getElementById("input-student-id");
-const inputCourseName = document.getElementById("input-course-name");
+const MODES = {
+  forum: {
+    action: "Tulis Jawaban Diskusi Sekarang",
+    hint: "Langsung ke Tahap 3 tanpa pencarian jurnal. Jawaban siap ditempel ke forum e-learning."
+  },
+  bahan: {
+    action: "Lanjut: Masukkan Bahan Bacaan",
+    hint: "Berikutnya Tahap 2. Unggah cerpen, bab buku, atau modul dari dosen untuk dibedah."
+  },
+  jurnal: {
+    action: "Lanjut: Cari Jurnal Ilmiah",
+    hint: "Berikutnya Tahap 2. Artikel terbuka dicari di OpenAlex memakai kata kunci dari soal."
+  }
+};
+
+const DIRECT_ANSWER_TYPES = ["terjemahan", "jawaban_singkat"];
+// Jenis jawaban ini sudah menentukan susunan naskah, jadi pilihan format disembunyikan
+const FORMAT_DECIDED_TYPES = ["esai", "makalah", "terjemahan", "jawaban_singkat", "jawaban_bernomor"];
+const LENGTH_WORDS = { ringkas: 400, sedang: 950, panjang: 1800 };
+
+const State = {
+  step: 1,
+  maxStep: 1,
+  mode: "jurnal",
+  questionFileName: "",
+  // Batas per soal yang berbeda tiap nomor dari lembar soal, misal soal 1 maksimal 200 dan soal 2 maksimal 300
+  detectedItemLimits: null,
+  // Format bagian wajib dari dosen tidak punya kolom sendiri, jadi dibawa apa adanya ke permintaan generate
+  detectedSections: null,
+  specSource: null,
+  papers: [],
+  selectedPaperIds: new Set(),
+  lastQuery: "",
+  materials: [],
+  generating: false,
+  taskId: null,
+  doc: null,
+  docBusy: false
+};
+
+const storage = {
+  get(key) {
+    try { return localStorage.getItem(key) || ""; } catch (err) { return ""; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch (err) { /* profil webview read-only, abaikan */ }
+  },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch (err) { /* abaikan */ }
+  }
+};
+
+// =====================================================================
+// 2. API (HTTP SERVICE)
+// =====================================================================
+class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+  get isRateLimited() {
+    return this.status === 429 || this.status === 503 || /limit|sibuk|jeda|quota|kuota/i.test(this.message);
+  }
+}
+
+const Api = {
+  async request(url, options = {}) {
+    let res;
+    try {
+      res = await fetch(url, options);
+    } catch (err) {
+      throw new ApiError("Server lokal tidak merespons. Tutup lalu buka lagi aplikasinya.", 0);
+    }
+    let data = null;
+    try { data = await res.json(); } catch (err) { data = null; }
+    if (!res.ok) {
+      const detail = data && data.detail;
+      const message = typeof detail === "string" ? detail
+        : Array.isArray(detail) ? "Ada isian yang belum valid. Periksa lagi lalu coba ulang."
+        : `Server membalas kode ${res.status}.`;
+      throw new ApiError(message, res.status);
+    }
+    return data;
+  },
+  postJson(url, body) {
+    return this.request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  },
+  upload(url, file) {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request(url, { method: "POST", body: form });
+  },
+  health: () => Api.request("/api/health"),
+  uploadQuestion: (file) => Api.upload("/api/upload-question-file", file),
+  parseReadingDoc: (file) => Api.upload("/api/parse-reading-doc", file),
+  saveMaterial: (payload) => Api.postJson("/api/manual-module", payload),
+  search: (query, limit) => Api.postJson("/api/search", { query, limit }),
+  generate: (payload) => Api.postJson("/api/generate", payload),
+  utLookup: (query) => Api.request(`/api/ut-course-lookup?query=${encodeURIComponent(query)}`),
+  extractScreenshot: (dataUrl) => Api.postJson("/api/extract-screenshot", { image_data: dataUrl }),
+  updateTask: (id, doc) => Api.request(`/api/tasks/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) }),
+  rewriteSection: (id, index, instruction) => Api.postJson(`/api/tasks/${id}/sections/${index}/rewrite`, { instruction })
+};
+
+// =====================================================================
+// 3. UI (RENDER DOM)
+// =====================================================================
+const $ = (id) => document.getElementById(id);
+
+const dom = {
+  statusBadge: $("api-status-badge"),
+  stepper: $("stepper"),
+  alert: $("global-alert"),
+  steps: [$("step-1"), $("step-2"), $("step-3")],
+  formTask: $("form-task"),
+  topic: $("input-topic"),
+  draftStatus: $("draft-status"),
+  topicMeta: $("question-type-meta"),
+  tabType: $("tab-type"),
+  tabUpload: $("tab-upload"),
+  panelType: $("panel-type"),
+  panelUpload: $("panel-upload"),
+  questionFile: $("upload-question-file"),
+  questionDropzone: $("question-dropzone"),
+  questionUploading: $("question-uploading"),
+  questionUploadingText: $("question-uploading-text"),
+  questionPreview: $("question-preview"),
+  questionPreviewBody: $("question-preview-body"),
+  questionPreviewMeta: $("question-preview-meta"),
+  questionFileName: $("question-file-name"),
+  questionCharBadge: $("question-char-badge"),
+  toneSummary: $("tone-summary"),
+  detailsTone: $("details-tone"),
+  detailsSpec: $("details-spec"),
+  specSummary: $("spec-summary"),
+  specNote: $("answer-spec-note"),
+  specAnswerType: $("spec-answer-type"),
+  specQuestionCount: $("spec-question-count"),
+  specLanguage: $("spec-language"),
+  specWordLimit: $("spec-word-limit"),
+  specWordScope: $("spec-word-scope"),
+  specWordSummary: $("spec-word-summary"),
+  formatWrapper: $("format-wrapper"),
+  lengthWrapper: $("length-target-wrapper"),
+  selectLength: $("select-length"),
+  customWordsWrapper: $("custom-words-wrapper"),
+  customWords: $("input-custom-words"),
+  selectDepth: $("select-depth"),
+  instructions: $("input-instructions"),
+  identitySummary: $("identity-summary"),
+  studentName: $("input-student-name"),
+  studentId: $("input-student-id"),
+  courseName: $("input-course-name"),
+  primaryLabel: $("primary-action-label"),
+  primaryHint: $("primary-action-hint"),
+  step2Title: $("step-2-title"),
+  step2Lede: $("step-2-lede"),
+  panelBahan: $("panel-bahan"),
+  panelJurnal: $("panel-jurnal"),
+  materialFile: $("upload-material-file"),
+  materialDropzone: $("material-dropzone"),
+  materialReading: $("material-reading"),
+  materialReadingText: $("material-reading-text"),
+  materialTitle: $("input-material-title"),
+  materialUtSpinner: $("material-ut-spinner"),
+  materialUtResult: $("material-ut-result"),
+  materialAuthor: $("input-material-author"),
+  materialYear: $("input-material-year"),
+  materialPublisher: $("input-material-publisher"),
+  materialPage: $("input-material-page"),
+  materialText: $("input-material-text"),
+  materialTextMeta: $("material-text-meta"),
+  materialScreenshot: $("upload-material-screenshot"),
+  materialOcrStatus: $("material-ocr-status"),
+  materialChunks: $("material-chunks"),
+  materialChunkCount: $("material-chunk-count"),
+  materialList: $("material-list"),
+  btnSaveMaterial: $("btn-save-material"),
+  refineForm: $("form-refine"),
+  refineQuery: $("input-refine-query"),
+  btnRefine: $("btn-refine-search"),
+  searchInfo: $("search-backend-info"),
+  btnToggleManual: $("btn-toggle-manual"),
+  manualForm: $("manual-paper-wrapper"),
+  manualDoi: $("input-manual-doi"),
+  btnAddManual: $("btn-add-manual-paper"),
+  papersLoading: $("papers-loading"),
+  papersList: $("papers-list"),
+  selectedCount: $("selected-count-label"),
+  selectedHint: $("selected-hint"),
+  btnGenerate: $("btn-generate"),
+  generating: $("generating-indicator"),
+  genStepTitle: $("gen-step-title"),
+  pipeline: $("pipeline"),
+  result: $("result-container"),
+  resultTitle: $("result-title"),
+  resultStats: $("result-stats"),
+  evidence: $("evidence-container"),
+  evidenceList: $("evidence-list"),
+  evidenceCount: $("evidence-count-badge"),
+  paper: $("preview-content"),
+  btnRegenerate: $("btn-regenerate-all"),
+  confirmDialog: $("dialog-confirm"),
+  confirmTitle: $("confirm-title"),
+  confirmMessage: $("confirm-message"),
+  confirmOk: $("btn-confirm-ok"),
+  toastRegion: $("toast-region")
+};
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>',
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M4.27 21.7A2 2 0 0 0 6 22h12a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3.3"/><circle cx="5" cy="14" r="3"/><path d="m9 18-1.5-1.5"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
 
 function escapeHtml(text) {
   const div = document.createElement("div");
-  div.textContent = text;
+  div.textContent = text == null ? "" : String(text);
   return div.innerHTML;
 }
 
-// Nama dan NIM jarang berubah, jadi diingat di browser. Mata kuliah beda tiap tugas.
-[[inputStudentName, "atc-student-name"], [inputStudentId, "atc-student-id"]].forEach(([el, key]) => {
-  try {
-    el.value = localStorage.getItem(key) || "";
-  } catch (err) {}
-  el.addEventListener("change", () => {
-    try {
-      localStorage.setItem(key, el.value.trim());
-    } catch (err) {}
-  });
-});
-const btnSearch = document.getElementById("btn-search");
+function formatNumber(n) {
+  return Number(n).toLocaleString("id-ID");
+}
 
-// Question File Upload Elements
-const btnUploadQuestionFile = document.getElementById("btn-upload-question-file");
-const uploadQuestionFile = document.getElementById("upload-question-file");
-const questionFileStatus = document.getElementById("question-file-status");
-const questionFileStatusText = document.getElementById("question-file-status-text");
-const questionFileBadge = document.getElementById("question-file-badge");
-const questionFileInfo = document.getElementById("question-file-info");
-const btnClearQuestionFile = document.getElementById("btn-clear-question-file");
-
-// Answer Spec Elements
-const answerSpecNote = document.getElementById("answer-spec-note");
-const specQuestionCount = document.getElementById("spec-question-count");
-const specAnswerType = document.getElementById("spec-answer-type");
-const specCitations = document.getElementById("spec-citations");
-const specLanguage = document.getElementById("spec-language");
-const specWordLimit = document.getElementById("spec-word-limit");
-const specWordScope = document.getElementById("spec-word-scope");
-const specWordSummary = document.getElementById("spec-word-summary");
-const formatWrapper = document.getElementById("format-wrapper");
-const toneWrapper = document.getElementById("tone-wrapper");
-const lengthTargetWrapper = document.getElementById("length-target-wrapper");
-const ANSWER_SPEC_DEFAULT_NOTE = "Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.";
-const DIRECT_ANSWER_TYPES = ["terjemahan", "jawaban_singkat"];
-// Jenis jawaban ini sudah menentukan susunan naskah, jadi pilihan susunan disembunyikan
-const FORMAT_DECIDED_TYPES = ["esai", "makalah", "terjemahan", "jawaban_singkat", "jawaban_bernomor"];
-
-// Batas per soal yang berbeda tiap nomor dari lembar soal, misal soal 1 maksimal 200 dan soal 2 maksimal 300
-let detectedItemLimits = null;
-// Format bagian wajib dari dosen tidak punya kolom sendiri, jadi dibawa apa adanya ke permintaan generate
-let detectedSections = null;
+function countWords(text) {
+  const words = (text || "").replace(/\[Gambar:[\s\S]*?\]/g, " ").match(/\S+/g);
+  return words ? words.length : 0;
+}
 
 function readInt(input) {
   const n = parseInt(input.value, 10);
   return Number.isFinite(n) ? n : null;
 }
 
-function computeWordLimits() {
-  const count = readInt(specQuestionCount);
-  const validCount = count >= 1 && count <= 50 ? count : null;
-  const limit = readInt(specWordLimit);
+function radioValue(name) {
+  const checked = document.querySelector(`input[name="${name}"]:checked`);
+  return checked ? checked.value : "";
+}
 
-  if (detectedItemLimits && limit === null) {
-    // Butir tanpa batas atas bikin total tidak bisa dihitung
-    const bounded = detectedItemLimits.every((n) => n);
-    const total = detectedItemLimits.reduce((sum, n) => sum + (n || 0), 0);
-    return { total: bounded && total <= 10000 ? total : null, items: detectedItemLimits, error: null };
+function setRadio(name, value) {
+  const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (input) input.checked = true;
+  return Boolean(input);
+}
+
+function setBusy(button, busy, label) {
+  if (!button.dataset.label) button.dataset.label = button.innerHTML;
+  button.disabled = busy;
+  button.classList.toggle("is-loading", busy);
+  button.innerHTML = busy ? `<span class="spinner" aria-hidden="true"></span>${escapeHtml(label)}` : button.dataset.label;
+}
+
+// ---------- Alert, toast, konfirmasi ----------
+const UI = {
+  showAlert(title, message, { type = "error", retry = null, retryLabel = "Coba lagi" } = {}) {
+    const box = el("div", `alert ${type === "error" ? "alert-error" : "alert-success"}`);
+    const icon = el("span");
+    icon.innerHTML = type === "error" ? ICON.alert : ICON.success;
+    const body = el("div", "flex-1 min-w-0");
+    body.append(el("p", "alert-title", title), el("p", "alert-body", message));
+    box.append(icon.firstChild, body);
+    if (retry) {
+      const btn = el("button", "btn btn-secondary px-3 py-1.5 text-xs shrink-0", retryLabel);
+      btn.type = "button";
+      btn.addEventListener("click", () => { UI.clearAlert(); retry(); });
+      box.append(btn);
+    }
+    const close = el("button", "btn btn-ghost px-2 py-1.5 text-xs shrink-0", "Tutup");
+    close.type = "button";
+    close.addEventListener("click", UI.clearAlert);
+    box.append(close);
+    dom.alert.replaceChildren(box);
+    dom.alert.classList.remove("hidden");
+    dom.alert.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  },
+
+  showError(title, err, retry) {
+    const message = err instanceof ApiError ? err.message : "Terjadi kendala tak terduga. Coba ulangi sekali lagi.";
+    UI.showAlert(title, message, { retry });
+  },
+
+  clearAlert() {
+    dom.alert.classList.add("hidden");
+    dom.alert.replaceChildren();
+  },
+
+  toast(message) {
+    const node = el("div", "toast");
+    node.innerHTML = ICON.check;
+    node.append(document.createTextNode(message));
+    dom.toastRegion.append(node);
+    setTimeout(() => {
+      node.classList.add("is-leaving");
+      setTimeout(() => node.remove(), 220);
+    }, 2600);
+  },
+
+  confirm({ title, message, okLabel = "Lanjutkan" }) {
+    dom.confirmTitle.textContent = title;
+    dom.confirmMessage.textContent = message;
+    dom.confirmOk.textContent = okLabel;
+    dom.confirmDialog.returnValue = "";
+    dom.confirmDialog.showModal();
+    dom.confirmOk.focus();
+    return new Promise((resolve) => {
+      dom.confirmDialog.addEventListener("close", () => resolve(dom.confirmDialog.returnValue === "ok"), { once: true });
+    });
+  },
+
+  // ---------- Status Gemini ----------
+  renderStatus(dotClass, label, model, hint) {
+    dom.statusBadge.replaceChildren();
+    dom.statusBadge.append(el("span", `status-dot ${dotClass}`), el("span", "", label));
+    if (model) dom.statusBadge.append(el("span", "hidden md:inline font-mono text-[10px] text-ink-3", model));
+    dom.statusBadge.title = hint;
+  },
+
+  // ---------- Stepper ----------
+  renderStepper() {
+    const steps = [
+      { kicker: "Tahap 1", label: "Masukkan soal dan mode" },
+      { kicker: "Tahap 2", label: "Kurasi sumber rujukan" },
+      { kicker: "Tahap 3", label: "Studio naskah dan cetak" }
+    ];
+    dom.stepper.replaceChildren(...steps.map((item, idx) => {
+      const n = idx + 1;
+      const skipped = n === 2 && State.mode === "forum";
+      const active = n === State.step;
+      const done = !active && !skipped && n <= State.maxStep;
+      const li = el("li", `step-item${active ? " is-active" : ""}${done ? " is-done" : ""}${skipped ? " is-skipped" : ""}`);
+      const btn = el("button", "step-btn");
+      btn.type = "button";
+      btn.dataset.clickable = String(done);
+      btn.disabled = !done;
+      if (active) btn.setAttribute("aria-current", "step");
+      const circle = el("span", "step-circle");
+      circle.innerHTML = done ? ICON.check : String(n);
+      const text = el("span", "step-text");
+      text.append(el("span", "step-kicker", skipped ? "Dilewati" : item.kicker), el("span", "step-label", item.label));
+      btn.append(circle, text);
+      btn.setAttribute("aria-label", `${item.kicker}: ${item.label}${done ? ", selesai, klik untuk membuka" : skipped ? ", dilewati untuk jalur forum" : ""}`);
+      if (done) btn.addEventListener("click", () => goStep(n));
+      li.append(btn);
+      return li;
+    }));
+  },
+
+  showStep(n) {
+    dom.steps.forEach((section, idx) => section.classList.toggle("hidden", idx + 1 !== n));
+    UI.renderStepper();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  },
+
+  // ---------- Soal ----------
+  selectQuestionTab(tab) {
+    const isUpload = tab === "upload";
+    dom.tabType.setAttribute("aria-selected", String(!isUpload));
+    dom.tabUpload.setAttribute("aria-selected", String(isUpload));
+    dom.tabType.tabIndex = isUpload ? -1 : 0;
+    dom.tabUpload.tabIndex = isUpload ? 0 : -1;
+    dom.panelType.classList.toggle("hidden", isUpload);
+    dom.panelUpload.classList.toggle("hidden", !isUpload);
+    if (isUpload) UI.renderUploadPanel();
+  },
+
+  renderTopicMeta() {
+    const text = dom.topic.value;
+    dom.topicMeta.textContent = text.trim() ? `${formatNumber(countWords(text))} kata · ${formatNumber(text.length)} karakter` : "";
+  },
+
+  renderUploadPanel(loadingMessage) {
+    const loading = Boolean(loadingMessage);
+    const hasFile = Boolean(State.questionFileName && dom.topic.value.trim());
+    dom.questionUploading.classList.toggle("hidden", !loading);
+    dom.questionDropzone.classList.toggle("hidden", loading || hasFile);
+    dom.questionPreview.classList.toggle("hidden", loading || !hasFile);
+    if (loading) dom.questionUploadingText.textContent = loadingMessage;
+    if (!loading && hasFile) UI.renderQuestionPreview(dom.topic.value);
+  },
+
+  renderQuestionPreview(text) {
+    const ITEM_LINE = /^(\d{1,2})[.)]\s+(.*)$/;
+    const OPTION_LINE = /^([a-hA-H])[.)]\s+(.*)$/;
+    dom.questionPreviewBody.replaceChildren();
+    let figures = 0;
+
+    text.split(/(\[Gambar:[\s\S]*?\])/).forEach((part, index) => {
+      if (index % 2 === 1) {
+        figures += 1;
+        const details = el("details", "ml-7 my-2 rounded-xl border border-line bg-subtle text-xs");
+        const summary = el("summary", "cursor-pointer select-none px-3 py-2 font-semibold text-ink-2 rounded-xl", `Gambar ${figures} terbaca, buka untuk lihat isinya`);
+        details.append(summary, el("p", "px-3 pb-3 leading-relaxed text-ink-2 whitespace-pre-line", part.replace(/^\[Gambar:\s*/, "").replace(/\]$/, "")));
+        dom.questionPreviewBody.append(details);
+        return;
+      }
+      part.split("\n").forEach((line) => {
+        if (!line.trim()) return;
+        const item = line.match(ITEM_LINE);
+        const option = line.match(OPTION_LINE);
+        const row = el("p");
+        if (item) {
+          row.className = "flex gap-2 pt-2 first:pt-0";
+          row.append(el("span", "w-6 shrink-0 font-bold tabular-nums", `${item[1]}.`), el("span", "", item[2]));
+        } else if (option) {
+          row.className = "flex gap-2 pl-8 text-ink-2";
+          row.append(el("span", "w-5 shrink-0 font-semibold", `${option[1]}.`), el("span", "", option[2]));
+        } else {
+          row.className = "text-ink-2";
+          row.textContent = line;
+        }
+        dom.questionPreviewBody.append(row);
+      });
+    });
+
+    dom.questionFileName.textContent = State.questionFileName;
+    dom.questionCharBadge.textContent = `${formatNumber(text.length)} karakter`;
+    const meta = [`${formatNumber(countWords(text))} kata`];
+    if (figures) meta.push(`${figures} gambar terbaca`);
+    dom.questionPreviewMeta.textContent = meta.join(" · ");
+  },
+
+  // ---------- Setelan ----------
+  renderModeAction() {
+    const mode = MODES[State.mode];
+    dom.primaryLabel.textContent = mode.action;
+    dom.primaryHint.textContent = mode.hint;
+  },
+
+  renderSummaries() {
+    const tone = document.querySelector('input[name="tone"]:checked');
+    dom.toneSummary.textContent = tone ? tone.closest("label").querySelector("b").textContent : "";
+
+    const parts = [];
+    const typeOption = dom.specAnswerType.selectedOptions[0];
+    parts.push(dom.specAnswerType.value ? typeOption.textContent : "Otomatis");
+    const count = readInt(dom.specQuestionCount);
+    if (count) parts.push(`${count} soal`);
+    const { total, items } = computeWordLimits();
+    if (items && items.length) parts.push(`maks ${formatNumber(items[0])} kata per soal`);
+    else if (total) parts.push(`maks ${formatNumber(total)} kata`);
+    dom.specSummary.textContent = parts.join(" · ");
+
+    const name = dom.studentName.value.trim();
+    const nim = dom.studentId.value.trim();
+    dom.identitySummary.textContent = name || nim ? [name, nim].filter(Boolean).join(" · ") : "Belum diisi";
+  },
+
+  renderWordSummary() {
+    const { total, items, error } = computeWordLimits();
+    const isDirect = DIRECT_ANSWER_TYPES.includes(dom.specAnswerType.value);
+    dom.specWordLimit.setAttribute("aria-invalid", error ? "true" : "false");
+    dom.specWordSummary.classList.toggle("text-danger-text", Boolean(error));
+
+    let text;
+    if (error) {
+      text = error;
+    } else if (State.detectedItemLimits && !dom.specWordLimit.value) {
+      const list = State.detectedItemLimits.map((n, i) => `soal ${i + 1}: ${n ? `maksimal ${formatNumber(n)} kata` : "tanpa batas atas"}`).join(", ");
+      text = `Batas dari dosen berbeda tiap soal, ${list}.${total ? ` Total ${formatNumber(total)} kata.` : ""}`;
+    } else if (items && items.length > 1) {
+      text = `${items.length} soal kali ${formatNumber(items[0])} kata, total ${formatNumber(total || items[0] * items.length)} kata. Tiap soal dijaga tidak lewat batas.`;
+    } else if (items) {
+      text = `Tiap soal maksimal ${formatNumber(items[0])} kata. Isi jumlah soal supaya totalnya dihitung.`;
+    } else if (total) {
+      text = `Maksimal ${formatNumber(total)} kata untuk seluruh jawaban.`;
+    } else if (isDirect) {
+      text = "Tidak ada batas dari dosen. Panjang tiap butir menyesuaikan pertanyaannya.";
+    } else {
+      text = "Tidak ada batas dari dosen. Panjang mengikuti target panjang.";
+    }
+    dom.specWordSummary.textContent = text;
+    return { total, error };
+  },
+
+  // Opsi yang tidak berpengaruh untuk jenis jawaban terpilih disembunyikan agar form tidak membingungkan
+  renderSpecVisibility() {
+    const type = dom.specAnswerType.value;
+    const isDirect = DIRECT_ANSWER_TYPES.includes(type);
+    const { total } = UI.renderWordSummary();
+    const hideFormat = FORMAT_DECIDED_TYPES.includes(type);
+    dom.formatWrapper.classList.toggle("hidden", hideFormat);
+    if (hideFormat) setRadio("format", "otomatis");
+    dom.detailsTone.classList.toggle("hidden", isDirect);
+    // Target panjang tetap bisa dipilih selama batas total dosen belum pasti
+    const hideTarget = isDirect || Boolean(total);
+    dom.lengthWrapper.classList.toggle("hidden", hideTarget);
+    dom.customWordsWrapper.classList.toggle("hidden", hideTarget || dom.selectLength.value !== "kustom");
+    UI.renderSummaries();
+  },
+
+  renderSpecNote() {
+    if (!State.specSource) {
+      dom.specNote.textContent = "Terisi otomatis saat lembar soal diunggah. Koreksi di sini jika ada yang keliru.";
+      return;
+    }
+    dom.specNote.textContent = (State.specSource === "ai"
+      ? "Dideteksi AI dari lembar soal. Cek sekali lagi sebelum lanjut."
+      : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.")
+      + (State.detectedSections ? ` Format wajib: ${State.detectedSections.join(", ")}.` : "");
+  },
+
+  // ---------- Tahap 2 ----------
+  renderStep2() {
+    const isBahan = State.mode === "bahan";
+    dom.panelBahan.classList.toggle("hidden", !isBahan);
+    dom.panelJurnal.classList.toggle("hidden", isBahan);
+    dom.step2Title.textContent = isBahan ? "Studio bahan bacaan dosen" : "Kurasi jurnal ilmiah terbuka";
+    dom.step2Lede.textContent = isBahan
+      ? "Unggah naskah yang diberikan dosen, lengkapi keterangannya, lalu periksa potongan teks yang akan dibaca saat menyusun jawaban."
+      : "Centang artikel yang mau disitir. Teks asli artikel terpilih dibaca lalu dikutip nyata ke dalam naskah.";
+    if (isBahan) {
+      UI.renderMaterialPreview();
+      UI.renderMaterialList();
+    } else if (!State.papers.length && dom.papersLoading.classList.contains("hidden")) {
+      UI.renderPapersEmpty("Tekan Cari jurnal untuk mulai mencari artikel yang relevan.");
+    }
+    UI.renderSelection();
+  },
+
+  renderSelection() {
+    const isBahan = State.mode === "bahan";
+    const count = isBahan ? State.materials.length : State.selectedPaperIds.size;
+    dom.selectedCount.textContent = String(count);
+    dom.selectedHint.textContent = isBahan
+      ? (count ? `${count} bahan siap dibaca` : "Simpan minimal satu bahan, atau isi formulir lalu langsung tulis")
+      : (count ? `${count} rujukan terpilih untuk disitir` : "Belum ada rujukan dicentang, naskah ditulis tanpa sitasi jurnal");
+  },
+
+  renderPapersLoading(loading) {
+    dom.papersLoading.classList.toggle("hidden", !loading);
+    if (loading) dom.papersList.replaceChildren();
+  },
+
+  renderPapersEmpty(message, query) {
+    const box = el("li", "empty-state");
+    box.innerHTML = ICON.search;
+    box.append(
+      el("p", "text-sm font-bold", "Belum ada artikel yang cocok"),
+      el("p", "text-xs text-ink-2 mt-1 max-w-md mx-auto", message || "Coba kata kunci yang lebih ringkas, atau masukkan DOI jika sudah punya artikel tertentu.")
+    );
+    if (query) box.append(el("p", "text-[11px] text-ink-3 mt-3", `Kata kunci yang diproses: ${query}`));
+    dom.papersList.replaceChildren(box);
+  },
+
+  renderPapers() {
+    if (!State.papers.length) return UI.renderPapersEmpty();
+    dom.papersList.replaceChildren(...State.papers.map((paper) => {
+      const li = el("li");
+      const card = el("label", "paper-card");
+      const check = el("input", "paper-check");
+      check.type = "checkbox";
+      check.checked = State.selectedPaperIds.has(paper.id);
+      check.setAttribute("aria-label", `Pilih ${paper.title}`);
+      check.addEventListener("change", () => togglePaper(paper.id, check.checked));
+
+      const body = el("div", "flex-1 min-w-0");
+      const meta = el("div", "flex flex-wrap items-center gap-2 mb-1.5");
+      meta.append(el("span", "count-badge", paper.year ? String(paper.year) : "t.t."));
+      if (paper.venue) meta.append(el("span", "text-[11px] font-semibold text-ink-2 truncate max-w-[22rem]", paper.venue));
+      const oa = el("span", "oa-badge", paper.is_ut_bmp ? "Modul UT" : "Akses terbuka");
+      meta.append(oa);
+
+      const authors = (paper.authors || []).slice(0, 3).join(", ") + ((paper.authors || []).length > 3 ? " dkk." : "");
+      body.append(meta, el("h3", "text-sm font-bold leading-snug", paper.title));
+      if (authors) body.append(el("p", "text-xs text-ink-2 mt-1", authors));
+
+      const links = el("div", "mt-3 flex flex-wrap items-center gap-4");
+      if (paper.abstract) {
+        const abstract = el("p", "hidden mt-3 text-xs leading-relaxed text-ink-2 max-w-prose", paper.abstract);
+        abstract.id = `abstract-${paper.id}`;
+        const toggle = el("button", "abstract-toggle", "Pratinjau abstrak");
+        toggle.type = "button";
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-controls", abstract.id);
+        toggle.addEventListener("click", (e) => {
+          e.preventDefault();
+          const open = abstract.classList.toggle("hidden") === false;
+          toggle.setAttribute("aria-expanded", String(open));
+          toggle.textContent = open ? "Tutup abstrak" : "Pratinjau abstrak";
+        });
+        links.append(toggle);
+        body.append(links, abstract);
+      } else {
+        body.append(links);
+      }
+      [[paper.doi, "DOI"], [paper.scholar_url, "Halaman asli"]].forEach(([href, label]) => {
+        if (!href || !/^https?:\/\//.test(href)) return;
+        const a = el("a", "abstract-toggle text-ink-2", label);
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.addEventListener("click", (e) => e.stopPropagation());
+        links.append(a);
+      });
+
+      card.append(check, body);
+      li.append(card);
+      return li;
+    }));
+  },
+
+  renderMaterialMeta() {
+    const text = dom.materialText.value;
+    dom.materialTextMeta.textContent = text.trim() ? `${formatNumber(countWords(text))} kata · ${formatNumber(text.length)} karakter` : "";
+  },
+
+  renderMaterialPreview() {
+    UI.renderMaterialMeta();
+    const chunks = chunkParagraphs(dom.materialText.value);
+    dom.materialChunkCount.textContent = chunks.length ? `${chunks.length} bagian` : "";
+    if (!chunks.length) {
+      const empty = el("li", "empty-state !py-8");
+      empty.innerHTML = ICON.book;
+      empty.append(
+        el("p", "text-sm font-bold", "Belum ada naskah"),
+        el("p", "text-xs text-ink-2 mt-1", "Potongan bagian muncul di sini setelah berkas dibaca atau teks ditempel.")
+      );
+      dom.materialChunks.replaceChildren(empty);
+      return;
+    }
+    const shown = chunks.slice(0, 6).map((chunk, i) => {
+      const li = el("li", "flex gap-3 p-3 rounded-xl border border-line bg-subtle");
+      li.append(
+        el("span", "font-serif italic text-ink-3 text-sm w-6 shrink-0 tabular-nums", String(i + 1).padStart(2, "0")),
+        el("p", "text-xs leading-relaxed text-ink-2 line-clamp-3", chunk)
+      );
+      return li;
+    });
+    if (chunks.length > 6) shown.push(el("li", "text-[11px] text-ink-3 pl-9", `dan ${chunks.length - 6} bagian lainnya ikut dibaca`));
+    dom.materialChunks.replaceChildren(...shown);
+  },
+
+  renderMaterialList() {
+    if (!State.materials.length) {
+      dom.materialList.replaceChildren(el("li", "text-xs text-ink-3 leading-relaxed", "Belum ada bahan tersimpan. Bahan di formulir tetap ikut dibaca saat menulis naskah."));
+      return;
+    }
+    dom.materialList.replaceChildren(...State.materials.map((m) => {
+      const li = el("li", "flex items-start gap-2 p-3 rounded-xl border border-ok-line bg-ok-bg");
+      const body = el("div", "flex-1 min-w-0");
+      body.append(el("p", "text-xs font-bold text-ok-text truncate", m.title));
+      const meta = [(m.authors || []).join(", "), m.year].filter(Boolean).join(", ");
+      if (meta) body.append(el("p", "text-[11px] text-ok-text opacity-80 truncate", meta));
+      const remove = el("button", "btn btn-ghost p-1.5 shrink-0");
+      remove.type = "button";
+      remove.innerHTML = ICON.trash;
+      remove.firstChild.setAttribute("class", "w-3.5 h-3.5");
+      remove.setAttribute("aria-label", `Hapus ${m.title}`);
+      remove.addEventListener("click", () => removeMaterial(m.id));
+      li.append(body, remove);
+      return li;
+    }));
+  },
+
+  renderUtResult(data, onApply) {
+    const box = dom.materialUtResult;
+    if (!data) {
+      box.classList.add("hidden");
+      box.replaceChildren();
+      return;
+    }
+    box.classList.remove("hidden");
+    const wrap = el("div", "p-3 rounded-xl border border-ok-line bg-ok-bg text-xs text-ok-text");
+    if (data.exact) {
+      const row = el("div", "flex items-center justify-between gap-2 flex-wrap");
+      const info = el("p", "font-semibold", `Terdeteksi modul resmi UT: ${data.course.kode} ${data.course.nama}, ${data.course.edisi}`);
+      const btn = el("button", "btn btn-primary px-3 py-1.5 text-[11px]", "Pakai judul resmi");
+      btn.type = "button";
+      btn.addEventListener("click", () => onApply(data.course));
+      row.append(info, btn);
+      wrap.append(row);
+    } else {
+      wrap.append(el("p", "font-semibold mb-2", "Mata kuliah UT yang mirip:"));
+      const pills = el("div", "flex flex-wrap gap-1.5");
+      data.suggestions.forEach((s) => {
+        const pill = el("button", "btn btn-secondary px-2.5 py-1 text-[11px]", `${s.kode} ${s.nama}`);
+        pill.type = "button";
+        pill.addEventListener("click", () => onApply(s));
+        pills.append(pill);
+      });
+      wrap.append(pills);
+    }
+    box.replaceChildren(wrap);
+  },
+
+  // ---------- Tahap 3 ----------
+  renderPipeline(active) {
+    dom.pipeline.querySelectorAll("li").forEach((li) => {
+      const n = Number(li.dataset.pipe);
+      li.classList.toggle("is-done", n < active);
+      li.classList.toggle("is-active", n === active);
+    });
+  },
+
+  renderGenerating(on) {
+    dom.generating.classList.toggle("hidden", !on);
+    dom.result.classList.toggle("hidden", on || !State.doc);
+  },
+
+  renderStats() {
+    const refs = State.doc.references.length;
+    dom.resultStats.textContent = `Sekitar ${formatNumber(State.doc.wordCount)} kata · ${refs ? `${refs} rujukan terverifikasi` : "tanpa rujukan"}`;
+  },
+
+  renderEvidence(evidence) {
+    const list = evidence || [];
+    dom.evidence.classList.toggle("hidden", !list.length);
+    dom.evidenceCount.textContent = list.length ? `${list.length} sumber` : "";
+    dom.evidenceList.replaceChildren(...list.map((ev) => {
+      const item = el("div", "p-4 rounded-xl border border-line bg-subtle");
+      const badges = el("div", "flex flex-wrap items-center gap-2 mb-1.5");
+      badges.append(el("span", ev.has_full_pdf ? "oa-badge" : "count-badge", ev.has_full_pdf ? "Teks lengkap terbaca" : "Abstrak dan metadata"));
+      if (ev.citation_count > 0) badges.append(el("span", "count-badge", `${ev.citation_count} kali disitir`));
+      badges.append(el("span", "text-[11px] text-ink-3", [ev.venue, ev.year || "t.t."].filter(Boolean).join(", ")));
+      item.append(badges, el("p", "text-sm font-bold leading-snug", ev.title), el("p", "text-xs text-ink-2 mt-0.5", ev.authors));
+      (ev.snippets || []).forEach((sn) => {
+        const quote = el("blockquote", "mt-2 pl-3 border-l-2 border-edge text-xs leading-relaxed text-ink-2");
+        const where = typeof sn.page === "number" ? `Hlm. ${sn.page}` : sn.page;
+        quote.append(el("span", "font-semibold text-ink", `${where}. `), document.createTextNode(sn.text));
+        item.append(quote);
+      });
+      return item;
+    }));
+  },
+
+  renderDocument() {
+    const doc = State.doc;
+    dom.resultTitle.textContent = doc.title;
+    UI.renderStats();
+    dom.paper.replaceChildren(UI.buildTitleBlock());
+    if (doc.identityLines.length) {
+      const identity = el("div", "paper-identity");
+      doc.identityLines.forEach((line) => identity.append(el("div", "", line)));
+      dom.paper.append(identity);
+    } else {
+      dom.paper.append(el("div", "h-8"));
+    }
+    doc.sections.forEach((sec, index) => dom.paper.append(UI.buildSectionBlock(sec, index)));
+    if (doc.references.length) dom.paper.append(UI.buildReferencesBlock());
+  },
+
+  docButton(label, primary, onClick, ariaLabel) {
+    const node = el("button", primary ? "doc-btn doc-btn-primary" : "doc-btn", label);
+    node.type = "button";
+    if (ariaLabel) node.setAttribute("aria-label", ariaLabel);
+    node.disabled = State.docBusy;
+    node.addEventListener("click", onClick);
+    return node;
+  },
+
+  buildTitleBlock() {
+    const wrap = el("div", "paper-title-wrap relative");
+    const tools = el("div", "doc-tools justify-center mb-2");
+    tools.append(UI.docButton("Ubah judul", false, () => UI.openTitleEditor(wrap), "Ubah judul naskah"));
+    wrap.append(tools, el("h2", "paper-title", State.doc.title));
+    return wrap;
+  },
+
+  openTitleEditor(wrap) {
+    const input = el("input", "doc-field text-center font-bold");
+    input.value = State.doc.title;
+    input.maxLength = 300;
+    input.setAttribute("aria-label", "Judul naskah");
+    const save = () => {
+      const title = input.value.trim();
+      if (!title) return input.focus();
+      saveDocument({ title, sections: State.doc.sections }, wrap);
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") save();
+      if (e.key === "Escape") UI.renderDocument();
+    });
+    const actions = el("div", "flex justify-center gap-2 mt-2");
+    actions.append(UI.docButton("Batal", false, UI.renderDocument), UI.docButton("Simpan", true, save));
+    wrap.replaceChildren(input, actions);
+    input.focus();
+  },
+
+  buildSectionBlock(sec, index) {
+    const article = el("section", "doc-section");
+    const label = sec.heading && sec.heading.trim() ? sec.heading : `Bagian ${index + 1}`;
+    const head = el("div", "flex items-start justify-between gap-3");
+    head.append(sec.heading ? el("h3", "paper-heading", sec.heading) : el("span"));
+    const tools = el("div", "doc-tools shrink-0");
+    tools.append(
+      UI.docButton("Edit", false, () => UI.openSectionEditor(article, index), `Edit ${label}`),
+      UI.docButton("Tulis ulang", false, () => UI.openRewriteForm(article, index), `Tulis ulang ${label}`)
+    );
+    head.append(tools);
+    const body = el("div", "section-body");
+    UI.fillParagraphs(body, sec.content);
+    article.append(head, body);
+    return article;
+  },
+
+  // Satu baris naskah jadi satu alinea. Butir bernomor dan daftar tidak diberi indentasi.
+  fillParagraphs(container, content) {
+    const LIST_LINE = /^(\d{1,2}[.)]|[a-hA-H][.)]|[-•*])\s/;
+    container.replaceChildren(...(content || "").split(/\n+/).filter((l) => l.trim()).map((line) => {
+      const p = el("p", LIST_LINE.test(line.trim()) ? "no-indent" : "");
+      UI.appendWithCitations(p, line.trim());
+      return p;
+    }));
+  },
+
+  // Sitasi seperti (Navis, 1956) jadi penanda yang bisa diklik untuk loncat ke daftar pustaka
+  appendWithCitations(node, text) {
+    const CITE = /\(([^()]*?(?:\d{4}[a-z]?|n\.d\.|t\.t\.)[^()]*?)\)/g;
+    let last = 0;
+    for (const match of text.matchAll(CITE)) {
+      node.append(document.createTextNode(text.slice(last, match.index)));
+      const refIndex = findReferenceIndex(match[1]);
+      if (refIndex === -1) {
+        node.append(document.createTextNode(match[0]));
+      } else {
+        const cite = el("button", "cite", match[0]);
+        cite.type = "button";
+        cite.title = "Lihat sumber di daftar pustaka";
+        cite.addEventListener("click", () => UI.flashReference(refIndex));
+        node.append(cite);
+      }
+      last = match.index + match[0].length;
+    }
+    node.append(document.createTextNode(text.slice(last)));
+  },
+
+  flashReference(index) {
+    const item = dom.paper.querySelector(`[data-ref-index="${index}"]`);
+    if (!item) return;
+    item.scrollIntoView({ behavior: "smooth", block: "center" });
+    item.classList.add("is-flash");
+    setTimeout(() => item.classList.remove("is-flash"), 1600);
+  },
+
+  buildReferencesBlock() {
+    const sample = (State.doc.title + " " + (State.doc.sections[0] ? State.doc.sections[0].content : "")).toLowerCase().split(/\s+/);
+    const isEnDoc = ["the", "and", "is", "of", "to", "that", "this"].some((w) => sample.includes(w));
+    const block = el("div", "paper-refs");
+    block.append(el("h3", "paper-heading", isEnDoc ? "References" : "Daftar Pustaka"));
+    const list = el("ol");
+    State.doc.references.forEach((ref, i) => {
+      const authors = (ref.authors && ref.authors.length ? ref.authors : ["Anonim"]).join(", ");
+      const parts = [`${authors}. (${ref.year || "n.d."}). ${ref.title}.`];
+      if (ref.venue) parts.push(`${ref.venue}.`);
+      if (ref.doi) parts.push(ref.doi);
+      const li = el("li", "", parts.join(" "));
+      li.dataset.refIndex = String(i);
+      list.append(li);
+    });
+    block.append(list);
+    return block;
+  },
+
+  showSectionError(container, message) {
+    container.querySelectorAll(".doc-error").forEach((node) => node.remove());
+    const error = el("p", "doc-error", message);
+    error.setAttribute("role", "alert");
+    container.append(error);
+  },
+
+  openSectionEditor(article, index) {
+    const sec = State.doc.sections[index];
+    const headingInput = el("input", "doc-field font-bold");
+    headingInput.value = sec.heading || "";
+    headingInput.maxLength = 500;
+    headingInput.setAttribute("aria-label", "Judul bagian");
+    const contentInput = el("textarea", "doc-field resize-y");
+    contentInput.value = sec.content;
+    contentInput.rows = Math.min(24, Math.max(6, Math.ceil(sec.content.length / 90) + sec.content.split("\n").length));
+    contentInput.setAttribute("aria-label", "Isi bagian");
+    const meta = el("span", "font-sans text-[11px] text-stone-500 tabular-nums");
+    const updateMeta = () => { meta.textContent = `${countWords(contentInput.value)} kata`; };
+    contentInput.addEventListener("input", updateMeta);
+    updateMeta();
+
+    const save = () => {
+      if (!contentInput.value.trim()) {
+        UI.showSectionError(article, "Isi bagian tidak boleh kosong.");
+        return contentInput.focus();
+      }
+      const sections = State.doc.sections.map((s, i) => i === index ? { heading: headingInput.value.trim(), content: contentInput.value.trim() } : s);
+      saveDocument({ title: State.doc.title, sections }, article);
+    };
+    contentInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save();
+      if (e.key === "Escape") UI.renderDocument();
+    });
+
+    const actions = el("div", "flex items-center justify-between gap-2");
+    const buttons = el("div", "flex gap-2");
+    buttons.append(UI.docButton("Batal", false, UI.renderDocument), UI.docButton("Simpan bagian", true, save));
+    actions.append(meta, buttons);
+    const form = el("div", "space-y-2");
+    form.append(headingInput, contentInput, actions);
+    article.replaceChildren(form);
+    contentInput.focus();
+  },
+
+  openRewriteForm(article, index) {
+    if (article.querySelector(".rewrite-form")) return;
+    const form = el("div", "rewrite-form font-sans mt-3 p-3 rounded-lg bg-stone-50 border border-stone-200 space-y-2");
+    const input = el("input", "doc-field");
+    input.maxLength = 500;
+    input.placeholder = "Arahan opsional, misalnya lebih santai, persingkat, tambah contoh";
+    input.setAttribute("aria-label", "Arahan tulis ulang");
+    const run = () => rewriteSection(article, index, input.value.trim());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") run();
+      if (e.key === "Escape") form.remove();
+    });
+    const actions = el("div", "flex justify-end gap-2");
+    actions.append(UI.docButton("Batal", false, () => form.remove()), UI.docButton("Tulis ulang bagian ini", true, run));
+    form.append(input, actions);
+    article.append(form);
+    input.focus();
+  },
+
+  setDocBusy(busy) {
+    State.docBusy = busy;
+    dom.paper.setAttribute("aria-busy", String(busy));
+    dom.paper.querySelectorAll("button, input, textarea").forEach((node) => { node.disabled = busy; });
+    dom.btnRegenerate.disabled = busy;
   }
-  if (limit === null) return { total: null, items: null, error: null };
+};
 
-  if (specWordScope.value === "total") {
-    if (limit < 50 || limit > 10000) return { total: null, items: null, error: "Batas total harus 50 sampai 10.000 kata." };
-    return { total: limit, items: null, error: null };
-  }
-  if (limit < 10 || limit > 5000) return { total: null, items: null, error: "Batas per soal harus 10 sampai 5.000 kata." };
-  if (!validCount) return { total: null, items: [limit], error: null };
-  const total = limit * validCount;
-  return { total: total <= 10000 ? total : null, items: Array(validCount).fill(limit), error: null };
+// =====================================================================
+// 4. LOGIKA MURNI
+// =====================================================================
+
+// Mengikuti tools/content_chunker.py supaya pratinjau sama dengan potongan yang disimpan server
+function chunkParagraphs(text, maxChars = 3000) {
+  const clean = (text || "").replace(/\r\n?/g, "\n").trim();
+  if (!clean) return [];
+  const pieces = [];
+  clean.split(/\n\s*\n/).map((p) => p.split(/\s+/).join(" ").trim()).filter(Boolean).forEach((para) => {
+    while (para.length > maxChars) {
+      let cut = para.lastIndexOf(". ", maxChars);
+      cut = cut > maxChars / 2 ? cut + 1 : maxChars;
+      pieces.push(para.slice(0, cut).trim());
+      para = para.slice(cut).trim();
+    }
+    if (para) pieces.push(para);
+  });
+  const chunks = [];
+  pieces.forEach((piece) => {
+    if (chunks.length && chunks[chunks.length - 1].length + 2 + piece.length <= maxChars) {
+      chunks[chunks.length - 1] += "\n\n" + piece;
+    } else {
+      chunks.push(piece);
+    }
+  });
+  return chunks;
 }
-
-function formatNumber(n) {
-  return n.toLocaleString("id-ID");
-}
-
-function renderWordSummary() {
-  const { total, items, error } = computeWordLimits();
-  const isDirect = DIRECT_ANSWER_TYPES.includes(specAnswerType.value);
-  const invalid = Boolean(error);
-  specWordLimit.setAttribute("aria-invalid", invalid ? "true" : "false");
-  specWordLimit.classList.toggle("border-rose-500", invalid);
-  specWordSummary.classList.toggle("text-rose-600", invalid);
-  specWordSummary.classList.toggle("dark:text-rose-400", invalid);
-
-  let text;
-  if (error) {
-    text = error;
-  } else if (detectedItemLimits && !specWordLimit.value) {
-    const parts = detectedItemLimits.map((n, i) => `soal ${i + 1}: ${n ? `maksimal ${formatNumber(n)} kata` : "tanpa batas atas"}`).join(", ");
-    text = `Batas dari dosen berbeda tiap soal, ${parts}.${total ? ` Total ${formatNumber(total)} kata.` : ""}`;
-  } else if (items && items.length > 1) {
-    text = `${items.length} soal × ${formatNumber(items[0])} kata = ${formatNumber(total || items[0] * items.length)} kata total. Tiap soal dijaga tidak lewat ${formatNumber(items[0])} kata.`;
-  } else if (items) {
-    text = `Tiap soal maksimal ${formatNumber(items[0])} kata. Isi Jumlah Soal supaya totalnya dihitung.`;
-  } else if (total) {
-    text = `Maksimal ${formatNumber(total)} kata untuk seluruh jawaban.`;
-  } else if (isDirect) {
-    text = "Tidak ada batas dari dosen. Panjang tiap butir menyesuaikan pertanyaannya.";
-  } else {
-    text = "Tidak ada batas dari dosen. Panjang mengikuti Target Panjang.";
-  }
-  specWordSummary.textContent = text;
-  return { total, items, error };
-}
-
-// Opsi yang tidak berpengaruh untuk jenis jawaban terpilih disembunyikan agar form tidak membingungkan
-function updateSpecVisibility() {
-  const type = specAnswerType.value;
-  const isDirect = DIRECT_ANSWER_TYPES.includes(type);
-  const { total } = renderWordSummary();
-  // Target panjang tetap bisa dipilih selama batas total dosen belum pasti, misal ada soal yang hanya punya batas minimal
-  const hasLecturerLimit = Boolean(total);
-
-  const hideFormat = FORMAT_DECIDED_TYPES.includes(type);
-  formatWrapper.classList.toggle("hidden", hideFormat);
-  if (hideFormat) selectFormat.value = "otomatis";
-
-  toneWrapper.classList.toggle("hidden", isDirect);
-
-  const hideTarget = isDirect || hasLecturerLimit;
-  lengthTargetWrapper.classList.toggle("hidden", hideTarget);
-  customWordsWrapper.classList.toggle("hidden", hideTarget || selectLength.value !== "kustom");
-}
-
-function applyAnswerSpec(spec, source) {
-  if (!spec) return;
-  specQuestionCount.value = spec.question_count || "";
-  specAnswerType.value = spec.answer_type || "";
-  // Hanya pindah ke tanpa rujukan jika dosen jelas tidak butuh sitasi
-  specCitations.value = spec.needs_citations === false ? "tidak" : "ya";
-  specLanguage.value = spec.answer_language || "";
-
-  const items = Array.isArray(spec.item_word_limits) && spec.item_word_limits.some((n) => n) ? spec.item_word_limits : null;
-  detectedItemLimits = null;
-  specWordLimit.placeholder = "Tidak ada";
-  if (items && items.every((n) => n === items[0])) {
-    specWordScope.value = "per_soal";
-    specWordLimit.value = items[0];
-  } else if (items) {
-    specWordScope.value = "per_soal";
-    specWordLimit.value = "";
-    specWordLimit.placeholder = "Beda tiap soal";
-    detectedItemLimits = items;
-  } else {
-    specWordScope.value = "total";
-    specWordLimit.value = spec.word_limit || "";
-  }
-
-  detectedSections = Array.isArray(spec.required_sections) && spec.required_sections.length ? spec.required_sections : null;
-  answerSpecNote.textContent = (source === "ai"
-    ? "Dideteksi AI dari lembar soal. Cek sekali lagi sebelum lanjut."
-    : "AI sedang tidak tersedia, jadi ini tebakan dari pola teks soal. Mohon dicek ulang.")
-    + (detectedSections ? ` Format wajib: ${detectedSections.join(", ")}.` : "");
-  updatePrimaryAction();
-  updateSpecVisibility();
-}
-
-function resetAnswerSpec() {
-  specQuestionCount.value = "";
-  specAnswerType.value = "";
-  specCitations.value = "ya";
-  specLanguage.value = "";
-  specWordLimit.value = "";
-  specWordLimit.placeholder = "Tidak ada";
-  specWordScope.value = "total";
-  detectedItemLimits = null;
-  detectedSections = null;
-  answerSpecNote.textContent = ANSWER_SPEC_DEFAULT_NOTE;
-  updatePrimaryAction();
-  updateSpecVisibility();
-}
-
-function readAnswerSpec() {
-  const count = readInt(specQuestionCount);
-  const { total, items } = computeWordLimits();
-  return {
-    question_count: count >= 1 && count <= 50 ? count : null,
-    answer_type: specAnswerType.value || null,
-    needs_citations: specCitations.value === "ya",
-    answer_language: specLanguage.value || null,
-    word_limit: total,
-    item_word_limits: items,
-    required_sections: detectedSections
-  };
-}
-
-specWordLimit.addEventListener("input", () => {
-  // Angka yang diketik pengguna menggantikan batas berbeda per soal hasil deteksi
-  if (specWordLimit.value) detectedItemLimits = null;
-  updateSpecVisibility();
-});
-[specWordScope, specAnswerType].forEach((el) => el.addEventListener("change", updateSpecVisibility));
-specQuestionCount.addEventListener("input", updateSpecVisibility);
-
-// Question Editor Elements
-const questionEmpty = document.getElementById("question-empty");
-const questionPreview = document.getElementById("question-preview");
-const questionPreviewBody = document.getElementById("question-preview-body");
-const questionPreviewMeta = document.getElementById("question-preview-meta");
-const btnEditQuestion = document.getElementById("btn-edit-question");
-const btnEditQuestionInline = document.getElementById("btn-edit-question-inline");
-const btnOpenQuestionEditor = document.getElementById("btn-open-question-editor");
-const dialogQuestion = document.getElementById("dialog-question");
-const dialogQuestionText = document.getElementById("dialog-question-text");
-const dialogQuestionMeta = document.getElementById("dialog-question-meta");
-
-const ITEM_LINE = /^(\d{1,2})[.)]\s+(.*)$/;
-const OPTION_LINE = /^([a-hA-H])[.)]\s+(.*)$/;
-const FIGURE_BLOCK = /(\[Gambar:[\s\S]*?\])/;
 
 // Blok gambar yang menempel di tengah kalimat soal dipindah ke bawah kalimatnya agar nomor soal tidak terpotong
 function detachFigures(text) {
@@ -254,9 +994,10 @@ function detachFigures(text) {
 
 // Merapikan teks soal: satu baris kosong sebelum tiap nomor dan tiap blok gambar, spasi berlebih dibuang
 function formatQuestionText(raw) {
+  const ITEM_LINE = /^(\d{1,2})[.)]\s+(.*)$/;
   const lines = detachFigures((raw || "").replace(/\r\n?/g, "\n").replace(/\t/g, " "))
     .split("\n")
-    .map((line) => line.replace(/\s+$/, "").replace(/^\s+/, ""));
+    .map((line) => line.trim());
   const out = [];
   lines.forEach((line) => {
     const startsBlock = ITEM_LINE.test(line) || line.startsWith("[Gambar:");
@@ -266,418 +1007,132 @@ function formatQuestionText(raw) {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function countWords(text) {
-  const words = text.replace(/\[Gambar:[\s\S]*?\]/g, " ").match(/\S+/g);
-  return words ? words.length : 0;
+function computeWordLimits() {
+  const count = readInt(dom.specQuestionCount);
+  const validCount = count >= 1 && count <= 50 ? count : null;
+  const limit = readInt(dom.specWordLimit);
+  const items = State.detectedItemLimits;
+
+  if (items && limit === null) {
+    // Butir tanpa batas atas bikin total tidak bisa dihitung
+    const bounded = items.every((n) => n);
+    const total = items.reduce((sum, n) => sum + (n || 0), 0);
+    return { total: bounded && total <= 10000 ? total : null, items, error: null };
+  }
+  if (limit === null) return { total: null, items: null, error: null };
+
+  if (dom.specWordScope.value === "total") {
+    if (limit < 50 || limit > 10000) return { total: null, items: null, error: "Batas total harus 50 sampai 10.000 kata." };
+    return { total: limit, items: null, error: null };
+  }
+  if (limit < 10 || limit > 5000) return { total: null, items: null, error: "Batas per soal harus 10 sampai 5.000 kata." };
+  if (!validCount) return { total: null, items: [limit], error: null };
+  const total = limit * validCount;
+  return { total: total <= 10000 ? total : null, items: Array(validCount).fill(limit), error: null };
 }
 
-function renderQuestionPreview(text) {
-  questionPreviewBody.replaceChildren();
-  let figures = 0;
+function readAnswerSpec() {
+  const count = readInt(dom.specQuestionCount);
+  const { total, items } = computeWordLimits();
+  return {
+    question_count: count >= 1 && count <= 50 ? count : null,
+    answer_type: dom.specAnswerType.value || null,
+    needs_citations: State.mode !== "forum",
+    answer_language: dom.specLanguage.value || null,
+    word_limit: total,
+    item_word_limits: items,
+    required_sections: State.detectedSections
+  };
+}
 
-  text.split(FIGURE_BLOCK).forEach((part, index) => {
-    if (index % 2 === 1) {
-      figures += 1;
-      const details = document.createElement("details");
-      details.className = "ml-6 my-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-950/60 text-xs";
-      const summary = document.createElement("summary");
-      summary.className = "cursor-pointer select-none px-3 py-2 font-semibold text-stone-700 dark:text-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200 rounded-lg";
-      summary.textContent = `Gambar ${figures} terbaca, klik untuk lihat isinya`;
-      const body = document.createElement("p");
-      body.className = "px-3 pb-3 leading-relaxed text-stone-600 dark:text-stone-400 whitespace-pre-line";
-      body.textContent = part.replace(/^\[Gambar:\s*/, "").replace(/\]$/, "");
-      details.append(summary, body);
-      questionPreviewBody.append(details);
-      return;
-    }
-    part.split("\n").forEach((line) => {
-      if (!line.trim()) return;
-      const item = line.match(ITEM_LINE);
-      const option = line.match(OPTION_LINE);
-      const row = document.createElement("p");
-      if (item) {
-        row.className = "flex gap-2 pt-2 first:pt-0";
-        const number = document.createElement("span");
-        number.className = "w-6 shrink-0 font-bold text-stone-900 dark:text-stone-100 tabular-nums";
-        number.textContent = `${item[1]}.`;
-        const content = document.createElement("span");
-        content.textContent = item[2];
-        row.append(number, content);
-      } else if (option) {
-        row.className = "flex gap-2 pl-8 text-stone-700 dark:text-stone-300";
-        const letter = document.createElement("span");
-        letter.className = "w-5 shrink-0 font-semibold";
-        letter.textContent = `${option[1]}.`;
-        const content = document.createElement("span");
-        content.textContent = option[2];
-        row.append(letter, content);
-      } else {
-        row.className = "text-stone-700 dark:text-stone-300";
-        row.textContent = line;
-      }
-      questionPreviewBody.append(row);
+function targetWords() {
+  const choice = dom.selectLength.value;
+  let words = choice === "kustom" ? (parseInt(dom.customWords.value, 10) || 1200) : (LENGTH_WORDS[choice] || 950);
+  // Batas total dari dosen menggantikan target, dibatasi rentang yang diterima server
+  const lecturerTotal = computeWordLimits().total;
+  if (lecturerTotal) words = lecturerTotal;
+  return Math.min(5000, Math.max(200, words));
+}
+
+function buildGeneratePayload(paperIds) {
+  let format = radioValue("format") || "otomatis";
+  // Jalur forum menulis jawaban mengalir tanpa bab kecuali mahasiswa memilih format lain
+  if (State.mode === "forum" && format === "otomatis" && !dom.specAnswerType.value) format = "esai";
+  return {
+    topic: dom.topic.value.trim(),
+    format_type: format,
+    target_length: dom.selectLength.value,
+    target_words: targetWords(),
+    paragraph_depth: dom.selectDepth.value,
+    tone: radioValue("tone") || "akademis formal",
+    paper_ids: paperIds,
+    custom_instructions: dom.instructions.value.trim(),
+    answer_spec: readAnswerSpec(),
+    student_name: dom.studentName.value.trim(),
+    student_id: dom.studentId.value.trim(),
+    course_name: dom.courseName.value.trim()
+  };
+}
+
+// Mencocokkan isi sitasi dengan nama belakang penulis di daftar pustaka
+function findReferenceIndex(citation) {
+  if (!State.doc) return -1;
+  const lower = citation.toLowerCase();
+  return State.doc.references.findIndex((ref) => (ref.authors || []).some((name) => {
+    const surname = name.trim().split(/\s+/).pop() || "";
+    return surname.length > 1 && lower.includes(surname.toLowerCase().replace(/[.,]/g, ""));
+  }));
+}
+
+function documentAsText() {
+  const doc = State.doc;
+  const out = [doc.title.toUpperCase(), ""];
+  if (doc.identityLines.length) out.push(...doc.identityLines, "");
+  doc.sections.forEach((sec) => {
+    if (sec.heading) out.push(sec.heading);
+    out.push(sec.content, "");
+  });
+  if (doc.references.length) {
+    out.push("Daftar Pustaka");
+    doc.references.forEach((ref) => {
+      const authors = (ref.authors && ref.authors.length ? ref.authors : ["Anonim"]).join(", ");
+      out.push([`${authors}. (${ref.year || "n.d."}). ${ref.title}.`, ref.venue ? `${ref.venue}.` : "", ref.doi || ""].filter(Boolean).join(" "));
     });
-  });
-
-  // Jumlah nomor tidak ditampilkan di sini karena daftar syarat di dalam soal ikut bernomor. Jumlah soal asli ada di panel pengaturan.
-  const meta = [`${formatNumber(countWords(text))} kata`];
-  if (figures) meta.push(`${figures} gambar terbaca`);
-  questionPreviewMeta.textContent = meta.join(" · ");
-}
-
-// Satu pintu untuk mengisi soal agar kotak data, pratinjau, dan tombol selalu sinkron
-function setQuestionText(raw) {
-  const text = formatQuestionText(raw);
-  inputTopic.value = text;
-  const hasText = text.length > 0;
-  questionEmpty.classList.toggle("hidden", hasText);
-  questionPreview.classList.toggle("hidden", !hasText);
-  btnEditQuestion.classList.toggle("hidden", !hasText);
-  if (hasText) renderQuestionPreview(text);
-}
-
-function setQuestionLoading(isLoading, message) {
-  questionFileStatus.classList.toggle("hidden", !isLoading);
-  if (message) questionFileStatusText.textContent = message;
-  if (isLoading) {
-    questionEmpty.classList.add("hidden");
-    questionPreview.classList.add("hidden");
-  } else {
-    setQuestionText(inputTopic.value);
   }
+  return out.join("\n").trim();
 }
 
-function updateDialogMeta() {
-  const text = dialogQuestionText.value;
-  dialogQuestionMeta.textContent = `${formatNumber(countWords(text))} kata · ${formatNumber(text.length)} karakter`;
+// =====================================================================
+// 5. ALUR APLIKASI
+// =====================================================================
+
+function goStep(n) {
+  State.step = n;
+  State.maxStep = Math.max(State.maxStep, n);
+  UI.clearAlert();
+  UI.showStep(n);
+  if (n === 2) UI.renderStep2();
 }
 
-function openQuestionEditor() {
-  dialogQuestionText.value = inputTopic.value;
-  updateDialogMeta();
-  dialogQuestion.showModal();
-  dialogQuestionText.focus();
-  dialogQuestionText.setSelectionRange(0, 0);
-  dialogQuestionText.scrollTop = 0;
+function setMode(mode) {
+  if (!MODES[mode]) return;
+  State.mode = mode;
+  setRadio("mode", mode);
+  storage.set(STORAGE.mode, mode);
+  UI.renderModeAction();
+  UI.renderStepper();
 }
 
-function saveQuestionEditor() {
-  setQuestionText(dialogQuestionText.value);
-  dialogQuestion.close();
-  btnEditQuestion.classList.contains("hidden") ? btnOpenQuestionEditor.focus() : btnEditQuestion.focus();
-}
-
-// Soal wajib diisi. Kotak data tersembunyi, jadi validasi bawaan form tidak bisa dipakai.
-function requireQuestion() {
-  if (inputTopic.value.trim().length >= 3) return true;
-  showAlert("Soal Belum Diisi", "Unggah lembar soal atau tempel teks soal dulu sebelum lanjut.");
-  openQuestionEditor();
-  return false;
-}
-
-// Batas kata yang keliru ditahan di sini supaya tidak dikirim diam-diam sebagai tanpa batas
-function requireValidSpec() {
-  const { error } = computeWordLimits();
-  if (!error) return true;
-  showAlert("Batas Kata Belum Benar", error);
-  specWordLimit.focus();
-  return false;
-}
-
-[btnEditQuestion, btnEditQuestionInline, btnOpenQuestionEditor].forEach((btn) => btn.addEventListener("click", openQuestionEditor));
-document.getElementById("btn-dialog-save").addEventListener("click", saveQuestionEditor);
-document.getElementById("btn-dialog-cancel").addEventListener("click", () => dialogQuestion.close());
-document.getElementById("btn-dialog-close").addEventListener("click", () => dialogQuestion.close());
-dialogQuestionText.addEventListener("input", updateDialogMeta);
-dialogQuestionText.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    saveQuestionEditor();
-  }
-});
-
-function wantsReferences() {
-  return specCitations.value === "ya";
-}
-
-// Tombol utama menyesuaikan pilihan rujukan agar tugas tanpa sitasi tidak lewat pencarian jurnal
-function updatePrimaryAction() {
-  const label = btnSearch.querySelector("span");
-  if (label) {
-    label.textContent = wantsReferences()
-      ? "Lanjut ke Langkah 2: Cari & Pilih Rujukan Ilmiah"
-      : "Tulis Jawaban Sekarang";
-  }
-  const skipButton = document.getElementById("btn-skip-references");
-  if (skipButton) skipButton.classList.toggle("hidden", !wantsReferences());
-}
-
-specCitations.addEventListener("change", updatePrimaryAction);
-
-async function handleQuestionFileUpload(file) {
-  if (!file) return;
-
-  const validExts = [".pdf", ".docx", ".txt"];
-  const fileName = file.name || "dokumen_soal";
-  const ext = "." + fileName.split(".").pop().toLowerCase();
-  if (!validExts.includes(ext)) {
-    showAlert("Format Berkas Tidak Didukung", "Silakan unggah lembar soal dalam format PDF, Word (.docx), atau berkas teks (.txt).");
-    return;
-  }
-
-  setQuestionLoading(true, `Membaca ${fileName}. Soal bergambar atau hasil scan bisa butuh setengah menit.`);
-
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await fetch("/api/upload-question-file", {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await res.json();
-
-    if (data.success && data.text) {
-      inputTopic.value = data.questions || data.text;
-      setQuestionLoading(false);
-
-      if (data.detected_guidelines && inputInstructions) {
-        inputInstructions.value = data.detected_guidelines;
-      }
-
-      // Batas kata dari dosen mengunci panjang jawaban, jadi target panjang tidak perlu ditebak lagi
-      applyAnswerSpec(data.answer_spec, data.answer_spec_source);
-
-      if (questionFileInfo) {
-        if (data.detected_guidelines) {
-          questionFileInfo.textContent = `Memuat "${data.filename}" (${data.char_count} karakter). Pertanyaan inti tugas dan kriteria petunjuk dosen berhasil dipisahkan otomatis.`;
-        } else {
-          questionFileInfo.textContent = `Memuat "${data.filename}" (${data.char_count} karakter). Seluruh lembar soal tersimpan utuh dan bebas dari distorsi penulisan.`;
-        }
-      }
-
-      if (questionFileBadge) questionFileBadge.classList.remove("hidden");
-
-      // Deteksi otomatis kode mata kuliah UT dari lembar soal jika ada
-      if (data.detected_course_code && inputStep1UtCode) {
-        if (!inputStep1UtCode.value) {
-          inputStep1UtCode.value = data.detected_course_code;
-          inputStep1UtCode.dispatchEvent(new Event("input"));
-        }
-      }
-
-      showAlert(
-        "Lembar Soal Berhasil Dimuat",
-        `Teks dari "${data.filename}" berhasil dimuat ke kotak tugas secara utuh tanpa ada yang terpotong.`,
-        "",
-        "success"
-      );
-    } else {
-      // Soal yang sudah ada sebelumnya dikembalikan, bukan dikosongkan
-      setQuestionLoading(false);
-      showAlert(
-        "Gagal Membaca Berkas Soal",
-        data.message || "Teks dokumen tidak dapat diekstrak.",
-        "Pastikan berkas PDF atau Word tidak terkunci atau rusak."
-      );
-    }
-  } catch (err) {
-    setQuestionLoading(false);
-    showAlert("Gagal Menghubungi Server", "Periksa koneksi server lokal.");
-  }
-}
-
-if (btnUploadQuestionFile && uploadQuestionFile) {
-  btnUploadQuestionFile.addEventListener("click", () => {
-    uploadQuestionFile.click();
-  });
-  uploadQuestionFile.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleQuestionFileUpload(e.target.files[0]);
-      e.target.value = "";
-    }
-  });
-}
-
-if (btnClearQuestionFile) {
-  btnClearQuestionFile.addEventListener("click", () => {
-    setQuestionText("");
-    if (questionFileBadge) questionFileBadge.classList.add("hidden");
-    resetAnswerSpec();
-    if (uploadQuestionFile) uploadQuestionFile.value = "";
-  });
-}
-
-// Berkas soal bisa ditarik ke kotak kosong maupun ke pratinjau untuk mengganti soal
-[questionEmpty, questionPreview].forEach((zone) => {
-  ["dragenter", "dragover"].forEach((evtName) => {
-    zone.addEventListener(evtName, (e) => {
-      e.preventDefault();
-      zone.classList.add("ring-2", "ring-stone-900", "dark:ring-stone-200");
-    });
-  });
-  ["dragleave", "drop"].forEach((evtName) => {
-    zone.addEventListener(evtName, (e) => {
-      e.preventDefault();
-      zone.classList.remove("ring-2", "ring-stone-900", "dark:ring-stone-200");
-    });
-  });
-  zone.addEventListener("drop", (e) => {
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleQuestionFileUpload(e.dataTransfer.files[0]);
-    }
-  });
-});
-
-selectLength.addEventListener("change", updateSpecVisibility);
-updateSpecVisibility();
-
-const step1 = document.getElementById("step-1");
-const step2 = document.getElementById("step-2");
-const step3 = document.getElementById("step-3");
-const stepTab1 = document.getElementById("step-tab-1");
-const stepTab2 = document.getElementById("step-tab-2");
-const stepTab3 = document.getElementById("step-tab-3");
-
-const searchBackendInfo = document.getElementById("search-backend-info");
-const papersLoading = document.getElementById("papers-loading");
-const papersList = document.getElementById("papers-list");
-const generateActions = document.getElementById("generate-actions");
-const selectedCountLabel = document.getElementById("selected-count-label");
-const btnGenerate = document.getElementById("btn-generate");
-const btnBackStep1 = document.getElementById("btn-back-step-1");
-
-const generatingIndicator = document.getElementById("generating-indicator");
-const genStepTitle = document.getElementById("gen-step-title");
-const genStepDesc = document.getElementById("gen-step-desc");
-const logStep1 = document.getElementById("log-step-1");
-const logStep2 = document.getElementById("log-step-2");
-const logStep3 = document.getElementById("log-step-3");
-const logStep4 = document.getElementById("log-step-4");
-
-const resultContainer = document.getElementById("result-container");
-const resultTitle = document.getElementById("result-title");
-const resultStats = document.getElementById("result-stats");
-const previewContent = document.getElementById("preview-content");
-const btnDownloadDocx = document.getElementById("btn-download-docx");
-const btnDownloadPdf = document.getElementById("btn-download-pdf");
-
-function showAlert(title, message, advice = "", type = "error") {
-  const isErr = type === "error";
-  globalAlert.className = `mb-6 p-4 sm:p-5 rounded-2xl border text-sm ${
-    isErr 
-      ? "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200" 
-      : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200"
-  }`;
-  
-  globalAlert.innerHTML = `
-    <div class="flex items-start space-x-3">
-      <div class="w-5 h-5 rounded-full ${isErr ? 'bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200' : 'bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'} flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-        ${isErr ? '!' : '✓'}
-      </div>
-      <div class="space-y-1">
-        <h4 class="font-bold text-sm leading-none">${title}</h4>
-        <p class="text-xs ${isErr ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}">${message}</p>
-        ${advice ? `<p class="text-xs font-semibold ${isErr ? 'text-rose-800 dark:text-rose-200' : 'text-emerald-800 dark:text-emerald-200'} pt-1 border-t ${isErr ? 'border-rose-200 dark:border-rose-900/60' : 'border-emerald-200 dark:border-emerald-900/60'}">Solusi: ${advice}</p>` : ''}
-      </div>
-    </div>
-  `;
-  globalAlert.classList.remove("hidden");
-}
-
-function clearAlert() {
-  globalAlert.classList.add("hidden");
-}
-
-function setStep(stepNum) {
-  clearAlert();
-  [step1, step2, step3].forEach(el => el.classList.add("hidden"));
-
-  const tabs = [
-    { el: stepTab1, num: "1", title: "Soal Tugas", sub: "Ketik atau unggah berkas" },
-    { el: stepTab2, num: "2", title: "Pilih Rujukan", sub: "Centang paper rujukan" },
-    { el: stepTab3, num: "3", title: "Naskah Selesai", sub: "Periksa & unduh Word" }
-  ];
-
-  tabs.forEach((tab, idx) => {
-    const s = idx + 1;
-    if (!tab.el) return;
-    if (s === stepNum) {
-      tab.el.className = "p-3.5 rounded-xl border-2 border-stone-900 dark:border-stone-100 bg-white dark:bg-stone-900 shadow-sm transition";
-      tab.el.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <span class="w-6 h-6 rounded-full bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-950 text-xs font-bold flex items-center justify-center shrink-0">${tab.num}</span>
-          <span class="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">${tab.title}</span>
-        </div>
-        <p class="text-[11px] text-stone-600 dark:text-stone-300 mt-1 pl-8 hidden sm:block">${tab.sub}</p>
-      `;
-      tab.el.onclick = null;
-    } else if (s < stepNum) {
-      tab.el.className = "p-3.5 rounded-xl border-2 border-emerald-600 dark:border-emerald-700 bg-emerald-50/70 dark:bg-emerald-950/40 cursor-pointer transition hover:bg-emerald-100/70 dark:hover:bg-emerald-950/60 shadow-sm";
-      tab.el.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <span class="w-6 h-6 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white dark:text-stone-950 text-xs font-bold flex items-center justify-center shrink-0">✓</span>
-          <span class="text-xs font-bold text-emerald-950 dark:text-emerald-300 truncate">${tab.title}</span>
-        </div>
-        <p class="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 pl-8 hidden sm:block">Klik untuk kembali</p>
-      `;
-      tab.el.onclick = () => setStep(s);
-    } else {
-      tab.el.className = "p-3.5 rounded-xl border-2 border-stone-200 dark:border-stone-800 bg-stone-100/70 dark:bg-stone-900/40 transition";
-      tab.el.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <span class="w-6 h-6 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-xs font-bold flex items-center justify-center shrink-0">${tab.num}</span>
-          <span class="text-xs font-bold text-stone-600 dark:text-stone-300 truncate">${tab.title}</span>
-        </div>
-        <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-8 hidden sm:block">${tab.sub}</p>
-      `;
-      tab.el.onclick = null;
-    }
-  });
-
-  if (stepNum === 1) {
-    step1.classList.remove("hidden");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  } else if (stepNum === 2) {
-    step2.classList.remove("hidden");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  } else if (stepNum === 3) {
-    step3.classList.remove("hidden");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-}
-
-// 1. Health Check
+// ---------- Health check ----------
 // Status dicek ulang berkala. Saat jeda, hitung mundur jalan tiap detik lalu dicek lagi begitu habis.
 const HEALTH_POLL_MS = 20000;
 let healthTimer = null;
 
-function renderStatusBadge(dotClass, label, model, hint) {
-  const modelHtml = model
-    ? `<span class="hidden sm:inline text-stone-500 dark:text-stone-400 font-mono text-[11px]">${escapeHtml(model)}</span>`
-    : "";
-  apiStatusBadge.innerHTML = `
-    <span class="w-2 h-2 rounded-full ${dotClass}"></span>
-    <span class="text-stone-700 dark:text-stone-200 font-semibold tabular-nums">${label}</span>
-    ${modelHtml}
-  `;
-  apiStatusBadge.title = hint;
-}
-
 function startCooldownCountdown(seconds, model) {
   let left = seconds;
   const tick = () => {
-    if (left <= 0) {
-      checkSystemHealth();
-      return;
-    }
-    renderStatusBadge(
-      "bg-sky-500 animate-pulse",
-      `Gemini Jeda ${left} dtk`,
-      model,
-      "Google sedang membatasi atau menolak permintaan. Tunggu hitungan selesai sebelum menulis naskah."
-    );
+    if (left <= 0) return checkSystemHealth();
+    UI.renderStatus("is-paused is-breathing", `Gemini jeda ${left} dtk`, model, "Google sedang membatasi permintaan. Tunggu hitungan selesai sebelum menulis naskah.");
     left -= 1;
     healthTimer = setTimeout(tick, 1000);
   };
@@ -687,1155 +1142,576 @@ function startCooldownCountdown(seconds, model) {
 async function checkSystemHealth() {
   clearTimeout(healthTimer);
   try {
-    const res = await fetch("/api/health");
-    if (!res.ok) throw new Error("Server tidak merespons");
-    const data = await res.json();
-    if (data.ai_state === "cooldown") {
-      startCooldownCountdown(data.retry_in || 30, data.active_model);
-      return;
-    }
+    const data = await Api.health();
+    if (data.ai_state === "cooldown") return startCooldownCountdown(data.retry_in || 30, data.active_model);
     if (data.ai_state === "ready") {
-      renderStatusBadge("bg-emerald-500", "Gemini Siap", data.active_model, `Model aktif otomatis: ${data.active_model}`);
+      UI.renderStatus("is-ready is-breathing", "Gemini siap", data.active_model, `Model aktif otomatis: ${data.active_model}`);
     } else if (data.ai_state === "unavailable") {
-      renderStatusBadge("bg-rose-500", "Model Tidak Tersedia", null, "Semua model Gemini menolak akun ini. Cek kuota atau API key di Google AI Studio.");
+      UI.renderStatus("is-down", "Model tidak tersedia", null, "Semua model Gemini menolak akun ini. Cek kuota atau API key di Google AI Studio.");
     } else {
-      renderStatusBadge("bg-amber-500", "API Key Belum Disetel", null, "Isi GEMINI_API_KEY di berkas .env lalu buka ulang aplikasi.");
+      UI.renderStatus("is-paused", "API key belum disetel", null, "Isi GEMINI_API_KEY di berkas .env lalu buka ulang aplikasi.");
     }
   } catch (err) {
-    renderStatusBadge("bg-rose-500", "Server Offline", null, "Server lokal tidak merespons.");
+    UI.renderStatus("is-down", "Server offline", null, "Server lokal tidak merespons.");
   }
   healthTimer = setTimeout(checkSystemHealth, HEALTH_POLL_MS);
 }
 
-// Search Refinement & Manual DOI Elements
-const inputRefineQuery = document.getElementById("input-refine-query");
-const btnRefineSearch = document.getElementById("btn-refine-search");
-const btnToggleManual = document.getElementById("btn-toggle-manual");
-const manualPaperWrapper = document.getElementById("manual-paper-wrapper");
-const inputManualDoi = document.getElementById("input-manual-doi");
-const btnAddManualPaper = document.getElementById("btn-add-manual-paper");
-
-async function performSearch(query) {
-  if (!query || query.trim().length < 3) return;
-  const cleanQ = query.trim();
-
-  btnSearch.disabled = true;
-  btnSearch.innerHTML = "<span>Mencari di repositori...</span>";
-  if (btnRefineSearch) {
-    btnRefineSearch.disabled = true;
-    btnRefineSearch.textContent = "Mencari...";
-  }
-  clearAlert();
-
-  setStep(2);
-  papersLoading.classList.remove("hidden");
-  searchBackendInfo.classList.add("hidden");
-  papersList.innerHTML = "";
-  generateActions.classList.add("hidden");
-  selectedPaperIds.clear();
-
-  if (inputRefineQuery) {
-    inputRefineQuery.value = cleanQ;
-  }
-
-  try {
-    const res = await fetch("/api/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: cleanQ, limit: 6 })
-    });
-
-    const data = await res.json();
-    papersLoading.classList.add("hidden");
-    btnSearch.disabled = false;
-    btnSearch.innerHTML = "<span>Cari Naskah Terverifikasi</span>";
-    if (btnRefineSearch) {
-      btnRefineSearch.disabled = false;
-      btnRefineSearch.textContent = "Cari Ulang";
-    }
-
-    const fetchedPapers = (data && data.papers) ? [...data.papers] : [];
-    
-    // Jika ada modul UT dari Langkah 1 yang sudah siap, pasang di urutan terdepan
-    if (pendingManualModule) {
-      const exists = fetchedPapers.some(p => p.id === pendingManualModule.id);
-      if (!exists) {
-        fetchedPapers.unshift(pendingManualModule);
-      }
-      selectedPaperIds.add(pendingManualModule.id);
-    }
-
-    if (fetchedPapers.length === 0) {
-      searchBackendInfo.innerHTML = `
-        <div class="space-y-1">
-          <p class="font-bold text-stone-800 dark:text-stone-200">Laporan Backend Pencarian:</p>
-          <p class="text-stone-600 dark:text-stone-300">${data.message || 'Tidak ada naskah yang cocok dengan kueri ini.'}</p>
-          <p class="text-stone-500 dark:text-stone-400 text-xs">Kata kunci yang diproses: <span class="font-semibold text-stone-800 dark:text-stone-200">${data.query_used || cleanQ}</span></p>
-        </div>
-      `;
-      searchBackendInfo.classList.remove("hidden");
-
-      papersList.innerHTML = `
-        <div class="p-8 text-center bg-stone-50 dark:bg-stone-900/60 rounded-2xl border border-dashed border-stone-300 dark:border-stone-700 space-y-2">
-          <p class="text-sm font-bold text-stone-800 dark:text-stone-200">Naskah tidak ditemukan untuk kata kunci ini</p>
-          <p class="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">Coba ketik kata kunci yang lebih ringkas di kotak pencarian atas, atau masukkan nomor DOI resmi jika sudah punya naskah tertentu.</p>
-        </div>
-      `;
-      updateSelectionState();
-      generateActions.classList.remove("hidden");
-      return;
-    }
-
-    currentPapers = fetchedPapers;
-    
-    // Tampilkan informasi backend sukses
-    searchBackendInfo.innerHTML = `
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <span class="font-semibold text-stone-800 dark:text-stone-200">Status Pencarian:</span> 
-          <span class="text-stone-700 dark:text-stone-300">${data.message || 'Naskah berhasil ditemukan.'}</span>
-        </div>
-        <div class="text-stone-500 dark:text-stone-400 text-xs">
-          Kueri Fokus: <span class="font-semibold text-stone-800 dark:text-stone-200">${data.query_used || cleanQ}</span>
-        </div>
-      </div>
-    `;
-    searchBackendInfo.classList.remove("hidden");
-
-    updateSelectionState();
-    renderPapersList();
-  } catch (err) {
-    papersLoading.classList.add("hidden");
-    btnSearch.disabled = false;
-    btnSearch.innerHTML = "<span>Cari Naskah Terverifikasi</span>";
-    if (btnRefineSearch) {
-      btnRefineSearch.disabled = false;
-      btnRefineSearch.textContent = "Cari Ulang";
-    }
-    showAlert(
-      "Gagal Menghubungi Server Backend",
-      "Koneksi jaringan terputus saat menghubungi endpoint /api/search.",
-      "Pastikan server di terminal masih aktif dan coba kembali."
-    );
-  }
-}
-
-// 2. Search Papers
-formSearch.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!requireQuestion() || !requireValidSpec()) return;
-
-  if (!wantsReferences()) {
-    startWithoutReferences();
-    return;
-  }
-
-  const step1UtCodeVal = inputStep1UtCode ? inputStep1UtCode.value.trim() : "";
-  const step1UtContentVal = inputStep1UtContent ? inputStep1UtContent.value.trim() : "";
-
-  // Jika kode dan kutipan teks modul diisi di Langkah 1, daftarkan modul ke backend
-  if (step1UtCodeVal && step1UtContentVal && step1UtContentVal.length >= 15) {
-    try {
-      const resModule = await fetch("/api/manual-module", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          module_title: step1UtCodeVal,
-          author: "Universitas Terbuka",
-          year: 2023,
-          page_or_kb: "Bahan Ajar Resmi",
-          content_text: step1UtContentVal
-        })
-      });
-      if (resModule.ok) {
-        pendingManualModule = await resModule.json();
-      }
-    } catch (err) {
-      console.warn("Gagal auto-save modul UT di Langkah 1", err);
-    }
-  } else if (step1UtCodeVal) {
-    // Sinkronkan kode atau nama modul ke form Langkah 2
-    if (inputUtTitle) {
-      inputUtTitle.value = step1UtCodeVal;
-    }
-    if (utModuleWrapper) {
-      utModuleWrapper.classList.remove("hidden");
-    }
-  }
-
-  performSearch(inputTopic.value);
-});
-
-// Tugas tanpa sitasi seperti terjemahan langsung ditulis tanpa lewat pencarian jurnal
-const btnSkipReferences = document.getElementById("btn-skip-references");
-function startWithoutReferences() {
-  if (!requireQuestion() || !requireValidSpec()) return;
-  selectedPaperIds.clear();
-  currentPapers = [];
-  papersList.innerHTML = "";
-  searchBackendInfo.classList.add("hidden");
-  updateSelectionState();
-  generateActions.classList.remove("hidden");
-  btnGenerate.click();
-}
-
-if (btnSkipReferences) {
-  btnSkipReferences.addEventListener("click", startWithoutReferences);
-}
-
-if (btnRefineSearch && inputRefineQuery) {
-  btnRefineSearch.addEventListener("click", () => {
-    performSearch(inputRefineQuery.value);
-  });
-  inputRefineQuery.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      performSearch(inputRefineQuery.value);
-    }
-  });
-}
-
-if (btnToggleManual && manualPaperWrapper) {
-  btnToggleManual.addEventListener("click", () => {
-    manualPaperWrapper.classList.toggle("hidden");
-    if (!manualPaperWrapper.classList.contains("hidden") && inputManualDoi) {
-      inputManualDoi.focus();
-    }
-  });
-}
-
-if (btnAddManualPaper && inputManualDoi) {
-  btnAddManualPaper.addEventListener("click", async () => {
-    const val = inputManualDoi.value.trim();
-    if (!val || val.length < 3) return;
-
-    btnAddManualPaper.disabled = true;
-    btnAddManualPaper.textContent = "Mencari...";
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: val, limit: 1 })
-      });
-      const data = await res.json();
-      btnAddManualPaper.disabled = false;
-      btnAddManualPaper.textContent = "Tambahkan ke Daftar";
-
-      if (data.success && data.papers && data.papers.length > 0) {
-        const newPaper = data.papers[0];
-        const existingIdx = currentPapers.findIndex(p => p.id === newPaper.id);
-        if (existingIdx === -1) {
-          currentPapers.unshift(newPaper);
-        }
-        selectedPaperIds.add(newPaper.id);
-        inputManualDoi.value = "";
-        manualPaperWrapper.classList.add("hidden");
-        updateSelectionState();
-        renderPapersList();
-        showAlert(
-          "Naskah Berhasil Ditambahkan",
-          `Naskah "${newPaper.title}" telah dimasukkan ke daftar rujukan dan dicentang otomatis.`,
-          "",
-          "success"
-        );
-      } else {
-        showAlert(
-          "Naskah Tidak Ditemukan",
-          "Nomor DOI atau judul naskah tidak ditemukan di registri ilmiah resmi.",
-          "Pastikan format DOI tepat seperti 10.xxxx/..."
-        );
-      }
-    } catch (e) {
-      btnAddManualPaper.disabled = false;
-      btnAddManualPaper.textContent = "Tambahkan ke Daftar";
-      showAlert("Gagal Menghubungi Server", "Periksa koneksi server lokal.");
-    }
-  });
-}
-
-// Step 1 UT Elements
-const inputStep1UtCode = document.getElementById("input-step1-ut-code");
-const step1UtLookupSpinner = document.getElementById("step1-ut-lookup-spinner");
-const step1UtDetectResult = document.getElementById("step1-ut-detect-result");
-const btnToggleStep1UtContent = document.getElementById("btn-toggle-step1-ut-content");
-const step1UtContentWrapper = document.getElementById("step1-ut-content-wrapper");
-const inputStep1UtContent = document.getElementById("input-step1-ut-content");
-const btnPickStep1Screenshot = document.getElementById("btn-pick-step1-screenshot");
-const step1UploadScreenshot = document.getElementById("step1-upload-screenshot");
-const step1OcrStatus = document.getElementById("step1-ocr-status");
-
-// Step 2 UT Module Elements & Handlers
-const btnToggleUtModule = document.getElementById("btn-toggle-ut-module");
-const utModuleWrapper = document.getElementById("ut-module-wrapper");
-const inputUtTitle = document.getElementById("input-ut-title");
-const utLookupSpinner = document.getElementById("ut-lookup-spinner");
-const utDetectResult = document.getElementById("ut-detect-result");
-const inputUtAuthor = document.getElementById("input-ut-author");
-const inputUtPage = document.getElementById("input-ut-page");
-const inputUtContent = document.getElementById("input-ut-content");
-const btnPickStep2Screenshot = document.getElementById("btn-pick-step2-screenshot");
-const step2UploadScreenshot = document.getElementById("step2-upload-screenshot");
-const step2OcrStatus = document.getElementById("step2-ocr-status");
-const btnSaveUtModule = document.getElementById("btn-save-ut-module");
-
-// Reusable UT Lookup Handler
-function attachUtLookup(inputEl, spinnerEl, resultEl, onSelectTitle) {
-  if (!inputEl || !resultEl) return;
-  let timer = null;
-  let lastQuery = "";
-
-  async function performLookup(val) {
-    const query = val.trim();
-    if (!query || query.length < 2) {
-      resultEl.classList.add("hidden");
-      resultEl.innerHTML = "";
-      return;
-    }
-
-    if (query === lastQuery) return;
-    lastQuery = query;
-
-    if (spinnerEl) spinnerEl.classList.remove("hidden");
-
-    try {
-      const res = await fetch(`/api/ut-course-lookup?query=${encodeURIComponent(query)}`);
-      const data = await res.json();
-      if (spinnerEl) spinnerEl.classList.add("hidden");
-
-      if (data.found && data.course) {
-        resultEl.classList.remove("hidden");
-        const course = data.course;
-
-        if (data.exact && !inputCourseName.value.trim()) inputCourseName.value = course.nama;
-        if (data.exact) {
-          resultEl.innerHTML = `
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <div class="space-y-0.5">
-                <div class="flex items-center gap-1.5 font-bold text-emerald-950 dark:text-emerald-300">
-                  <svg class="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                  <span>Terdeteksi Resmi di BMP UT:</span>
-                </div>
-                <div class="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
-                  ${course.kode} - ${course.nama} <span class="ml-1 text-[10px] bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-bold px-1.5 py-0.5 rounded">${course.edisi}</span>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                class="btn-apply-ut-detected px-2.5 py-1 rounded bg-emerald-900 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-semibold text-[11px] shrink-0 transition shadow-sm"
-              >
-                Gunakan Judul Resmi
-              </button>
-            </div>
-          `;
-          const btnApply = resultEl.querySelector(".btn-apply-ut-detected");
-          if (btnApply) {
-            btnApply.addEventListener("click", () => {
-              inputEl.value = course.formatted_title;
-              resultEl.classList.add("hidden");
-              if (onSelectTitle) onSelectTitle(course.formatted_title, course);
-            });
-          }
-        } else if (data.suggestions && data.suggestions.length > 0) {
-          const pillButtons = data.suggestions.map((s) => `
-            <button 
-              type="button" 
-              class="btn-select-suggestion text-left px-2 py-1 rounded bg-emerald-200/80 dark:bg-emerald-900/60 hover:bg-emerald-300 dark:hover:bg-emerald-800 text-emerald-950 dark:text-emerald-200 font-medium text-[11px] transition"
-              data-title="${s.formatted_title}"
-            >
-              ${s.kode} ${s.nama}
-            </button>
-          `).join("");
-
-          resultEl.innerHTML = `
-            <div class="space-y-1.5">
-              <div class="text-[11px] font-semibold text-emerald-950 dark:text-emerald-300">Pilih dari katalog mata kuliah UT yang cocok:</div>
-              <div class="flex flex-wrap gap-1.5">
-                ${pillButtons}
-              </div>
-            </div>
-          `;
-
-          resultEl.querySelectorAll(".btn-select-suggestion").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-              const pickedTitle = e.currentTarget.getAttribute("data-title");
-              if (pickedTitle) {
-                inputEl.value = pickedTitle;
-                resultEl.classList.add("hidden");
-                if (onSelectTitle) onSelectTitle(pickedTitle);
-              }
-            });
-          });
-        }
-      } else {
-        if (query.length >= 4) {
-          resultEl.classList.remove("hidden");
-          resultEl.innerHTML = `
-            <div class="text-xs text-stone-600 dark:text-stone-400 py-1">
-              <span class="font-semibold text-stone-800 dark:text-stone-200">Kode belum tercatat di katalog:</span>
-              <span class="font-mono font-bold text-stone-900 dark:text-stone-100">${query.toUpperCase()}</span>
-              <p class="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">Kode ini tetap dapat kamu pakai sebagai rujukan atau kamu lengkapi dengan judul manual.</p>
-            </div>
-          `;
-        } else {
-          resultEl.classList.add("hidden");
-          resultEl.innerHTML = "";
-        }
-      }
-    } catch (e) {
-      if (spinnerEl) spinnerEl.classList.add("hidden");
-    }
-  }
-
-  inputEl.addEventListener("input", (e) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      performLookup(e.target.value);
-    }, 200);
-  });
-
-  inputEl.addEventListener("paste", () => {
-    setTimeout(() => {
-      performLookup(inputEl.value);
-    }, 50);
-  });
-}
-
-// Inisialisasi auto-detect di Langkah 1 & Langkah 2
-if (btnToggleStep1UtContent && step1UtContentWrapper) {
-  btnToggleStep1UtContent.addEventListener("click", () => {
-    step1UtContentWrapper.classList.toggle("hidden");
-    if (!step1UtContentWrapper.classList.contains("hidden") && inputStep1UtContent) {
-      inputStep1UtContent.focus();
-    }
-  });
-}
-
-attachUtLookup(inputStep1UtCode, step1UtLookupSpinner, step1UtDetectResult, (title) => {
-  if (inputUtTitle) inputUtTitle.value = title;
-});
-
-attachUtLookup(inputUtTitle, utLookupSpinner, utDetectResult, (title) => {
-  if (inputStep1UtCode) inputStep1UtCode.value = title;
-});
-
-if (btnToggleUtModule && utModuleWrapper) {
-  btnToggleUtModule.addEventListener("click", () => {
-    utModuleWrapper.classList.toggle("hidden");
-    if (!utModuleWrapper.classList.contains("hidden") && inputUtTitle) {
-      inputUtTitle.focus();
-    }
-  });
-}
-
-if (btnSaveUtModule && inputUtContent && inputUtTitle) {
-  btnSaveUtModule.addEventListener("click", async () => {
-    const titleVal = inputUtTitle.value.trim();
-    const contentVal = inputUtContent.value.trim();
-
-    if (!titleVal) {
-      showAlert("Nama Modul Diperlukan", "Ketik nama atau kode modul kuliah, misalnya: FSSI4106 English for Translation.");
-      return;
-    }
-    if (!contentVal || contentVal.length < 15) {
-      showAlert("Teks Modul Kurang Panjang", "Tempelkan minimal beberapa kalimat atau paragraf materi teori dari pustaka.ut.ac.id.");
-      return;
-    }
-
-    btnSaveUtModule.disabled = true;
-    btnSaveUtModule.textContent = "Menyimpan Modul...";
-
-    try {
-      const res = await fetch("/api/manual-module", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          module_title: titleVal,
-          author: "Universitas Terbuka",
-          year: 2023,
-          page_or_kb: "Bahan Ajar Resmi",
-          content_text: contentVal
-        })
-      });
-
-      const newModule = await res.json();
-      btnSaveUtModule.disabled = false;
-      btnSaveUtModule.textContent = "Gunakan Modul Ini Sebagai Rujukan Tugas";
-
-      if (res.ok && newModule && newModule.id) {
-        currentPapers.unshift(newModule);
-        selectedPaperIds.add(newModule.id);
-        
-        inputUtTitle.value = "";
-        inputUtContent.value = "";
-        utModuleWrapper.classList.add("hidden");
-
-        updateSelectionState();
-        renderPapersList();
-
-        showAlert(
-          "Modul Bahan Ajar Berhasil Digunakan",
-          `Modul "${newModule.title}" telah dijadikan rujukan utama dan siap disitir ke dalam naskah tugas.`,
-          "",
-          "success"
-        );
-      } else {
-        showAlert("Gagal Menyimpan Modul", "Terjadi kesalahan saat memproses data modul.");
-      }
-    } catch (e) {
-      btnSaveUtModule.disabled = false;
-      btnSaveUtModule.textContent = "Gunakan Modul Ini Sebagai Rujukan Tugas";
-      showAlert("Gagal Menghubungi Server", "Periksa koneksi server lokal.");
-    }
-  });
-}
-
-// Handler Ekstraksi Screenshot OCR
-async function processScreenshotFile(file, targetTextarea, statusEl) {
-  if (!file || !file.type.startsWith("image/")) {
-    showAlert("Format Berkas Tidak Sesuai", "Pilih berkas gambar tangkapan layar seperti PNG, JPG, atau WebP.");
-    return;
-  }
-
-  if (statusEl) statusEl.classList.remove("hidden");
-
-  try {
-    const base64Data = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    const res = await fetch("/api/extract-screenshot", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_data: base64Data })
-    });
-
-    const data = await res.json();
-    if (statusEl) statusEl.classList.add("hidden");
-
-    if (data.success && data.extracted_text) {
-      const currentText = targetTextarea ? targetTextarea.value.trim() : "";
-      if (targetTextarea) {
-        if (currentText) {
-          targetTextarea.value = currentText + "\n\n" + data.extracted_text;
-        } else {
-          targetTextarea.value = data.extracted_text;
-        }
-      }
-      showAlert(
-        "Teks Modul Berhasil Diekstrak",
-        `Berhasil membaca materi modul (${data.extracted_text.length} karakter) tanpa watermark. Teks otomatis masuk ke kotak materi.`,
-        "",
-        "success"
-      );
+// ---------- Soal ----------
+let draftTimer = null;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const text = dom.topic.value;
+    if (text.trim()) {
+      storage.set(STORAGE.draft, text);
+      dom.draftStatus.textContent = "Draf tersimpan otomatis";
     } else {
-      showAlert(
-        "Gagal Membaca Gambar",
-        data.message || data.detail || "Teks pada gambar tidak terbaca jelas.",
-        "Pastikan tangkapan layar modul cukup tajam dan tidak terpotong."
-      );
+      storage.remove(STORAGE.draft);
+      dom.draftStatus.textContent = "";
     }
-  } catch (err) {
-    if (statusEl) statusEl.classList.add("hidden");
-    showAlert("Gagal Menghubungi Layanan OCR", "Periksa koneksi server lokal dan konfigurasi API key.");
-  }
+  }, 400);
 }
 
-// Event Listeners Unggah Berkas Screenshot
-if (btnPickStep1Screenshot && step1UploadScreenshot) {
-  btnPickStep1Screenshot.addEventListener("click", () => {
-    step1UploadScreenshot.click();
-  });
-  step1UploadScreenshot.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      processScreenshotFile(e.target.files[0], inputStep1UtContent, step1OcrStatus);
-      e.target.value = "";
-    }
-  });
+function setQuestionText(text) {
+  dom.topic.value = text;
+  UI.renderTopicMeta();
+  saveDraft();
 }
 
-if (btnPickStep2Screenshot && step2UploadScreenshot) {
-  btnPickStep2Screenshot.addEventListener("click", () => {
-    step2UploadScreenshot.click();
-  });
-  step2UploadScreenshot.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      processScreenshotFile(e.target.files[0], inputUtContent, step2OcrStatus);
-      e.target.value = "";
-    }
-  });
-}
+function applyAnswerSpec(spec, source) {
+  if (!spec) return;
+  dom.specQuestionCount.value = spec.question_count || "";
+  dom.specAnswerType.value = spec.answer_type || "";
+  dom.specLanguage.value = spec.answer_language || "";
 
-// Global Paste Listener (Ctrl+V Gambar dari Snipping Tool / Ruang Baca Virtual)
-window.addEventListener("paste", async (e) => {
-  const clipboardItems = e.clipboardData ? e.clipboardData.items : [];
-  let imageItem = null;
-
-  for (let i = 0; i < clipboardItems.length; i++) {
-    if (clipboardItems[i].type.startsWith("image/")) {
-      imageItem = clipboardItems[i];
-      break;
-    }
-  }
-
-  if (!imageItem) return;
-
-  const file = imageItem.getAsFile();
-  if (!file) return;
-
-  const isStep2Active = !step2.classList.contains("hidden");
-  if (isStep2Active) {
-    if (utModuleWrapper) utModuleWrapper.classList.remove("hidden");
-    e.preventDefault();
-    processScreenshotFile(file, inputUtContent, step2OcrStatus);
+  const items = Array.isArray(spec.item_word_limits) && spec.item_word_limits.some((n) => n) ? spec.item_word_limits : null;
+  State.detectedItemLimits = null;
+  dom.specWordLimit.placeholder = "Tidak ada";
+  if (items && items.every((n) => n === items[0])) {
+    dom.specWordScope.value = "per_soal";
+    dom.specWordLimit.value = items[0];
+  } else if (items) {
+    dom.specWordScope.value = "per_soal";
+    dom.specWordLimit.value = "";
+    dom.specWordLimit.placeholder = "Beda tiap soal";
+    State.detectedItemLimits = items;
   } else {
-    if (step1UtContentWrapper) step1UtContentWrapper.classList.remove("hidden");
-    e.preventDefault();
-    processScreenshotFile(file, inputStep1UtContent, step1OcrStatus);
+    dom.specWordScope.value = "total";
+    dom.specWordLimit.value = spec.word_limit || "";
   }
-});
 
-
-
-
-function renderPapersList() {
-  papersList.innerHTML = "";
-  generateActions.classList.remove("hidden");
-
-  currentPapers.forEach((paper) => {
-    const card = document.createElement("div");
-    const isSelected = selectedPaperIds.has(paper.id);
-    const isUtBmp = paper.id.startsWith("bmp_") || (paper.venue && paper.venue.includes("Universitas Terbuka"));
-
-    card.className = `p-4 sm:p-5 rounded-xl border transition cursor-pointer ${
-      isUtBmp
-        ? (isSelected ? "border-emerald-700 dark:border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 ring-1 ring-emerald-700 dark:ring-emerald-500" : "border-emerald-300 dark:border-emerald-900/60 hover:border-emerald-500 dark:hover:border-emerald-700 bg-white dark:bg-stone-900")
-        : (isSelected ? "border-stone-900 dark:border-stone-200 bg-stone-50 dark:bg-stone-800/80 ring-1 ring-stone-900 dark:ring-stone-200" : "border-stone-200 dark:border-stone-800 hover:border-stone-400 dark:hover:border-stone-600 bg-white dark:bg-stone-900")
-    }`;
-
-    const authors = paper.authors.slice(0, 3).join(", ") + (paper.authors.length > 3 ? " et al." : "");
-    const yearStr = paper.year ? paper.year : "n.d.";
-
-    const statusBadge = isUtBmp
-      ? `<span class="inline-flex items-center text-emerald-800 dark:text-emerald-300 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 mr-1.5"></span>Materi Pokok UT Siap Disitir</span>`
-      : `<span class="inline-flex items-center text-stone-700 dark:text-stone-300 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>Naskah PDF Asli Ada</span>`;
-
-    card.innerHTML = `
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1">
-          <div class="flex items-center space-x-2 text-xs font-semibold text-stone-500 dark:text-stone-400 mb-1">
-            <span class="px-2 py-0.5 rounded ${isUtBmp ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border border-emerald-300/40 dark:border-emerald-800' : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300'}">${yearStr}</span>
-            <span class="${isUtBmp ? 'text-emerald-800 dark:text-emerald-300 font-bold' : ''}">${paper.venue || "Publikasi Akademik"}</span>
-          </div>
-          <h4 class="text-sm font-bold text-stone-900 dark:text-stone-100 leading-snug">${paper.title}</h4>
-          <p class="text-xs text-stone-600 dark:text-stone-400 mt-1">${authors}</p>
-          <p class="text-xs text-stone-500 dark:text-stone-400 mt-2 line-clamp-2">${paper.abstract}</p>
-          
-          <div class="mt-3 flex items-center space-x-3 text-xs">
-            ${statusBadge}
-            ${paper.scholar_url ? `<a href="${paper.scholar_url}" target="_blank" rel="noopener" class="text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 underline" onclick="event.stopPropagation()">Rujukan Asli</a>` : ""}
-            ${paper.doi ? `<a href="${paper.doi}" target="_blank" rel="noopener" class="text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 underline" onclick="event.stopPropagation()">DOI</a>` : ""}
-          </div>
-        </div>
-        <div class="shrink-0 mt-1">
-          <input type="checkbox" class="w-4 h-4 rounded border-stone-300 dark:border-stone-700 text-stone-900 focus:ring-stone-900 dark:bg-stone-900" ${isSelected ? "checked" : ""}>
-        </div>
-      </div>
-    `;
-
-    card.addEventListener("click", () => {
-      if (selectedPaperIds.has(paper.id)) {
-        selectedPaperIds.delete(paper.id);
-      } else {
-        selectedPaperIds.add(paper.id);
-      }
-      updateSelectionState();
-      renderPapersList();
-    });
-
-    papersList.appendChild(card);
-  });
-
-  updateSelectionState();
+  State.detectedSections = Array.isArray(spec.required_sections) && spec.required_sections.length ? spec.required_sections : null;
+  State.specSource = source;
+  // Dosen jelas tidak butuh sitasi, jadi pencarian jurnal tidak perlu
+  if (spec.needs_citations === false && State.mode === "jurnal") setMode("forum");
+  UI.renderSpecNote();
+  UI.renderSpecVisibility();
 }
 
-function updateSelectionState() {
-  const count = selectedPaperIds.size;
-  selectedCountLabel.textContent = count === 0 ? "Tanpa rujukan" : `${count} naskah dipilih`;
+function resetAnswerSpec() {
+  dom.specQuestionCount.value = "";
+  dom.specAnswerType.value = "";
+  dom.specLanguage.value = "";
+  dom.specWordLimit.value = "";
+  dom.specWordLimit.placeholder = "Tidak ada";
+  dom.specWordScope.value = "total";
+  State.detectedItemLimits = null;
+  State.detectedSections = null;
+  State.specSource = null;
+  UI.renderSpecNote();
+  UI.renderSpecVisibility();
 }
 
-btnBackStep1.addEventListener("click", () => {
-  setStep(1);
-});
-
-// Stepper Progress Animation
-function resetProgressLogs() {
-  [logStep1, logStep2, logStep3, logStep4].forEach(el => {
-    el.className = "flex items-center space-x-2 text-stone-400 dark:text-stone-500";
-    el.querySelector("span:first-child").className = "w-2 h-2 rounded-full bg-stone-300 dark:bg-stone-700";
-  });
-}
-
-function setStepActive(stepEl) {
-  stepEl.className = "flex items-center space-x-2 text-stone-900 dark:text-stone-100 font-semibold";
-  stepEl.querySelector("span:first-child").className = "w-2 h-2 rounded-full bg-stone-900 dark:bg-stone-100 animate-ping";
-}
-
-function setStepDone(stepEl) {
-  stepEl.className = "flex items-center space-x-2 text-emerald-700 dark:text-emerald-400 font-medium";
-  stepEl.querySelector("span:first-child").className = "w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400";
-}
-
-// 3. Generate Draft
-btnGenerate.addEventListener("click", async () => {
-
-  setStep(3);
-  generatingIndicator.classList.remove("hidden");
-  resultContainer.classList.add("hidden");
-  resetProgressLogs();
-
-  // Jalankan animasi status kerja backend
-  setStepActive(logStep1);
-  genStepTitle.textContent = "Tahap 1: Mengunduh berkas PDF fisik ke laptop...";
-
-  const t1 = setTimeout(() => {
-    setStepDone(logStep1);
-    setStepActive(logStep2);
-    genStepTitle.textContent = "Tahap 2: Membedah isi teks dan nomor halaman...";
-  }, 1000);
-
-  const t2 = setTimeout(() => {
-    setStepDone(logStep2);
-    setStepActive(logStep3);
-    genStepTitle.textContent = "Tahap 3: Merangkai naskah via Gemini...";
-  }, 2200);
-
-  const t3 = setTimeout(() => {
-    setStepDone(logStep3);
-    setStepActive(logStep4);
-    genStepTitle.textContent = "Tahap 4: Mengompilasi berkas docx dan pdf format A4...";
-  }, 3800);
-
+// Kode mata kuliah UT dari lembar soal mengisi nama mata kuliah dan judul bahan bila masih kosong
+async function applyDetectedCourse(code) {
   try {
-    let targetWords = 1000;
-    const lenChoice = selectLength ? selectLength.value : "sedang";
-    if (lenChoice === "ringkas") {
-      targetWords = 400;
-    } else if (lenChoice === "sedang") {
-      targetWords = 950;
-    } else if (lenChoice === "panjang") {
-      targetWords = 1800;
-    } else if (lenChoice === "kustom") {
-      targetWords = parseInt(inputCustomWords.value) || 1200;
-    }
-    // Batas total dari dosen menggantikan target dropdown, dibatasi rentang yang diterima server
-    const lecturerTotal = computeWordLimits().total;
-    if (lecturerTotal) targetWords = Math.min(5000, Math.max(200, lecturerTotal));
-
-    const payload = {
-      topic: inputTopic.value.trim(),
-      format_type: selectFormat ? selectFormat.value : "makalah",
-      target_length: lenChoice,
-      target_words: targetWords,
-      paragraph_depth: selectDepth ? selectDepth.value : "standar",
-      tone: selectTone.value,
-      paper_ids: Array.from(selectedPaperIds),
-      custom_instructions: inputInstructions.value.trim(),
-      answer_spec: readAnswerSpec(),
-      student_name: inputStudentName.value.trim(),
-      student_id: inputStudentId.value.trim(),
-      course_name: inputCourseName.value.trim()
-    };
-
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    clearTimeout(t1);
-    clearTimeout(t2);
-    clearTimeout(t3);
-    checkSystemHealth();
-
-    const data = await res.json();
-    generatingIndicator.classList.add("hidden");
-
-    if (!res.ok || !data.success) {
-      const errDetail = data.detail || "Gagal menyusun naskah tugas.";
-      setStep(2);
-      showAlert(
-        "Kendala pada Proses Generasi Naskah",
-        errDetail,
-        "Tekan tombol 'Mulai Tulis Naskah Tugas' sekali lagi. Sistem cadangan akan mencoba varian model lain secara otomatis."
-      );
-      return;
-    }
-
-    currentTaskId = data.task_id;
-    renderResult(data);
+    const data = await Api.utLookup(code);
+    if (!data.found || !data.exact) return;
+    if (!dom.courseName.value.trim()) dom.courseName.value = data.course.nama;
+    if (!dom.materialTitle.value.trim()) dom.materialTitle.value = data.course.formatted_title;
+    UI.renderSummaries();
   } catch (err) {
-    clearTimeout(t1);
-    clearTimeout(t2);
-    clearTimeout(t3);
-    checkSystemHealth();
-    generatingIndicator.classList.add("hidden");
-    setStep(2);
-    showAlert(
-      "Gagal Menghubungi Server Backend",
-      "Koneksi ke endpoint /api/generate terputus atau timeout.",
-      "Periksa status server di terminal dan coba ulangi proses."
-    );
+    /* katalog opsional, kegagalan tidak mengganggu alur */
   }
-});
+}
 
-function renderResult(data) {
-  resultContainer.classList.remove("hidden");
-  resultTitle.textContent = data.title;
-  resultStats.textContent = data.references.length
-    ? `Sekitar ${data.word_count} kata - Menggunakan seluruh ${data.references.length} naskah rujukan terverifikasi`
-    : `Sekitar ${data.word_count} kata - Tanpa rujukan`;
-  const evidenceContainer = document.getElementById("evidence-container");
-  if (evidenceContainer) evidenceContainer.classList.toggle("hidden", !(data.evidence && data.evidence.length));
-
-  // Render Bukti Sitasi & Transparansi Naskah
-  const evidenceList = document.getElementById("evidence-list");
-  const evidenceCountBadge = document.getElementById("evidence-count-badge");
-  
-  if (evidenceList && data.evidence && data.evidence.length > 0) {
-    if (evidenceCountBadge) {
-      evidenceCountBadge.textContent = `${data.evidence.length} Sumber Naskah`;
-    }
-    let evHtml = "";
-    data.evidence.forEach(ev => {
-      const isFullPdf = ev.has_full_pdf;
-      const badgeStatus = isFullPdf 
-        ? `<span class="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-semibold border border-emerald-300/40 dark:border-emerald-800">Naskah Fisik PDF Terunduh</span>`
-        : `<span class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-xs font-semibold border border-amber-300/40 dark:border-amber-800">Abstrak & Metadata Resmi</span>`;
-      
-      const citeBadge = ev.citation_count > 0 
-        ? `<span class="px-2 py-0.5 rounded bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-medium">${ev.citation_count} kali disitir di teks</span>`
-        : `<span class="px-2 py-0.5 rounded bg-stone-100 dark:bg-stone-800/60 text-stone-500 dark:text-stone-400 text-xs">Disitir di analisis</span>`;
-
-      let snipHtml = "";
-      if (ev.snippets && ev.snippets.length > 0) {
-        snipHtml = `<div class="mt-2.5 space-y-1.5">`;
-        ev.snippets.forEach(sn => {
-          snipHtml += `
-            <div class="p-2.5 rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-xs text-stone-700 dark:text-stone-300 leading-relaxed">
-              <span class="font-bold text-stone-900 dark:text-stone-100">[Bukti Teks Halaman ${sn.page}]:</span> "${sn.text}"
-            </div>
-          `;
-        });
-        snipHtml += `</div>`;
-      }
-
-      evHtml += `
-        <div class="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/70 dark:bg-stone-900/60">
-          <div class="flex flex-wrap items-center gap-2 mb-1.5">
-            ${badgeStatus}
-            ${citeBadge}
-            <span class="text-xs text-stone-500 dark:text-stone-400">${ev.venue || "Publikasi Akademik"} (${ev.year || "n.d."})</span>
-          </div>
-          <h4 class="text-sm font-bold text-stone-900 dark:text-stone-100 leading-snug">${ev.title}</h4>
-          <p class="text-xs text-stone-600 dark:text-stone-400 mt-0.5">${ev.authors}</p>
-          ${snipHtml}
-          <div class="mt-2.5 flex items-center space-x-3 text-xs">
-            ${ev.doi ? `<a href="${ev.doi}" target="_blank" rel="noopener" class="text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 underline">Cek DOI Resmi</a>` : ""}
-            <a href="https://scholar.google.com/scholar?q=${encodeURIComponent(ev.title)}" target="_blank" rel="noopener" class="text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 underline">Cek Google Scholar</a>
-          </div>
-        </div>
-      `;
+async function handleQuestionFile(file) {
+  if (!file) return;
+  const ext = "." + (file.name || "").split(".").pop().toLowerCase();
+  if (![".pdf", ".docx", ".txt"].includes(ext)) {
+    UI.showAlert("Format berkas soal belum didukung", "Unggah lembar soal dalam format PDF, Word .docx, atau TXT.");
+    return;
+  }
+  // Defensive UI: soal yang sudah diketik tidak ditimpa diam diam
+  if (dom.topic.value.trim().length >= 3) {
+    const ok = await UI.confirm({
+      title: "Timpa soal yang sudah ada?",
+      message: `Teks soal di kotak ketik akan diganti isi berkas ${file.name}. Draf lama tidak bisa dikembalikan.`,
+      okLabel: "Ganti dengan berkas"
     });
-    evidenceList.innerHTML = evHtml;
+    if (!ok) return;
   }
 
-  currentDoc = {
-    title: data.title,
-    sections: data.sections,
-    references: data.references,
-    identityLines: data.identity_lines || [],
-    wordCount: data.word_count
-  };
-  renderDocument();
-}
-
-// Naskah aktif di Tahap 3. Edit dan tulis ulang per bagian memperbarui state ini lalu digambar ulang.
-let currentDoc = null;
-let docBusy = false;
-
-const TOOL_BTN = "font-sans text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 hover:border-stone-400 dark:hover:border-stone-500 bg-white dark:bg-stone-900 transition disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200";
-const PRIMARY_BTN = "font-sans text-xs font-semibold px-3.5 py-2 rounded-lg bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-200 transition disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-900 dark:focus-visible:ring-stone-200";
-const FIELD = "w-full font-sans px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-200";
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function button(label, className, onClick, ariaLabel) {
-  const node = el("button", className, label);
-  node.type = "button";
-  if (ariaLabel) node.setAttribute("aria-label", ariaLabel);
-  node.disabled = docBusy;
-  node.addEventListener("click", onClick);
-  return node;
-}
-
-function renderStats() {
-  const refs = currentDoc.references.length;
-  resultStats.textContent = refs
-    ? `Sekitar ${currentDoc.wordCount} kata - Menggunakan seluruh ${refs} naskah rujukan terverifikasi`
-    : `Sekitar ${currentDoc.wordCount} kata - Tanpa rujukan`;
-}
-
-function renderDocument() {
-  resultTitle.textContent = currentDoc.title;
-  renderStats();
-  previewContent.replaceChildren(buildTitleBlock());
-
-  if (currentDoc.identityLines.length) {
-    const identity = el("div", "mb-8 text-stone-700 dark:text-stone-300 leading-relaxed");
-    currentDoc.identityLines.forEach((line) => identity.append(el("div", "", line)));
-    previewContent.append(identity);
-  }
-  currentDoc.sections.forEach((sec, index) => previewContent.append(buildSectionBlock(sec, index)));
-  if (currentDoc.references.length) previewContent.append(buildReferencesBlock());
-}
-
-function buildTitleBlock() {
-  const wrap = el("div", "mb-8 space-y-2 text-center");
-  const heading = el("h1", "text-xl font-bold tracking-tight uppercase text-stone-900 dark:text-stone-100", currentDoc.title);
-  const edit = button("Ubah Judul", TOOL_BTN, () => {
-    const input = el("input", `${FIELD} text-center font-bold`);
-    input.value = currentDoc.title;
-    input.maxLength = 300;
-    input.setAttribute("aria-label", "Judul naskah");
-    const save = async () => {
-      const title = input.value.trim();
-      if (!title) return input.focus();
-      await saveDocument({ title, sections: currentDoc.sections }, wrap);
-    };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") save();
-      if (e.key === "Escape") renderDocument();
-    });
-    const actions = el("div", "flex justify-center gap-2");
-    actions.append(button("Batal", TOOL_BTN, renderDocument), button("Simpan", PRIMARY_BTN, save));
-    wrap.replaceChildren(input, actions);
-    input.focus();
-  }, "Ubah judul naskah");
-  wrap.append(heading, edit);
-  return wrap;
-}
-
-function buildSectionBlock(sec, index) {
-  const article = el("article", "mb-6 -mx-3 px-3 py-2 rounded-xl border border-transparent hover:border-stone-200 dark:hover:border-stone-800 focus-within:border-stone-300 dark:focus-within:border-stone-700 transition");
-  const head = el("div", "flex items-start justify-between gap-3 mb-2");
-  const label = sec.heading && sec.heading.trim() ? sec.heading : `Bagian ${index + 1}`;
-  head.append(el("h2", "text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100", sec.heading || ""));
-
-  const tools = el("div", "flex shrink-0 gap-1.5");
-  tools.append(
-    button("Edit", TOOL_BTN, () => openSectionEditor(article, index), `Edit ${label}`),
-    button("Tulis Ulang", TOOL_BTN, () => openRewriteForm(article, index), `Tulis ulang ${label}`)
-  );
-  head.append(tools);
-
-  const body = el("div", "section-body text-stone-700 dark:text-stone-300 whitespace-pre-line leading-relaxed", sec.content);
-  article.append(head, body);
-  return article;
-}
-
-function showSectionError(container, message) {
-  container.querySelectorAll(".section-error").forEach((node) => node.remove());
-  const error = el("p", "section-error font-sans mt-2 text-xs font-medium text-rose-700 dark:text-rose-400", message);
-  error.setAttribute("role", "alert");
-  container.append(error);
-}
-
-function openSectionEditor(article, index) {
-  const sec = currentDoc.sections[index];
-  const headingInput = el("input", `${FIELD} font-bold`);
-  headingInput.value = sec.heading || "";
-  headingInput.maxLength = 500;
-  headingInput.setAttribute("aria-label", "Judul bagian");
-  const contentInput = el("textarea", `${FIELD} leading-relaxed resize-y`);
-  contentInput.value = sec.content;
-  contentInput.rows = Math.min(24, Math.max(6, Math.ceil(sec.content.length / 90) + sec.content.split("\n").length));
-  contentInput.setAttribute("aria-label", "Isi bagian");
-  const meta = el("span", "font-sans text-[11px] text-stone-500 dark:text-stone-400 tabular-nums");
-  const updateMeta = () => { meta.textContent = `${countWords(contentInput.value)} kata`; };
-  contentInput.addEventListener("input", updateMeta);
-  updateMeta();
-
-  const save = async () => {
-    if (!contentInput.value.trim()) {
-      showSectionError(article, "Isi bagian tidak boleh kosong.");
-      return contentInput.focus();
-    }
-    const sections = currentDoc.sections.map((s, i) => i === index ? { heading: headingInput.value.trim(), content: contentInput.value.trim() } : s);
-    await saveDocument({ title: currentDoc.title, sections }, article);
-  };
-  contentInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save();
-    if (e.key === "Escape") renderDocument();
-  });
-
-  const actions = el("div", "flex items-center justify-between gap-2");
-  const buttons = el("div", "flex gap-2");
-  buttons.append(button("Batal", TOOL_BTN, renderDocument), button("Simpan Bagian", PRIMARY_BTN, save));
-  actions.append(meta, buttons);
-  const form = el("div", "space-y-2");
-  form.append(headingInput, contentInput, actions);
-  article.replaceChildren(form);
-  contentInput.focus();
-}
-
-function openRewriteForm(article, index) {
-  if (article.querySelector(".rewrite-form")) return;
-  const form = el("div", "rewrite-form font-sans mt-3 p-3 rounded-lg bg-stone-50 dark:bg-stone-950/60 border border-stone-200 dark:border-stone-800 space-y-2");
-  const input = el("input", FIELD);
-  input.maxLength = 500;
-  input.placeholder = "Arahan opsional, misal: lebih santai, persingkat, tambah contoh";
-  input.setAttribute("aria-label", "Arahan tulis ulang");
-  const run = () => rewriteSection(article, index, input.value.trim());
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") run();
-    if (e.key === "Escape") form.remove();
-  });
-  const actions = el("div", "flex justify-end gap-2");
-  actions.append(button("Batal", TOOL_BTN, () => form.remove()), button("Tulis Ulang Bagian Ini", PRIMARY_BTN, run));
-  form.append(input, actions);
-  article.append(form);
-  input.focus();
-}
-
-function setDocBusy(busy) {
-  docBusy = busy;
-  previewContent.setAttribute("aria-busy", busy ? "true" : "false");
-  previewContent.querySelectorAll("button, input, textarea").forEach((node) => { node.disabled = busy; });
-  btnRegenerateAll.disabled = busy;
-}
-
-async function applyTaskUpdate(url, method, payload) {
-  const res = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Isian tidak valid.");
-  Object.assign(currentDoc, { title: data.title, sections: data.sections, wordCount: data.word_count });
-}
-
-async function saveDocument(doc, container) {
-  setDocBusy(true);
+  UI.selectQuestionTab("upload");
+  UI.renderUploadPanel(`Membaca ${file.name}. Soal bergambar atau hasil scan bisa butuh setengah menit.`);
   try {
-    await applyTaskUpdate(`/api/tasks/${currentTaskId}`, "PUT", doc);
-    setDocBusy(false);
-    renderDocument();
+    const data = await Api.uploadQuestion(file);
+    if (!data.success || !data.text) throw new ApiError(data.message || "Teks dokumen tidak dapat diekstrak.", 422);
+    State.questionFileName = data.filename;
+    setQuestionText(formatQuestionText(data.questions || data.text));
+    if (data.detected_guidelines) dom.instructions.value = data.detected_guidelines;
+    applyAnswerSpec(data.answer_spec, data.answer_spec_source);
+    if (data.detected_course_code) applyDetectedCourse(data.detected_course_code);
+    UI.renderUploadPanel();
+    UI.toast(data.detected_guidelines ? "Soal terbaca, rubrik dosen dipisahkan" : "Lembar soal berhasil dibaca");
   } catch (err) {
-    setDocBusy(false);
-    showSectionError(container, `Gagal menyimpan: ${err.message}`);
-  }
-}
-
-async function rewriteSection(article, index, instruction) {
-  const body = article.querySelector(".section-body");
-  const original = body.textContent;
-  // Skeleton selama Gemini menulis ulang bagian ini
-  body.replaceChildren(...[100, 92, 96, 70].map((w) => {
-    const bar = el("div", "h-3 my-2 rounded bg-stone-200 dark:bg-stone-800 animate-pulse");
-    bar.style.width = `${w}%`;
-    return bar;
-  }));
-  const status = el("p", "font-sans text-xs text-stone-500 dark:text-stone-400", "Gemini sedang menulis ulang bagian ini...");
-  status.setAttribute("role", "status");
-  body.append(status);
-  setDocBusy(true);
-  try {
-    await applyTaskUpdate(`/api/tasks/${currentTaskId}/sections/${index}/rewrite`, "POST", { instruction });
-    setDocBusy(false);
-    renderDocument();
-  } catch (err) {
-    setDocBusy(false);
-    body.textContent = original;
-    showSectionError(article, err.message || "Gagal menghubungi server.");
+    UI.renderUploadPanel();
+    UI.showError("Lembar soal belum terbaca", err, () => handleQuestionFile(file));
   } finally {
     checkSystemHealth();
   }
 }
 
-function buildReferencesBlock() {
-  const sampleText = (currentDoc.title + " " + (currentDoc.sections[0] ? currentDoc.sections[0].content : "")).toLowerCase();
-  const isEnDoc = ["the", "and", "is", "of", "to", "in", "urban", "living"].some(w => sampleText.includes(w));
-  const block = el("div", "mt-8 pt-6 border-t border-stone-200 dark:border-stone-800");
-  block.append(el("h2", "text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-stone-100 mb-3", isEnDoc ? "REFERENCES" : "DAFTAR PUSTAKA"));
-  const list = el("ul", "space-y-2 text-xs text-stone-600 dark:text-stone-400");
-  currentDoc.references.forEach((ref) => {
-    list.append(el("li", "pl-4 -indent-4", `${ref.authors.join(", ")} (${ref.year || "n.d."}). ${ref.title}. ${ref.venue || "Publikasi Ilmiah"}. ${ref.doi || ""}`));
-  });
-  block.append(list);
-  return block;
+function requireQuestion() {
+  if (dom.topic.value.trim().length >= 3) return true;
+  UI.showAlert("Soal belum diisi", "Ketik soal atau unggah lembar soal dulu sebelum lanjut.");
+  UI.selectQuestionTab("type");
+  dom.topic.focus();
+  return false;
 }
 
-// Tulis ulang seluruh naskah memakai soal dan pengaturan yang sama dari Tahap 1 dan 2
-const btnRegenerateAll = document.getElementById("btn-regenerate-all");
-btnRegenerateAll.addEventListener("click", () => {
-  if (!window.confirm("Seluruh naskah, termasuk editan kamu, akan diganti tulisan baru. Lanjutkan?")) return;
-  btnGenerate.click();
-});
-
-
-// 4. Downloads & Restart
-btnDownloadDocx.addEventListener("click", () => {
-  if (!currentTaskId) return;
-  window.location.href = `/api/download/docx/${currentTaskId}`;
-});
-
-btnDownloadPdf.addEventListener("click", () => {
-  if (!currentTaskId) return;
-  window.location.href = `/api/download/pdf/${currentTaskId}`;
-});
-
-function resetToStep1() {
-  setQuestionText("");
-  if (questionFileBadge) questionFileBadge.classList.add("hidden");
-  inputInstructions.value = "";
-  resetAnswerSpec();
-  selectedPaperIds.clear();
-  currentTaskId = null;
-  setStep(1);
+// Batas kata yang keliru ditahan di sini supaya tidak dikirim diam diam sebagai tanpa batas
+function requireValidSpec() {
+  const { error } = computeWordLimits();
+  if (!error) return true;
+  UI.showAlert("Batas kata belum benar", error);
+  dom.detailsSpec.open = true;
+  dom.specWordLimit.focus();
+  return false;
 }
 
-
-const btnTopRestart = document.getElementById("btn-top-restart");
-if (btnTopRestart) {
-  btnTopRestart.addEventListener("click", resetToStep1);
-}
-
-// 5. Theme Toggle (Light / Dark)
-const btnToggleTheme = document.getElementById("btn-toggle-theme");
-const iconSun = document.getElementById("icon-sun");
-const iconMoon = document.getElementById("icon-moon");
-
-function syncDesktopTitlebar(isDark) {
-  if (window.pywebview && window.pywebview.api) {
-    window.pywebview.api.set_titlebar(isDark);
+function submitTask() {
+  if (!requireQuestion() || !requireValidSpec()) return;
+  if (State.mode === "forum") {
+    generate();
+    return;
+  }
+  goStep(2);
+  if (State.mode === "jurnal") {
+    const query = dom.topic.value.trim();
+    if (query !== State.lastQuery || !State.papers.length) {
+      dom.refineQuery.value = query.split(/\s+/).slice(0, 12).join(" ");
+      performSearch(query);
+    }
   }
 }
 
+// ---------- Jurnal ----------
+async function performSearch(rawQuery) {
+  const query = (rawQuery || "").trim();
+  if (query.length < 3) {
+    UI.showAlert("Kata kunci terlalu pendek", "Ketik minimal tiga huruf untuk mencari jurnal.");
+    return;
+  }
+  UI.clearAlert();
+  State.lastQuery = dom.topic.value.trim();
+  State.selectedPaperIds.clear();
+  UI.renderSelection();
+  UI.renderPapersLoading(true);
+  dom.searchInfo.textContent = "";
+  setBusy(dom.btnRefine, true, "Mencari");
+  try {
+    const data = await Api.search(query, 6);
+    State.papers = data.papers || [];
+    dom.searchInfo.textContent = data.message || "";
+    if (data.query_used) dom.refineQuery.value = data.query_used;
+    if (State.papers.length) UI.renderPapers();
+    else UI.renderPapersEmpty(data.message, data.query_used || query);
+  } catch (err) {
+    State.papers = [];
+    dom.papersList.replaceChildren();
+    UI.showError("Pencarian jurnal gagal", err, () => performSearch(query));
+  } finally {
+    UI.renderPapersLoading(false);
+    setBusy(dom.btnRefine, false);
+  }
+}
+
+function togglePaper(id, checked) {
+  if (checked) State.selectedPaperIds.add(id);
+  else State.selectedPaperIds.delete(id);
+  UI.renderSelection();
+}
+
+async function addManualPaper() {
+  const value = dom.manualDoi.value.trim();
+  if (value.length < 3) return dom.manualDoi.focus();
+  setBusy(dom.btnAddManual, true, "Mencari");
+  try {
+    const data = await Api.search(value, 1);
+    const paper = data.papers && data.papers[0];
+    if (!paper) {
+      UI.showAlert("Naskah tidak ditemukan", "DOI atau judul itu tidak ada di registri ilmiah. Pastikan format DOI seperti 10.xxxx/...");
+      return;
+    }
+    if (!State.papers.some((p) => p.id === paper.id)) State.papers.unshift(paper);
+    State.selectedPaperIds.add(paper.id);
+    dom.manualDoi.value = "";
+    dom.manualForm.classList.add("hidden");
+    dom.btnToggleManual.setAttribute("aria-expanded", "false");
+    UI.renderPapers();
+    UI.renderSelection();
+    UI.toast("Naskah ditambahkan dan dicentang");
+  } catch (err) {
+    UI.showError("Gagal menambahkan naskah", err, addManualPaper);
+  } finally {
+    setBusy(dom.btnAddManual, false);
+  }
+}
+
+// ---------- Bahan dosen ----------
+async function handleMaterialFile(file) {
+  if (!file) return;
+  const ext = "." + (file.name || "").split(".").pop().toLowerCase();
+  if (![".pdf", ".docx", ".txt", ".md"].includes(ext)) {
+    UI.showAlert("Format bahan belum didukung", "Unggah bahan dalam format PDF, Word .docx, TXT, atau MD.");
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    UI.showAlert("Berkas terlalu besar", "Batasnya 20 MB. Pecah dulu per bab lalu unggah satu per satu.");
+    return;
+  }
+  if (dom.materialText.value.trim().length >= 15) {
+    const ok = await UI.confirm({
+      title: "Ganti isi naskah?",
+      message: `Teks di kotak isi naskah akan diganti isi ${file.name}. Simpan dulu bahan sebelumnya jika masih dipakai.`,
+      okLabel: "Ganti isi"
+    });
+    if (!ok) return;
+  }
+
+  dom.materialDropzone.classList.add("hidden");
+  dom.materialReading.classList.remove("hidden");
+  dom.materialReadingText.textContent = `Membaca ${file.name} secara lokal`;
+  try {
+    const data = await Api.parseReadingDoc(file);
+    if (!data.success) throw new ApiError(data.message, 422);
+    dom.materialText.value = data.text;
+    if (!dom.materialTitle.value.trim()) dom.materialTitle.value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    UI.renderMaterialPreview();
+    UI.toast(`${formatNumber(data.char_count)} karakter terbaca`);
+  } catch (err) {
+    UI.showError("Bahan bacaan belum terbaca", err, () => handleMaterialFile(file));
+  } finally {
+    dom.materialReading.classList.add("hidden");
+    dom.materialDropzone.classList.remove("hidden");
+    checkSystemHealth();
+  }
+}
+
+function materialFormFilled() {
+  return dom.materialText.value.trim().length >= 15;
+}
+
+function readMaterialForm() {
+  const year = readInt(dom.materialYear);
+  return {
+    module_title: dom.materialTitle.value.trim(),
+    author: dom.materialAuthor.value.trim() || null,
+    year: year && year >= 1000 && year <= 2100 ? year : null,
+    publisher_or_venue: dom.materialPublisher.value.trim() || null,
+    page_or_ref: dom.materialPage.value.trim() || null,
+    content_text: dom.materialText.value.trim()
+  };
+}
+
+function clearMaterialForm() {
+  [dom.materialTitle, dom.materialAuthor, dom.materialYear, dom.materialPublisher, dom.materialPage, dom.materialText].forEach((input) => { input.value = ""; });
+  UI.renderUtResult(null);
+  UI.renderMaterialPreview();
+}
+
+// Mengembalikan true jika bahan berhasil tersimpan
+async function saveMaterial() {
+  const payload = readMaterialForm();
+  if (payload.module_title.length < 3) {
+    UI.showAlert("Judul naskah belum diisi", "Isi judul naskah minimal tiga huruf, misalnya judul cerpen atau kode mata kuliah UT.");
+    dom.materialTitle.focus();
+    return false;
+  }
+  if (payload.content_text.length < 15) {
+    UI.showAlert("Isi naskah masih kosong", "Unggah berkas bahan atau tempel minimal beberapa kalimat materi.");
+    dom.materialText.focus();
+    return false;
+  }
+  setBusy(dom.btnSaveMaterial, true, "Menyimpan");
+  try {
+    const material = await Api.saveMaterial(payload);
+    State.materials.push(material);
+    clearMaterialForm();
+    UI.renderMaterialList();
+    UI.renderSelection();
+    UI.toast("Bahan tersimpan sebagai rujukan");
+    return true;
+  } catch (err) {
+    UI.showError("Bahan belum tersimpan", err, saveMaterial);
+    return false;
+  } finally {
+    setBusy(dom.btnSaveMaterial, false);
+  }
+}
+
+function removeMaterial(id) {
+  State.materials = State.materials.filter((m) => m.id !== id);
+  UI.renderMaterialList();
+  UI.renderSelection();
+}
+
+function attachUtLookup() {
+  let timer = null;
+  let lastQuery = "";
+  const apply = (course) => {
+    dom.materialTitle.value = course.formatted_title;
+    if (!dom.materialAuthor.value.trim()) dom.materialAuthor.value = "Universitas Terbuka";
+    if (!dom.courseName.value.trim()) dom.courseName.value = course.nama;
+    UI.renderUtResult(null);
+    UI.renderSummaries();
+  };
+  const lookup = async () => {
+    const query = dom.materialTitle.value.trim();
+    // Hanya pola yang mirip kode mata kuliah, supaya judul cerpen biasa tidak memicu saran UT
+    if (!/[A-Za-z]{3,4}\s*-?\s*\d{2,4}/.test(query)) return UI.renderUtResult(null);
+    if (query === lastQuery) return;
+    lastQuery = query;
+    dom.materialUtSpinner.classList.remove("hidden");
+    try {
+      const data = await Api.utLookup(query);
+      const useful = data.found && data.course && (data.exact || (data.suggestions || []).length);
+      UI.renderUtResult(useful ? data : null, apply);
+    } catch (err) {
+      UI.renderUtResult(null);
+    } finally {
+      dom.materialUtSpinner.classList.add("hidden");
+    }
+  };
+  dom.materialTitle.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(lookup, 250);
+  });
+}
+
+async function readScreenshot(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    UI.showAlert("Berkas bukan gambar", "Pilih tangkapan layar berformat PNG, JPG, atau WebP.");
+    return;
+  }
+  dom.materialOcrStatus.classList.remove("hidden");
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const data = await Api.extractScreenshot(dataUrl);
+    if (!data.success || !data.extracted_text) throw new ApiError(data.message || "Teks pada gambar tidak terbaca jelas.", 422);
+    const current = dom.materialText.value.trim();
+    dom.materialText.value = current ? `${current}\n\n${data.extracted_text}` : data.extracted_text;
+    UI.renderMaterialPreview();
+    UI.toast(`${formatNumber(data.extracted_text.length)} karakter dari gambar ditambahkan`);
+  } catch (err) {
+    UI.showError("Gambar belum terbaca", err, () => readScreenshot(file));
+  } finally {
+    dom.materialOcrStatus.classList.add("hidden");
+    checkSystemHealth();
+  }
+}
+
+// ---------- Generate ----------
+let pipelineTimers = [];
+function runPipelineAnimation() {
+  pipelineTimers.forEach(clearTimeout);
+  UI.renderPipeline(1);
+  pipelineTimers = [[2, 1500], [3, 4000], [4, 14000]].map(([n, ms]) => setTimeout(() => UI.renderPipeline(n), ms));
+}
+
+async function collectPaperIds() {
+  if (State.mode === "forum") return [];
+  if (State.mode === "jurnal") return Array.from(State.selectedPaperIds);
+  // Bahan yang masih di formulir ikut disimpan supaya tidak hilang
+  if (materialFormFilled() && !(await saveMaterial())) return null;
+  if (!State.materials.length) {
+    UI.showAlert("Belum ada bahan bacaan", "Unggah atau tempel naskah dari dosen dulu, lalu tulis naskahnya.");
+    return null;
+  }
+  return State.materials.map((m) => m.id);
+}
+
+async function generate() {
+  if (State.generating) return;
+  if (!requireQuestion() || !requireValidSpec()) return;
+  const paperIds = await collectPaperIds();
+  if (!paperIds) return;
+
+  const returnStep = State.mode === "forum" ? 1 : 2;
+  State.generating = true;
+  goStep(3);
+  UI.renderGenerating(true);
+  runPipelineAnimation();
+  try {
+    const data = await Api.generate(buildGeneratePayload(paperIds));
+    if (!data.success) throw new ApiError("Naskah gagal disusun. Coba sekali lagi.", 500);
+    State.taskId = data.task_id;
+    State.doc = {
+      title: data.title,
+      sections: data.sections,
+      references: data.references,
+      identityLines: data.identity_lines || [],
+      wordCount: data.word_count
+    };
+    UI.renderPipeline(5);
+    UI.renderEvidence(data.evidence);
+    UI.renderDocument();
+    UI.renderGenerating(false);
+    UI.toast("Naskah selesai disusun");
+  } catch (err) {
+    UI.renderGenerating(false);
+    // Naskah lama tetap valid di server, jadi kegagalan tulis ulang tidak membuang Tahap 3
+    if (!State.doc) {
+      State.maxStep = returnStep;
+      goStep(returnStep);
+    }
+    if (err instanceof ApiError && err.isRateLimited) {
+      UI.showAlert("Gemini sedang jeda", `${err.message} Tunggu lampu status di pojok kanan atas kembali hijau, lalu coba lagi.`, { retry: generate });
+    } else {
+      UI.showError("Naskah belum berhasil disusun", err, generate);
+    }
+  } finally {
+    pipelineTimers.forEach(clearTimeout);
+    State.generating = false;
+    checkSystemHealth();
+  }
+}
+
+// ---------- Studio naskah ----------
+async function saveDocument(doc, container) {
+  UI.setDocBusy(true);
+  try {
+    const data = await Api.updateTask(State.taskId, doc);
+    Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
+    UI.setDocBusy(false);
+    UI.renderDocument();
+    UI.toast("Perubahan tersimpan");
+  } catch (err) {
+    UI.setDocBusy(false);
+    UI.showSectionError(container, `Gagal menyimpan: ${err.message}`);
+  }
+}
+
+async function rewriteSection(article, index, instruction) {
+  const body = article.querySelector(".section-body");
+  const original = State.doc.sections[index].content;
+  body.replaceChildren(...[100, 92, 96, 70].map((w) => {
+    const bar = el("div", "doc-skeleton");
+    bar.style.width = `${w}%`;
+    return bar;
+  }));
+  const status = el("p", "doc-error !text-stone-500", "Gemini sedang menulis ulang bagian ini");
+  status.setAttribute("role", "status");
+  body.append(status);
+  UI.setDocBusy(true);
+  try {
+    const data = await Api.rewriteSection(State.taskId, index, instruction);
+    Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
+    UI.setDocBusy(false);
+    UI.renderDocument();
+    UI.toast("Bagian berhasil ditulis ulang");
+  } catch (err) {
+    UI.setDocBusy(false);
+    UI.fillParagraphs(body, original);
+    UI.showSectionError(article, err.message || "Gagal menghubungi server.");
+  } finally {
+    checkSystemHealth();
+  }
+}
+
+async function copyDocument() {
+  if (!State.doc) return;
+  const text = documentAsText();
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    // Cadangan untuk webview yang menolak Clipboard API
+    const area = el("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  UI.toast("Naskah berhasil disalin");
+}
+
+function download(type) {
+  if (State.taskId) window.location.href = `/api/download/${type}/${State.taskId}`;
+}
+
+async function regenerateAll() {
+  const ok = await UI.confirm({
+    title: "Tulis ulang seluruh naskah?",
+    message: "Semua isi naskah, termasuk editan kamu, diganti tulisan baru dengan soal dan rujukan yang sama.",
+    okLabel: "Tulis ulang"
+  });
+  if (ok) generate();
+}
+
+async function startNewTask() {
+  const ok = await UI.confirm({
+    title: "Mulai tugas baru?",
+    message: "Soal, rujukan, dan naskah ini dibersihkan dari layar. Berkas yang sudah diunduh tetap aman di laptop. Nama dan NIM tetap diingat.",
+    okLabel: "Mulai baru"
+  });
+  if (!ok) return;
+  State.questionFileName = "";
+  setQuestionText("");
+  storage.remove(STORAGE.draft);
+  dom.draftStatus.textContent = "";
+  dom.instructions.value = "";
+  dom.courseName.value = "";
+  resetAnswerSpec();
+  State.papers = [];
+  State.selectedPaperIds.clear();
+  State.lastQuery = "";
+  State.materials = [];
+  State.taskId = null;
+  State.doc = null;
+  dom.papersList.replaceChildren();
+  dom.searchInfo.textContent = "";
+  clearMaterialForm();
+  UI.selectQuestionTab("type");
+  State.maxStep = 1;
+  goStep(1);
+}
+
+// ---------- Tema dan jendela desktop ----------
+function syncDesktopTitlebar(isDark) {
+  if (window.pywebview && window.pywebview.api) window.pywebview.api.set_titlebar(isDark);
+}
+
+function applyTheme(isDark) {
+  document.documentElement.classList.toggle("dark", isDark);
+  document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  syncDesktopTitlebar(isDark);
+}
+
 function setMaximizedIcon(isMaximized) {
-  document.getElementById("icon-window-maximize").classList.toggle("hidden", isMaximized);
-  document.getElementById("icon-window-restore").classList.toggle("hidden", !isMaximized);
-  const btn = document.getElementById("btn-window-maximize");
-  const label = isMaximized ? "Kembalikan ukuran jendela" : "Besarkan jendela";
-  btn.setAttribute("aria-label", label);
+  $("icon-window-maximize").classList.toggle("hidden", isMaximized);
+  $("icon-window-restore").classList.toggle("hidden", !isMaximized);
+  const btn = $("btn-window-maximize");
+  btn.setAttribute("aria-label", isMaximized ? "Kembalikan ukuran jendela" : "Besarkan jendela");
   btn.title = isMaximized ? "Kembalikan" : "Besarkan";
 }
 
@@ -1846,92 +1722,175 @@ async function toggleMaximize() {
 // Jendela desktop tanpa bingkai: header aplikasi jadi title bar, tombol jendela dipasang di ujung kanan
 function enableDesktopChrome() {
   const api = window.pywebview.api;
-  const inner = document.getElementById("app-header-inner");
-  inner.classList.remove("max-w-5xl", "mx-auto");
+  const inner = $("app-header-inner");
+  inner.classList.remove("max-w-6xl", "mx-auto", "pr-5");
   inner.classList.add("pr-0");
-  document.getElementById("window-controls").classList.replace("hidden", "flex");
-  document.querySelectorAll(".desktop-drag").forEach((el) => {
-    el.classList.add("pywebview-drag-region");
-    el.addEventListener("dblclick", toggleMaximize);
+  $("window-controls").classList.replace("hidden", "flex");
+  document.querySelectorAll(".desktop-drag").forEach((node) => {
+    node.classList.add("pywebview-drag-region");
+    node.addEventListener("dblclick", toggleMaximize);
   });
-  document.getElementById("btn-window-minimize").addEventListener("click", () => api.minimize());
-  document.getElementById("btn-window-maximize").addEventListener("click", toggleMaximize);
-  document.getElementById("btn-window-close").addEventListener("click", () => api.close());
+  $("btn-window-minimize").addEventListener("click", () => api.minimize());
+  $("btn-window-maximize").addEventListener("click", toggleMaximize);
+  $("btn-window-close").addEventListener("click", () => api.close());
 }
 
-// Baca modul dari jendela Ruang Baca Virtual. Halaman gambar dikirim ke OCR yang sama dengan unggah screenshot.
-function enableRbvReader() {
-  const api = window.pywebview.api;
-  const btnGrab = document.getElementById("btn-grab-rbv");
-  document.getElementById("rbv-actions").classList.remove("hidden");
-  document.getElementById("btn-open-rbv").addEventListener("click", () => api.open_rbv());
-
-  btnGrab.addEventListener("click", async () => {
-    btnGrab.disabled = true;
-    btnGrab.textContent = "Mengambil Halaman...";
-    try {
-      const page = await api.grab_rbv_page();
-      if (page.error) {
-        showAlert("Halaman Modul Belum Terbaca", page.error);
-      } else if (page.text) {
-        const current = inputUtContent.value.trim();
-        inputUtContent.value = current ? `${current}\n\n${page.text}` : page.text;
-        showAlert("Teks Modul Berhasil Diambil", `${page.text.length} karakter masuk ke kotak materi.`, "", "success");
-      } else {
-        for (const [i, dataUrl] of page.images.entries()) {
-          const blob = await (await fetch(dataUrl)).blob();
-          await processScreenshotFile(new File([blob], `rbv-${i + 1}.jpg`, { type: "image/jpeg" }), inputUtContent, step2OcrStatus);
-        }
-      }
-    } catch (e) {
-      showAlert("Gagal Membaca Jendela RBV", "Tutup jendela Ruang Baca Virtual lalu buka lagi.");
-    } finally {
-      btnGrab.disabled = false;
-      btnGrab.textContent = "Ambil Halaman yang Terbuka";
-    }
+// =====================================================================
+// 6. EVENT WIRING
+// =====================================================================
+function bindDropzone(zone, input, onFile) {
+  zone.addEventListener("click", () => input.click());
+  input.addEventListener("change", () => {
+    if (input.files && input.files[0]) onFile(input.files[0]);
+    input.value = "";
+  });
+  ["dragenter", "dragover"].forEach((name) => zone.addEventListener(name, (e) => {
+    e.preventDefault();
+    zone.classList.add("is-dragover");
+  }));
+  ["dragleave", "drop"].forEach((name) => zone.addEventListener(name, (e) => {
+    e.preventDefault();
+    zone.classList.remove("is-dragover");
+  }));
+  zone.addEventListener("drop", (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files[0];
+    if (file) onFile(file);
   });
 }
 
-// Di mode desktop, API pywebview baru siap setelah halaman dimuat
-window.addEventListener("pywebviewready", () => {
-  enableDesktopChrome();
-  enableRbvReader();
-  syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
-  window.pywebview.api.fit_height(document.documentElement.scrollHeight);
-});
-
-function applyTheme(isDark) {
-  syncDesktopTitlebar(isDark);
-  if (isDark) {
-    document.documentElement.classList.add("dark");
-    document.documentElement.setAttribute("data-theme", "dark");
-    if (iconSun && iconMoon) {
-      iconSun.classList.remove("hidden");
-      iconMoon.classList.add("hidden");
-    }
-  } else {
-    document.documentElement.classList.remove("dark");
-    document.documentElement.setAttribute("data-theme", "light");
-    if (iconSun && iconMoon) {
-      iconSun.classList.add("hidden");
-      iconMoon.classList.remove("hidden");
-    }
-  }
-}
-
-if (btnToggleTheme) {
-  const savedTheme = localStorage.getItem("atc-theme");
+function init() {
+  // Tema
+  const savedTheme = storage.get(STORAGE.theme);
   const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const initialDark = savedTheme ? savedTheme === "dark" : prefersDark;
-  applyTheme(initialDark);
-
-  btnToggleTheme.addEventListener("click", () => {
-    const isDarkNow = document.documentElement.classList.contains("dark");
-    const nextDark = !isDarkNow;
-    applyTheme(nextDark);
-    localStorage.setItem("atc-theme", nextDark ? "dark" : "light");
+  applyTheme(savedTheme ? savedTheme === "dark" : prefersDark);
+  $("btn-toggle-theme").addEventListener("click", () => {
+    const next = !document.documentElement.classList.contains("dark");
+    applyTheme(next);
+    storage.set(STORAGE.theme, next ? "dark" : "light");
   });
+
+  // Identitas dan gaya bahasa diingat antar sesi. Mata kuliah beda tiap tugas jadi tidak disimpan.
+  dom.studentName.value = storage.get(STORAGE.name);
+  dom.studentId.value = storage.get(STORAGE.nim);
+  [[dom.studentName, STORAGE.name], [dom.studentId, STORAGE.nim]].forEach(([input, key]) => {
+    input.addEventListener("input", () => {
+      storage.set(key, input.value.trim());
+      UI.renderSummaries();
+    });
+  });
+  dom.courseName.addEventListener("input", UI.renderSummaries);
+  if (!setRadio("tone", storage.get(STORAGE.tone))) setRadio("tone", "akademis formal");
+  document.querySelectorAll('input[name="tone"]').forEach((input) => input.addEventListener("change", () => {
+    storage.set(STORAGE.tone, input.value);
+    UI.renderSummaries();
+  }));
+
+  // Jalur
+  setMode(storage.get(STORAGE.mode) || "jurnal");
+  document.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", () => setMode(input.value)));
+
+  // Soal: draf dipulihkan dari sesi sebelumnya
+  const draft = storage.get(STORAGE.draft);
+  if (draft) {
+    dom.topic.value = draft;
+    dom.draftStatus.textContent = "Draf dari sesi sebelumnya dipulihkan";
+  }
+  UI.renderTopicMeta();
+  dom.topic.addEventListener("input", () => {
+    UI.renderTopicMeta();
+    saveDraft();
+  });
+
+  // Tab soal dengan navigasi panah kiri kanan
+  dom.tabType.addEventListener("click", () => UI.selectQuestionTab("type"));
+  dom.tabUpload.addEventListener("click", () => UI.selectQuestionTab("upload"));
+  [dom.tabType, dom.tabUpload].forEach((tab) => tab.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const next = tab === dom.tabType ? dom.tabUpload : dom.tabType;
+    UI.selectQuestionTab(next === dom.tabUpload ? "upload" : "type");
+    next.focus();
+  }));
+  bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
+  $("btn-replace-question-file").addEventListener("click", () => dom.questionFile.click());
+  $("btn-edit-question-text").addEventListener("click", () => {
+    UI.selectQuestionTab("type");
+    dom.topic.focus();
+  });
+
+  // Setelan jawaban
+  dom.specWordLimit.addEventListener("input", () => {
+    // Angka yang diketik menggantikan batas berbeda per soal hasil deteksi
+    if (dom.specWordLimit.value) State.detectedItemLimits = null;
+    UI.renderSpecVisibility();
+  });
+  [dom.specWordScope, dom.specAnswerType, dom.selectLength].forEach((node) => node.addEventListener("change", UI.renderSpecVisibility));
+  dom.specQuestionCount.addEventListener("input", UI.renderSpecVisibility);
+  UI.renderSpecNote();
+  UI.renderSpecVisibility();
+
+  dom.formTask.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitTask();
+  });
+
+  // Tahap 2
+  $("btn-back-step-1").addEventListener("click", () => goStep(1));
+  dom.refineForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    performSearch(dom.refineQuery.value);
+  });
+  dom.btnToggleManual.addEventListener("click", () => {
+    const open = dom.manualForm.classList.toggle("hidden") === false;
+    dom.btnToggleManual.setAttribute("aria-expanded", String(open));
+    if (open) dom.manualDoi.focus();
+  });
+  dom.manualForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    addManualPaper();
+  });
+
+  bindDropzone(dom.materialDropzone, dom.materialFile, handleMaterialFile);
+  let previewTimer = null;
+  dom.materialText.addEventListener("input", () => {
+    UI.renderMaterialMeta();
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(UI.renderMaterialPreview, 300);
+  });
+  $("btn-pick-material-screenshot").addEventListener("click", () => dom.materialScreenshot.click());
+  dom.materialScreenshot.addEventListener("change", () => {
+    if (dom.materialScreenshot.files[0]) readScreenshot(dom.materialScreenshot.files[0]);
+    dom.materialScreenshot.value = "";
+  });
+  dom.btnSaveMaterial.addEventListener("click", saveMaterial);
+  attachUtLookup();
+  dom.btnGenerate.addEventListener("click", generate);
+
+  // Ctrl+V gambar dari Snipping Tool saat mengisi bahan dosen
+  window.addEventListener("paste", (e) => {
+    if (State.step !== 2 || State.mode !== "bahan") return;
+    const item = Array.from((e.clipboardData && e.clipboardData.items) || []).find((i) => i.type.startsWith("image/"));
+    const file = item && item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    readScreenshot(file);
+  });
+
+  // Tahap 3
+  $("btn-download-docx").addEventListener("click", () => download("docx"));
+  $("btn-download-pdf").addEventListener("click", () => download("pdf"));
+  $("btn-copy-text").addEventListener("click", copyDocument);
+  dom.btnRegenerate.addEventListener("click", regenerateAll);
+  $("btn-new-task").addEventListener("click", startNewTask);
+
+  // Di mode desktop, API pywebview baru siap setelah halaman dimuat
+  window.addEventListener("pywebviewready", () => {
+    enableDesktopChrome();
+    syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
+    window.pywebview.api.fit_height(document.documentElement.scrollHeight);
+  });
+
+  UI.showStep(1);
+  checkSystemHealth();
 }
 
-// Init
-checkSystemHealth();
+init();

@@ -11,7 +11,8 @@ from api.schemas import (
     PaperItem, ManualModuleRequest, UTCourseLookupResponse,
     ExtractScreenshotRequest, ExtractScreenshotResponse,
     ParseQuestionDocRequest, ParseQuestionDocResponse,
-    TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse
+    TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse,
+    ParseReadingDocResponse
 )
 from tools.academic_search import search_openalex_papers
 from tools.pdf_downloader import download_paper_pdf
@@ -19,10 +20,13 @@ from tools.pdf_parser import extract_text_with_pages
 from tools.ut_catalog import lookup_ut_course
 from tools.ocr_vision import extract_text_from_image
 from tools.question_reader import parse_question_document
+from tools.reading_doc_reader import read_reading_doc, MAX_READING_DOC_BYTES
+from tools.content_chunker import chunk_paragraphs
 from tools.gemini_client import get_ai_status
 from agents.generator import generate_academic_draft, rewrite_section
 from exporters.docx_builder import create_assignment_docx
 from exporters.pdf_builder import create_assignment_pdf
+from tools.task_store import save_task_to_disk, load_task_from_disk
 
 
 
@@ -78,7 +82,18 @@ def build_task_files(task_id: str, task: Dict[str, Any]) -> None:
 def get_task_or_404(task_id: str) -> Dict[str, Any]:
     task = TASKS_DB.get(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="Naskah tidak ditemukan. Aplikasi mungkin sudah dibuka ulang, silakan tulis ulang tugasnya.")
+        task = load_task_from_disk(task_id)
+        if task:
+            TASKS_DB[task_id] = task
+            docx_ok = task.get("docx_path") and os.path.exists(task["docx_path"])
+            pdf_ok = task.get("pdf_path") and os.path.exists(task["pdf_path"])
+            if not docx_ok or not pdf_ok:
+                try:
+                    build_task_files(task_id, task)
+                except Exception as e:
+                    print(f"Peringatan: Gagal merakit ulang berkas untuk tugas {task_id}: {e}")
+    if not task:
+        raise HTTPException(status_code=404, detail="Naskah tidak ditemukan. Silakan periksa kembali ID tugas atau buat tugas baru.")
     return task
 
 
@@ -89,6 +104,7 @@ async def update_task(task_id: str, payload: TaskEditRequest):
     task["title"] = payload.title.strip()
     task["sections"] = [{"heading": s.heading.strip(), "content": s.content.strip()} for s in payload.sections]
     build_task_files(task_id, task)
+    save_task_to_disk(task_id, task)
     return TaskUpdateResponse(title=task["title"], sections=task["sections"], word_count=count_words(task["sections"]))
 
 
@@ -119,55 +135,97 @@ async def rewrite_task_section(task_id: str, index: int, payload: SectionRewrite
 
     task["sections"][index] = new_section
     build_task_files(task_id, task)
+    save_task_to_disk(task_id, task)
     return TaskUpdateResponse(title=task["title"], sections=task["sections"], word_count=count_words(task["sections"]))
 
 
 @router.post("/manual-module", response_model=PaperItem)
 async def add_manual_module(payload: ManualModuleRequest):
-    """Menerima teks salinan modul BMP UT atau diktat kuliah dan menyimpannya sebagai rujukan."""
-    mod_id = f"bmp_{uuid.uuid4().hex[:8]}"
-    author_name = payload.author.strip() if payload.author and payload.author.strip() else "Universitas Terbuka"
-    authors = [author_name]
+    """Menyimpan bahan bacaan dosen, cerpen, bab buku, atau modul BMP UT sebagai rujukan tugas."""
+    content = payload.content_text.strip()
+    chunks = chunk_paragraphs(content, max_chars=3000)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="Isi bahan bacaan masih kosong.")
 
     module_title = payload.module_title.strip()
     lookup = lookup_ut_course(module_title)
-    if lookup.get("found") and lookup.get("exact") and lookup.get("course"):
+    # Label Universitas Terbuka hanya untuk judul yang benar-benar memuat kode mata kuliah resmi
+    is_ut_bmp = bool(lookup.get("found") and lookup.get("exact") and lookup.get("course"))
+    if is_ut_bmp:
         module_title = lookup["course"]["formatted_title"]
 
-    venue_name = "Buku Materi Pokok (BMP) Universitas Terbuka"
+    author = (payload.author or "").strip()
+    authors = [author] if author else (["Universitas Terbuka"] if is_ut_bmp else [])
+    venue = (payload.publisher_or_venue or "").strip()
+    if not venue and is_ut_bmp:
+        venue = "Buku Materi Pokok (BMP) Universitas Terbuka"
+    page_ref = (payload.page_or_ref or "").strip()
+
+    mod_id = f"bmp_{uuid.uuid4().hex[:8]}"
     item_data = {
         "id": mod_id,
         "title": module_title,
         "authors": authors,
-        "year": payload.year or 2023,
-        "venue": venue_name,
+        "year": payload.year,
+        "venue": venue,
         "doi": "",
         "pdf_url": "",
         "all_pdf_urls": [],
-        "abstract": f"Bahan ajar modul kuliah resmi: {payload.module_title}. Rujukan: {payload.page_or_kb}.",
-        "scholar_url": "https://pustaka.ut.ac.id/",
+        "abstract": " ".join(content.split())[:400],
+        "scholar_url": "https://pustaka.ut.ac.id/" if is_ut_bmp else "",
         "has_full_pdf": True,
         "is_manual_module": True,
-        "source_status": "Buku Materi Pokok UT",
-        "page_info": payload.page_or_kb or "Modul 1",
+        "is_ut_bmp": is_ut_bmp,
+        "source_status": "Buku Materi Pokok UT" if is_ut_bmp else "Bahan bacaan dosen",
+        "page_info": page_ref,
         "pages_content": [
-            {
-                "page_number": payload.page_or_kb or "Modul 1",
-                "text": f"Buku Materi Pokok: {payload.module_title}\nRujukan: {payload.page_or_kb}\nTeks Pembahasan Modul:\n{payload.content_text.strip()}"
-            }
-        ]
+            {"page_number": f"{page_ref}, bagian {i}" if page_ref else f"Bagian {i}", "text": chunk}
+            for i, chunk in enumerate(chunks, 1)
+        ],
     }
     CACHED_PAPERS[mod_id] = item_data
     return PaperItem(
         id=mod_id,
-        title=item_data["title"],
-        authors=item_data["authors"],
-        year=item_data["year"],
-        venue=item_data["venue"],
+        title=module_title,
+        authors=authors,
+        year=payload.year,
+        venue=venue,
         doi="",
         pdf_url="",
         abstract=item_data["abstract"],
-        scholar_url=item_data["scholar_url"]
+        scholar_url=item_data["scholar_url"],
+        is_ut_bmp=is_ut_bmp,
+    )
+
+
+@router.post("/parse-reading-doc", response_model=ParseReadingDocResponse)
+async def parse_reading_doc(file: UploadFile = File(...)):
+    """Membaca teks bahan bacaan dosen secara lokal. Gemini hanya dipakai untuk PDF hasil scan."""
+    filename = file.filename or "bahan_bacaan"
+    content = await file.read(MAX_READING_DOC_BYTES + 1)
+    if len(content) > MAX_READING_DOC_BYTES:
+        raise HTTPException(status_code=413, detail="Berkas lebih dari 20 MB. Pecah dulu per bab lalu unggah lagi.")
+    if len(content) < 10:
+        raise HTTPException(status_code=400, detail="Berkas kosong atau rusak.")
+
+    try:
+        text, used_ocr = await read_reading_doc(content, filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not text:
+        return ParseReadingDocResponse(
+            success=False,
+            filename=filename,
+            message="Teks tidak terbaca. Kalau ini hasil scan, tunggu status Gemini hijau lalu coba lagi."
+        )
+    source = "lewat OCR Gemini" if used_ocr else "secara lokal"
+    return ParseReadingDocResponse(
+        success=True,
+        filename=filename,
+        text=text,
+        char_count=len(text),
+        message=f"Berhasil membaca {len(text)} karakter dari {filename} {source}."
     )
 
 
@@ -327,7 +385,6 @@ async def generate_task(payload: GenerateRequest):
         p_data_copy = dict(p_data)
         if p_data.get("is_manual_module"):
             p_data_copy["has_full_pdf"] = True
-            p_data_copy["source_status"] = "Buku Materi Pokok UT"
             selected_papers.append(p_data_copy)
             continue
 
@@ -410,6 +467,7 @@ async def generate_task(payload: GenerateRequest):
     }
     build_task_files(task_id, task)
     TASKS_DB[task_id] = task
+    save_task_to_disk(task_id, task)
     total_words = count_words(sections)
 
     # Susun bukti sitasi transparan (evidence)

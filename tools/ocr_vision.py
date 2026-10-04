@@ -79,55 +79,32 @@ IMAGE_DESCRIPTION_RULE = (
 )
 
 
-def upscale_image(image_bytes: bytes, mime_type: str, target: int = 1500) -> tuple:
-    """Memperbesar gambar kecil supaya garis tipis dan label huruf terbaca model. Gambar yang gagal dibuka dikirim apa adanya."""
+def prepare_image(image_bytes: bytes, mime_type: str, low: int = 1500, high: int = 1536) -> tuple:
+    """
+    Menyiapkan gambar sebelum dikirim ke Gemini. Gambar kecil diperbesar supaya garis tipis dan label huruf terbaca,
+    gambar besar diperkecil, lalu dikompres JPEG supaya banyak gambar muat dalam satu permintaan.
+    Gambar yang gagal dibuka dikirim apa adanya.
+    """
     try:
         img = Image.open(io.BytesIO(image_bytes))
+        img.load()
+        if img.mode in ("RGBA", "LA", "P"):
+            # Latar transparan jadi hitam kalau langsung diubah ke RGB, jadi ditempel di atas latar putih
+            img = img.convert("RGBA")
+            background = Image.new("RGB", img.size, "white")
+            background.paste(img, mask=img.getchannel("A"))
+            img = background
+        else:
+            img = img.convert("RGB")
         longest = max(img.size)
-        if longest >= target:
-            return image_bytes, mime_type
-        scale = target / longest
-        img = img.convert("RGB").resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+        if longest < low or longest > high:
+            scale = (low if longest < low else high) / longest
+            img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
         out = io.BytesIO()
-        img.save(out, "PNG")
-        return out.getvalue(), "image/png"
+        img.save(out, "JPEG", quality=85)
+        return out.getvalue(), "image/jpeg"
     except Exception:
         return image_bytes, mime_type
-
-
-async def describe_image(image_bytes: bytes, mime_type: str = "image/png", question_context: str = "") -> str:
-    """Mendeskripsikan gambar di lembar soal supaya soal yang merujuk gambar bisa dijawab sesuai isinya.
-    question_context berisi teks soal di sekitar gambar agar detail yang ditanyakan ikut dideskripsikan."""
-    if not image_bytes or len(image_bytes) < 100:
-        return ""
-
-    image_bytes, mime_type = upscale_image(image_bytes, mime_type)
-    focus = ""
-    if question_context.strip():
-        focus = f" Teks soal di sekitar gambar:\n{question_context.strip()}\n" + QUESTION_FOCUS_RULE
-
-    prompt = (
-        "Gambar ini bagian dari lembar soal tugas kuliah. Deskripsikan isinya secara objektif. Data soal seperti rumus, grafik, graf, dan tabel ditulis lengkap. "
-        + IMAGE_CONTENT_GUIDE
-        + focus
-        + f" Jika gambar hanya logo, ikon, stempel, atau hiasan yang bukan bahan soal, balas persis: {SKIP_IMAGE}. "
-        "Tulis dalam paragraf biasa tanpa format markdown, tanpa pembuka atau komentar tambahan."
-    )
-
-    try:
-        response = await generate_with_fallback(
-            "fast",
-            [types.Part.from_bytes(data=image_bytes, mime_type=mime_type), prompt],
-            config=types.GenerateContentConfig(temperature=0.1),
-            timeout=20.0,
-            total_budget=45.0,
-        )
-    except Exception as e:
-        print(f"Deskripsi gambar soal gagal: {e}")
-        return ""
-
-    text = response.text.strip()
-    return "" if text.upper().startswith(SKIP_IMAGE) else text
 
 
 # Batas data inline Gemini sekitar 20MB per permintaan, disisakan ruang untuk prompt
@@ -177,35 +154,67 @@ async def extract_text_from_pdf(pdf_bytes: bytes, mark_figures: bool = False) ->
     return response.text.strip()
 
 
-async def locate_figures(page_png: bytes) -> list:
+FIGURE_BOX_SCHEMA = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {
+            "page": {"type": "INTEGER"},
+            "box_2d": {"type": "ARRAY", "items": {"type": "INTEGER"}},
+        },
+        "required": ["page", "box_2d"],
+    },
+}
+
+
+async def locate_figures(pages: list) -> list:
     """
-    Mencari kotak letak gambar soal di satu halaman, urut dari atas ke bawah, skala 0 sampai 1000.
+    Mencari kotak letak gambar soal di semua halaman dalam satu panggilan, skala 0 sampai 1000.
+    Mengembalikan satu list kotak per halaman, urut dari atas ke bawah.
     Gambar soal dipotong lalu dibaca terpisah karena garis tipis seperti sisi graf tidak terbaca akurat dari satu halaman penuh.
     """
+    if not pages:
+        return []
     prompt = (
-        "Temukan setiap gambar bahan soal di halaman ini: foto, ilustrasi, graf, diagram, grafik, bangun geometri, atau rumus berbentuk gambar. "
+        f"Ada {len(pages)} halaman lembar soal di atas, berurutan dari halaman 1. "
+        "Temukan setiap gambar bahan soal di tiap halaman: foto, ilustrasi, graf, diagram, grafik, bangun geometri, atau rumus berbentuk gambar. "
         "Abaikan logo, kop, stempel, garis pemisah, dan blok teks biasa. Kotak harus mencakup seluruh gambar beserta label hurufnya. "
         "Urutkan sesuai urutan baca dari atas ke bawah. "
-        'Balas JSON murni berupa list objek {"box_2d": [ymin, xmin, ymax, xmax]} dengan skala 0 sampai 1000, atau [] jika tidak ada.'
+        'Balas JSON murni berupa list objek {"page": nomor halaman, "box_2d": [ymin, xmin, ymax, xmax]} dengan skala 0 sampai 1000 '
+        "relatif terhadap halaman itu, atau [] jika tidak ada."
     )
+    contents = []
+    for page in pages:
+        data, mime = prepare_image(page, "image/png")
+        contents.append(types.Part.from_bytes(data=data, mime_type=mime))
+    contents.append(prompt)
     try:
         response = await generate_with_fallback(
             "fast",
-            [types.Part.from_bytes(data=page_png, mime_type="image/png"), prompt],
-            config=types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json"),
-            timeout=30.0,
-            total_budget=60.0,
+            contents,
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+                # Tanpa skema, model kadang membungkus box_2d jadi list di dalam list sehingga kotaknya terbuang
+                response_schema=FIGURE_BOX_SCHEMA,
+            ),
+            timeout=45.0,
+            total_budget=90.0,
         )
         items = json.loads(response.text)
     except Exception as e:
         print(f"Pencarian gambar di halaman gagal: {e}")
-        return []
+        return [[] for _ in pages]
 
-    boxes = []
+    boxes = [[] for _ in pages]
     for item in items if isinstance(items, list) else []:
-        box = item.get("box_2d") if isinstance(item, dict) else None
+        if not isinstance(item, dict):
+            continue
+        page, box = item.get("page"), item.get("box_2d")
+        if not isinstance(page, int) or not 1 <= page <= len(pages):
+            continue
         if isinstance(box, list) and len(box) == 4 and all(isinstance(v, (int, float)) for v in box):
             ymin, xmin, ymax, xmax = (max(0, min(1000, v)) for v in box)
             if ymax > ymin and xmax > xmin:
-                boxes.append((ymin, xmin, ymax, xmax))
+                boxes[page - 1].append((ymin, xmin, ymax, xmax))
     return boxes

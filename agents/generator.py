@@ -57,6 +57,58 @@ def clean_output_text(text: str) -> str:
     return text.replace("…", "...")
 
 
+def robust_json_dict_parse(text: str) -> Optional[Dict[str, Any]]:
+    """Mengekstrak dan mem-parse struktur kamus JSON dari respons model dengan berbagai strategi pemulihan."""
+    if not text or not text.strip():
+        return None
+
+    raw = text.strip()
+
+    # 1. Coba parse langsung
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]
+    except Exception:
+        pass
+
+    # 2. Bersihkan blok markdown ```json ... ``` atau ``` ... ```
+    cleaned = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned).strip()
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]
+    except Exception:
+        pass
+
+    # 3. Cari substring JSON terluar dengan kurung kurawal pertama dan terakhir
+    first_brace = raw.find("{")
+    last_brace = raw.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        snippet = raw[first_brace : last_brace + 1]
+        try:
+            data = json.loads(snippet)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            # 4. Tangani kemungkinan karakter kontrol liar dan koma menggantung (trailing commas)
+            try:
+                sanitized = re.sub(r",\s*([\]}])", r"\1", snippet)
+                sanitized = re.sub(r"(?<!\\)[\x00-\x1f]", lambda m: f"\\u{ord(m.group(0)):04x}", sanitized)
+                data = json.loads(sanitized)
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+
+    return None
+
+
 DIRECT_ANSWER_LABELS = {
     "terjemahan": "terjemahan teks",
     "jawaban_singkat": "jawaban singkat, isian, benar salah, pemahaman bacaan, atau hitungan",
@@ -429,8 +481,10 @@ async def generate_academic_draft(
         year = p.get("year") or "n.d."
         title = p.get("title", "")
         pages_content = p.get("pages_content", [])
-        if p.get("is_manual_module"):
-            status_label = "Buku Materi Pokok (BMP) UT / Diktat Bahan Ajar"
+        if p.get("is_ut_bmp"):
+            status_label = "Buku Materi Pokok (BMP) UT"
+        elif p.get("is_manual_module"):
+            status_label = "Bahan Bacaan dari Dosen"
         else:
             status_label = "Naskah Fisik PDF" if p.get("has_full_pdf") else "Abstrak Resmi Terverifikasi"
 
@@ -444,7 +498,8 @@ async def generate_academic_draft(
 
         for page in pages_content:
             page_num = page.get("page_number", 1)
-            text_snippet = page.get("text", "")[:1500]
+            # Bahan dosen dibaca utuh per bagian, naskah jurnal cukup cuplikan per halaman
+            text_snippet = page.get("text", "")[:3000 if p.get("is_manual_module") else 1500]
             sources_text += f"[{page_num}]: {text_snippet}\n"
 
     if is_en:
@@ -725,13 +780,7 @@ async def generate_academic_draft(
     )
 
     language = "en" if is_en else "id"
-    try:
-        parsed = json.loads(response.text)
-    except ValueError as e:
-        print(f"Error parsing Gemini JSON response: {e}")
-        parsed = None
-    if isinstance(parsed, list) and parsed:
-        parsed = parsed[0]
+    parsed = robust_json_dict_parse(response.text)
     if not isinstance(parsed, dict):
         return {
             "title": topic.title(),

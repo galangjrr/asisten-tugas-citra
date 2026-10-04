@@ -319,12 +319,12 @@ async def test_read_pdf_ocr_runs_only_when_a_page_is_scanned(monkeypatch):
     monkeypatch.setattr(qr, "extract_text_from_pdf", fake_ocr)
 
     text_only = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler secara lengkap."])
-    assert "segmentasi pasar" in await qr.read_pdf_file(text_only)
+    assert "segmentasi pasar" in (await qr.read_pdf_file(text_only))[0]
     assert calls == []
 
     # Halaman kedua hasil scan, jadi seluruh PDF ditranskripsi walau halaman pertama berteks
     mixed = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler.", ["2. Soal dari halaman scan"]])
-    result = await qr.read_pdf_file(mixed)
+    result, _ = await qr.read_pdf_file(mixed)
     assert len(calls) == 1
     assert "halaman hasil scan" in result
 
@@ -338,7 +338,7 @@ async def test_read_pdf_keeps_extracted_text_when_ocr_fails(monkeypatch):
 
     monkeypatch.setattr(qr, "extract_text_from_pdf", failed_ocr)
     mixed = _make_pdf(["1. Jelaskan konsep segmentasi pasar menurut Kotler.", ["2. Soal scan"]])
-    assert "segmentasi pasar" in await qr.read_pdf_file(mixed)
+    assert "segmentasi pasar" in (await qr.read_pdf_file(mixed))[0]
 
 
 def _noise_png(size: int = 128) -> bytes:
@@ -354,30 +354,83 @@ def _noise_png(size: int = 128) -> bytes:
 
 
 @pytest.mark.anyio
-async def test_read_docx_describes_question_images_in_place(monkeypatch):
+async def test_docx_images_are_described_in_one_call(monkeypatch):
+    import json
     import tools.question_reader as qr
+    calls = []
 
-    async def fake_describe(blob, mime, question_context=""):
-        assert mime == "image/png"
-        # Pendeskripsi menerima perintah soal di sekitar gambar, di atas maupun di bawahnya
-        assert "1. Describe the coffee shop" in question_context
-        assert "2. Write a letter" in question_context
-        assert "[GAMBAR INI]" in question_context
-        return "Interior kafe dengan kursi merah dan meja bar kayu."
+    class Res:
+        text = json.dumps({
+            "question_topic": "1. Describe the coffee shop in the picture below.\n[[GAMBAR_1]]\n2. Write a letter to the editor.",
+            "guidelines": "",
+            "course_code": None,
+            "answer_spec": {"answer_type": "uraian"},
+            "images": [
+                {"id": 0, "description": "ABAIKAN"},
+                {"id": "GAMBAR_1", "description": "Interior kafe dengan kursi merah dan meja bar kayu."},
+            ],
+        })
 
-    monkeypatch.setattr(qr, "describe_image", fake_describe)
+    async def fake_generate(category, contents, **kwargs):
+        calls.append(contents)
+        return Res()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(qr, "generate_with_fallback", fake_generate)
     doc = docx.Document()
+    doc.add_picture(io.BytesIO(_noise_png()))
     doc.add_paragraph("1. Describe the coffee shop in the picture below.")
     doc.add_picture(io.BytesIO(_noise_png()))
     doc.add_paragraph("2. Write a letter to the editor.")
     stream = io.BytesIO()
     doc.save(stream)
 
-    text = await qr.read_docx_with_images(stream.getvalue())
-    assert "[Gambar: Interior kafe dengan kursi merah" in text
-    assert text.index("1. Describe") < text.index("[Gambar:") < text.index("2. Write")
+    res = await qr.parse_question_document(stream.getvalue(), "soal.docx")
+    # Strukturisasi dan deskripsi kedua gambar cukup satu panggilan
+    assert len(calls) == 1
+    prompt, *parts = calls[0]
+    assert "[[GAMBAR_0]]" in prompt and "[[GAMBAR_1]]" in prompt and '"images"' in prompt
+    assert sum(not isinstance(p, str) for p in parts) == 2
+    q = res["questions"]
+    assert "[Gambar: Interior kafe dengan kursi merah" in q
+    assert q.index("1. Describe") < q.index("[Gambar:") < q.index("2. Write")
+    # Logo yang dibalas ABAIKAN hilang tanpa sisa penanda
+    assert "GAMBAR" not in res["text"] and res["text"].count("[Gambar:") == 1
     # Pembacaan tanpa list gambar tetap teks murni seperti sebelumnya
     assert "GAMBAR" not in qr.read_docx_file(stream.getvalue())
+
+
+@pytest.mark.anyio
+async def test_image_markers_are_dropped_when_ai_is_unavailable(monkeypatch):
+    import tools.question_reader as qr
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    doc = docx.Document()
+    doc.add_paragraph("1. Describe the coffee shop in the picture below.")
+    doc.add_picture(io.BytesIO(_noise_png()))
+    stream = io.BytesIO()
+    doc.save(stream)
+
+    res = await qr.parse_question_document(stream.getvalue(), "soal.docx")
+    assert "GAMBAR" not in res["text"] and "GAMBAR" not in res["questions"]
+
+
+def test_prepare_image_sizes_and_compresses():
+    from PIL import Image
+    from tools.ocr_vision import prepare_image
+
+    def png(size, mode="RGB", color="white"):
+        out = io.BytesIO()
+        Image.new(mode, size, color).save(out, "PNG")
+        return out.getvalue()
+
+    small, mime = prepare_image(png((300, 200)), "image/png")
+    assert mime == "image/jpeg" and max(Image.open(io.BytesIO(small)).size) == 1500
+    big, _ = prepare_image(png((4000, 3000)), "image/png")
+    assert max(Image.open(io.BytesIO(big)).size) == 1536
+    # Latar transparan jadi putih, bukan hitam
+    clear, _ = prepare_image(png((1500, 1500), "RGBA", (0, 0, 0, 0)), "image/png")
+    assert Image.open(io.BytesIO(clear)).getpixel((10, 10))[0] > 240
+    assert prepare_image(b"bukan gambar", "image/png") == (b"bukan gambar", "image/png")
 
 
 def test_read_docx_keeps_word_equations_as_linear_text():
@@ -411,55 +464,37 @@ def test_read_docx_keeps_word_equations_as_linear_text():
 
 
 @pytest.mark.anyio
-async def test_describe_image_drops_logos(monkeypatch):
-    import tools.ocr_vision as ov
-
-    class Res:
-        text = "ABAIKAN"
-
-    async def fake_generate(*args, **kwargs):
-        return Res()
-
-    monkeypatch.setattr(ov, "generate_with_fallback", fake_generate)
-    assert await ov.describe_image(b"x" * 500) == ""
-
-
-@pytest.mark.anyio
-async def test_pdf_figures_are_cropped_and_described_in_order(monkeypatch):
+async def test_pdf_figures_are_cropped_in_order(monkeypatch):
     import tools.question_reader as qr
     marker_text = (
         "2. Tentukan matriks adjacency graf berikut.\n[[GAMBAR]]\n"
         "3. Diketahui graf di bawah ini.\n[[GAMBAR]]\na. Tentukan derajat tiap simpul."
     )
-    contexts = []
+    locate_calls = []
 
     async def fake_ocr(pdf_bytes, mark_figures=False):
         return marker_text if mark_figures else "DESKRIPSI HALAMAN PENUH"
 
-    async def fake_locate(page_png):
-        return [(100, 100, 300, 500), (500, 100, 700, 500)]
-
-    async def fake_describe(blob, mime, question_context=""):
-        contexts.append(question_context)
-        assert blob[1:4] == b"PNG"
-        return f"graf ke-{len(contexts)}"
+    async def fake_locate(pages):
+        locate_calls.append(len(pages))
+        return [[(100, 100, 300, 500), (500, 100, 700, 500)] for _ in pages]
 
     monkeypatch.setattr(qr, "extract_text_from_pdf", fake_ocr)
     monkeypatch.setattr(qr, "locate_figures", fake_locate)
-    monkeypatch.setattr(qr, "describe_image", fake_describe)
     pdf = _make_pdf(["Halaman soal graf"])
 
-    text = await qr._transcribe_with_figures(pdf)
-    assert text.index("[Gambar: graf ke-") < text.index("3. Diketahui") < text.rindex("[Gambar: graf ke-")
-    # Setiap potongan menerima teks soal di sekitarnya dengan posisinya ditandai
-    assert all("[GAMBAR INI]" in c for c in contexts)
+    text, crops = await qr._transcribe_with_figures(pdf)
+    # Semua halaman dicari gambarnya dalam satu panggilan
+    assert locate_calls == [1]
+    assert len(crops) == 2 and all(blob[1:4] == b"PNG" for blob, _ in crops)
+    assert text.index("[[GAMBAR_0]]") < text.index("3. Diketahui") < text.index("[[GAMBAR_1]]")
 
     # Jumlah potongan tidak cocok dengan penanda, jadi urutan tidak dipercaya dan pakai deskripsi halaman penuh
-    async def one_box(page_png):
-        return [(100, 100, 300, 500)]
+    async def one_box(pages):
+        return [[(100, 100, 300, 500)] for _ in pages]
 
     monkeypatch.setattr(qr, "locate_figures", one_box)
-    assert await qr._transcribe_with_figures(pdf) == "DESKRIPSI HALAMAN PENUH"
+    assert await qr._transcribe_with_figures(pdf) == ("DESKRIPSI HALAMAN PENUH", [])
 
 
 def test_item_word_limit_is_totalled_per_question():

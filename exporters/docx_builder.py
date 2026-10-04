@@ -113,10 +113,10 @@ def create_assignment_docx(
     ref_h_run.font.size = Pt(12)
 
     for ref in references:
-        authors_str = ", ".join(ref.get("authors", ["Anonim"]))
-        year = ref.get("year", "n.d.")
+        authors_str = ", ".join(ref.get("authors") or ["Anonim"])
+        year = ref.get("year") or "n.d."
         ref_title = ref.get("title", "")
-        venue = ref.get("venue", "Publikasi Akademik")
+        venue = (ref.get("venue") or "").strip()
         doi = ref.get("doi", "")
 
         ref_p = doc.add_paragraph()
@@ -125,7 +125,8 @@ def create_assignment_docx(
         ref_p.paragraph_format.first_line_indent = Inches(-0.5)
         ref_p.paragraph_format.space_after = Pt(6)
 
-        citation_line = f"{authors_str}. ({year}). {ref_title}. {venue}."
+        # Bahan dosen tanpa penerbit tidak boleh menyisakan titik ganda
+        citation_line = f"{authors_str}. ({year}). {ref_title}." + (f" {venue}." if venue else "")
         if doi:
             citation_line += f" {doi}"
 

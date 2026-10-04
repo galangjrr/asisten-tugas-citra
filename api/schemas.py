@@ -22,6 +22,7 @@ class PaperItem(BaseModel):
     pdf_url: Optional[str] = None
     abstract: Optional[str] = None
     scholar_url: Optional[str] = None
+    is_ut_bmp: bool = False
 
 
 class SearchRequest(BaseModel):
@@ -92,11 +93,20 @@ class GenerateResponse(BaseModel):
 
 
 class ManualModuleRequest(BaseModel):
-    module_title: str = Field(..., min_length=3, description="Kode dan Judul Modul BMP UT atau Diktat")
-    author: Optional[str] = "Universitas Terbuka"
-    year: Optional[int] = 2023
-    page_or_kb: Optional[str] = "Modul 1, KB 1"
-    content_text: str = Field(..., min_length=15, description="Teks hasil salin dari Ruang Baca Virtual")
+    module_title: str = Field(..., min_length=3, max_length=300, description="Judul naskah, bab buku, cerpen, atau kode modul UT")
+    author: Optional[str] = Field(None, max_length=200)
+    year: Optional[int] = Field(None, ge=1000, le=2100)
+    publisher_or_venue: Optional[str] = Field(None, max_length=200, description="Penerbit atau nama majalah, teks bebas")
+    page_or_ref: Optional[str] = Field(None, max_length=100)
+    content_text: str = Field(..., min_length=15, max_length=2_000_000, description="Teks bahan bacaan dari dosen")
+
+
+class ParseReadingDocResponse(BaseModel):
+    success: bool
+    filename: str = ""
+    text: str = ""
+    char_count: int = 0
+    message: str = ""
 
 
 class UTCourseDetail(BaseModel):

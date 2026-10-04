@@ -117,13 +117,13 @@ def create_assignment_pdf(
         story.append(Paragraph(ref_title_text, heading_style))
 
     for ref in references:
-        authors_str = ", ".join(ref.get("authors", ["Anonim"]))
-        year = ref.get("year", "n.d.")
+        authors_str = ", ".join(ref.get("authors") or ["Anonim"])
+        year = ref.get("year") or "n.d."
         ref_title = ref.get("title", "")
-        venue = ref.get("venue", "Publikasi Akademik")
+        venue = (ref.get("venue") or "").strip()
         doi = ref.get("doi", "")
 
-        cit = f"{authors_str}. ({year}). {ref_title}. <i>{venue}</i>."
+        cit = f"{authors_str}. ({year}). {ref_title}." + (f" <i>{venue}</i>." if venue else "")
         if doi:
             cit += f" {doi}"
 

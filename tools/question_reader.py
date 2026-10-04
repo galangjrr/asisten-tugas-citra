@@ -13,7 +13,11 @@ from tools.gemini_client import generate_with_fallback
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from pypdf.generic import ContentStream
-from tools.ocr_vision import FIGURE_MARKER, MIN_QUESTION_IMAGE_BYTES, describe_image, extract_text_from_pdf, locate_figures
+from google.genai import types
+from tools.ocr_vision import (
+    FIGURE_MARKER, IMAGE_CONTENT_GUIDE, MIN_QUESTION_IMAGE_BYTES, QUESTION_FOCUS_RULE, SKIP_IMAGE,
+    extract_text_from_pdf, locate_figures, prepare_image,
+)
 
 
 def extract_course_code_from_text(text: str) -> Optional[str]:
@@ -209,30 +213,22 @@ def read_docx_file(file_bytes: bytes, images: Optional[list] = None) -> str:
     return "\n\n".join(block_lines(doc.element.body))
 
 
-def _text_around(text: str, marker: str, width: int = 1000) -> str:
-    """Teks soal sebelum dan sesudah gambar. Perintah bisa di atas ('gambar di bawah') atau di bawah ('gambar di atas')."""
-    pos = text.find(marker)
-    if pos < 0:
-        return ""
-    window = text[max(0, pos - width):pos] + "[GAMBAR INI]" + text[pos + len(marker):pos + len(marker) + width]
-    return re.sub(r"\[\[GAMBAR_\d+\]\]", "[gambar lain]", window)
+IMAGE_MARKER = re.compile(r"\[\[GAMBAR_(\d+)\]\]")
 
 
-async def read_docx_with_images(file_bytes: bytes) -> str:
-    """Membaca DOCX lalu mengganti penanda gambar dengan deskripsi isinya agar soal bergambar bisa dijawab."""
+def read_docx_with_images(file_bytes: bytes) -> tuple:
+    """Membaca DOCX beserta gambar soalnya. Posisi gambar ke-n ditandai [[GAMBAR_n]] dan dideskripsikan saat strukturisasi."""
     images: list = []
     text = read_docx_file(file_bytes, images)
-    return await _fill_image_markers(text, images)
+    return text, images
 
 
-async def _fill_image_markers(text: str, images: list) -> str:
-    """Mengganti penanda [[GAMBAR_n]] dengan deskripsi gambar ke-n, dibaca bersama teks soal di sekitarnya."""
-    descriptions = await asyncio.gather(
-        *(describe_image(blob, mime, _text_around(text, f"[[GAMBAR_{i}]]")) for i, (blob, mime) in enumerate(images))
-    )
-    for i, desc in enumerate(descriptions):
-        text = text.replace(f"[[GAMBAR_{i}]]", f"[Gambar: {desc}]" if desc else "")
-    return text
+def fill_image_markers(text: str, descriptions: Dict[int, str]) -> str:
+    """Mengganti penanda [[GAMBAR_n]] dengan deskripsi gambar ke-n. Gambar tanpa deskripsi, seperti logo, dihapus penandanya."""
+    def describe(match):
+        desc = descriptions.get(int(match.group(1)), "")
+        return f"[Gambar: {desc}]" if desc else ""
+    return IMAGE_MARKER.sub(describe, text)
 
 
 # Font rumus LaTeX, Word, dan MathType. Teks bawaan pypdf merusak susunan pecahan dan pangkatnya.
@@ -269,10 +265,10 @@ def _needs_vision(page, text: str) -> bool:
         return True
 
 
-async def read_pdf_file(file_bytes: bytes) -> str:
+async def read_pdf_file(file_bytes: bytes) -> tuple:
     """
-    Membaca teks PDF lembar tugas. Jika ada halaman hasil scan atau gambar soal, di halaman mana pun,
-    seluruh PDF ditranskripsi Gemini beserta deskripsi gambarnya supaya urutan isi tetap utuh.
+    Membaca teks PDF lembar tugas beserta potongan gambar soalnya. Jika ada halaman hasil scan atau gambar soal,
+    di halaman mana pun, seluruh PDF ditranskripsi Gemini supaya urutan isi tetap utuh.
     """
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
     page_texts = []
@@ -287,13 +283,13 @@ async def read_pdf_file(file_bytes: bytes) -> str:
 
     extracted = "\n\n".join(page_texts)
     if not needs_vision:
-        return extracted
+        return extracted, []
 
-    ocr_text = await _transcribe_with_figures(file_bytes)
+    ocr_text, crops = await _transcribe_with_figures(file_bytes)
     # Transkripsi yang lebih pendek dari teks bawaan berarti OCR gagal sebagian, jadi teks bawaan dipakai
     if len(ocr_text) > len(extracted):
-        return ocr_text
-    return extracted
+        return ocr_text, crops
+    return extracted, []
 
 
 # ponytail: lembar soal biasanya beberapa halaman, PDF lebih panjang dibaca dari halaman penuh saja agar panggilan tidak membengkak
@@ -384,7 +380,7 @@ async def _crop_pdf_figures(file_bytes: bytes) -> list:
     except Exception as e:
         print(f"Render halaman PDF gagal: {e}")
         return []
-    boxes_per_page = await asyncio.gather(*(locate_figures(_png(image)) for image, _ in pages))
+    boxes_per_page = await locate_figures([_png(image) for image, _ in pages])
     crops = []
     for (image, objects), boxes in zip(pages, boxes_per_page):
         w, h = image.size
@@ -399,23 +395,23 @@ async def _crop_pdf_figures(file_bytes: bytes) -> list:
     return crops
 
 
-async def _transcribe_with_figures(file_bytes: bytes) -> str:
+async def _transcribe_with_figures(file_bytes: bytes) -> tuple:
     """
-    Transkripsi PDF dengan gambar soal yang dipotong dan dibaca satu per satu.
+    Transkripsi PDF dengan gambar soal yang dipotong satu per satu, posisinya ditandai [[GAMBAR_n]].
     Membaca graf atau diagram dari satu halaman penuh sering salah, sedangkan potongan yang diperbesar terbaca akurat.
     """
     text = await extract_text_from_pdf(file_bytes, mark_figures=True)
     count = text.count(FIGURE_MARKER)
     if not count:
-        return text
+        return text, []
     crops = await _crop_pdf_figures(file_bytes)
     if len(crops) != count:
         # Urutan gambar tidak bisa dicocokkan dengan penanda, jadi gambar dideskripsikan dari halaman penuh
         print(f"Peringatan: {count} penanda gambar tetapi {len(crops)} potongan, beralih ke deskripsi halaman penuh")
-        return await extract_text_from_pdf(file_bytes)
+        return await extract_text_from_pdf(file_bytes), []
     for i in range(count):
         text = text.replace(FIGURE_MARKER, f"[[GAMBAR_{i}]]", 1)
-    return await _fill_image_markers(text, crops)
+    return text, crops
 
 
 # Judul bagian soal: "Soal:", "Soal 1:", "SOAL TUGAS TUTORIAL I", "Pertanyaan 2.", "Questions".
@@ -700,14 +696,22 @@ def normalize_answer_spec(raw: Any, questions: str, guidelines: str = "") -> Dic
     }
 
 
-async def structure_assignment_with_ai(raw_text: str) -> Optional[Dict[str, Any]]:
-    """Memilah lembar tugas secara cerdas menggunakan Gemini."""
+# ponytail: batas total gambar per permintaan supaya payload inline di bawah 20MB, gambar sesudahnya tidak dideskripsikan
+MAX_IMAGE_PAYLOAD = 14 * 1024 * 1024
+MAX_STRUCTURE_CHARS = 12000
+
+
+async def structure_assignment_with_ai(raw_text: str, images: list = ()) -> Optional[Dict[str, Any]]:
+    """
+    Memilah lembar tugas dan mendeskripsikan semua gambar soalnya dalam satu panggilan Gemini.
+    images berisi (bytes, mime) untuk penanda [[GAMBAR_n]] ke-n. Deskripsinya dikembalikan di image_descriptions.
+    """
     if not os.getenv("GEMINI_API_KEY") or len(raw_text.strip()) < 40:
         return None
 
     prompt = """Analisis lembar tugas kuliah ini (bisa berbahasa Indonesia atau Inggris).
 Tugasmu: Pisahkan struktur dokumen ini ke dalam format JSON yang bersih:
-1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab, beserta SELURUH teks bacaan, kasus, atau dialog yang dibutuhkan untuk menjawabnya. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan. Jika butir soal merujuk gambar, sertakan blok "[Gambar: ...]" terkait secara utuh.
+1. "question_topic": HANYA inti pertanyaan tugas, studi kasus, atau instruksi esai yang harus dikerjakan atau dijawab, beserta SELURUH teks bacaan, kasus, atau dialog yang dibutuhkan untuk menjawabnya. BUANG kop dokumen (fakultas, prodi, kode mata kuliah, tahun, skor maks), capaian pembelajaran, indikator, label judul seperti "Guidelines:", "Petunjuk:", "Rubrik:", "Remember!", "Purpose:", batas waktu atau sesi, dan kalimat sapaan. Salin butir soal beserta teks kasus, dialog, atau bacaan pendukungnya PERSIS kata per kata, jangan diringkas atau diterjemahkan. Penanda gambar seperti [[GAMBAR_0]] wajib disalin persis di posisinya, jangan dihapus, diubah, atau diganti deskripsi.
 2. "guidelines": Seluruh capaian pembelajaran, indikator, petunjuk teknis, rubrik penilaian, kriteria dosen, ketentuan format, atau batasan kata yang harus dipatuhi saat menulis jawaban.
 3. "course_code": Kode mata kuliah resmi jika ada (contoh: EKMA4116, FSSI4206), atau null.
 4. "answer_spec": spesifikasi bentuk jawaban yang diminta dosen:
@@ -732,19 +736,41 @@ Format Keluaran (JSON murni):
     "word_limit": null,
     "item_word_limits": null,
     "required_sections": null
-  }
+  }IMAGES_FORMAT
 }
+"""
 
-Dokumen Tugas:
-""" + raw_text[:12000]
+    text = raw_text[:MAX_STRUCTURE_CHARS]
+    image_parts: list = []
+    used = 0
+    for i, (blob, mime) in enumerate(images):
+        if f"[[GAMBAR_{i}]]" not in text:
+            continue
+        data, mime = prepare_image(blob, mime)
+        if used + len(data) > MAX_IMAGE_PAYLOAD:
+            break
+        used += len(data)
+        image_parts += [f"Gambar untuk penanda [[GAMBAR_{i}]]:", types.Part.from_bytes(data=data, mime_type=mime)]
+
+    images_rule = images_format = ""
+    if image_parts:
+        images_rule = (
+            '5. "images": daftar deskripsi setiap gambar terlampir, berupa objek {"id": angka n dari penanda [[GAMBAR_n]], "description": "..."}. '
+            "Deskripsikan isi gambar secara objektif dalam paragraf biasa tanpa format markdown. Data soal seperti rumus, grafik, graf, dan tabel ditulis lengkap. "
+            + IMAGE_CONTENT_GUIDE + " Baca teks soal di sekitar penanda gambar itu untuk tahu detail apa yang ditanyakan. " + QUESTION_FOCUS_RULE
+            + f" Jika gambar hanya logo, ikon, stempel, atau hiasan yang bukan bahan soal, isi description persis: {SKIP_IMAGE}.\n\n"
+        )
+        images_format = ',\n  "images": [{"id": 0, "description": "..."}]'
+    prompt = prompt.replace("Format Keluaran (JSON murni):", images_rule + "Format Keluaran (JSON murni):", 1)
+    prompt = prompt.replace("IMAGES_FORMAT", images_format, 1) + "\nDokumen Tugas:\n" + text
 
     try:
         res = await generate_with_fallback(
             "fast",
-            prompt,
+            [prompt, *image_parts],
             config={"response_mime_type": "application/json"},
-            timeout=15.0,
-            total_budget=40.0,
+            timeout=60.0 if image_parts else 15.0,
+            total_budget=120.0 if image_parts else 40.0,
         )
         parsed = json.loads(res.text)
     except Exception as e:
@@ -761,6 +787,16 @@ Dokumen Tugas:
     if isinstance(g, list):
         parsed["guidelines"] = "\n".join(str(item) for item in g)
 
+    descriptions: Dict[int, str] = {}
+    for item in parsed.get("images") or []:
+        if not isinstance(item, dict):
+            continue
+        num = re.search(r"\d+", str(item.get("id", "")))
+        desc = str(item.get("description") or "").strip()
+        if num and desc and not desc.upper().startswith(SKIP_IMAGE):
+            descriptions[int(num.group())] = desc
+    parsed["image_descriptions"] = descriptions
+
     return parsed
 
 
@@ -768,35 +804,39 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
     """Membaca berkas soal dosen (PDF, DOCX, TXT) secara utuh tanpa memotong isi."""
     fn_lower = filename.lower()
     text = ""
+    images: list = []
     file_type = "unknown"
 
     if fn_lower.endswith(".docx"):
         file_type = "docx"
-        text = await read_docx_with_images(file_bytes)
+        text, images = read_docx_with_images(file_bytes)
     elif fn_lower.endswith(".pdf"):
         file_type = "pdf"
-        text = await read_pdf_file(file_bytes)
+        text, images = await read_pdf_file(file_bytes)
     elif fn_lower.endswith(".txt"):
         file_type = "txt"
         text = file_bytes.decode("utf-8", errors="replace").strip()
     else:
         # Coba baca sebagai docx, jika gagal coba pdf
         try:
-            text = await read_docx_with_images(file_bytes)
+            text, images = read_docx_with_images(file_bytes)
             file_type = "docx"
         except Exception:
-            text = await read_pdf_file(file_bytes)
+            text, images = await read_pdf_file(file_bytes)
             file_type = "pdf"
 
     clean_text = strip_time_limit_lines(text).strip()
     detected_code = extract_course_code_from_text(clean_text)
 
-    # Coba gunakan pemilah cerdas AI terlebih dahulu
-    ai_res = await structure_assignment_with_ai(clean_text)
+    # Coba gunakan pemilah cerdas AI terlebih dahulu. Gambar soal ikut dideskripsikan di panggilan yang sama.
+    ai_res = await structure_assignment_with_ai(clean_text, images)
+    # Tanpa AI, penanda gambar dihapus karena tidak ada deskripsinya
+    descriptions = (ai_res or {}).get("image_descriptions") or {}
+    clean_text = fill_image_markers(clean_text, descriptions)
     if ai_res and ai_res.get("question_topic"):
-        q_topic = str(ai_res.get("question_topic", "")).strip()
+        q_topic = fill_image_markers(str(ai_res.get("question_topic") or ""), descriptions).strip()
         questions = q_topic if len(q_topic) >= 10 else clean_text
-        g_lines = str(ai_res.get("guidelines", "")).strip()
+        g_lines = fill_image_markers(str(ai_res.get("guidelines") or ""), descriptions).strip()
         c_code = ai_res.get("course_code") or detected_code
         spec = normalize_answer_spec(ai_res.get("answer_spec"), questions, g_lines)
 

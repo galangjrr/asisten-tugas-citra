@@ -49,6 +49,53 @@ def work_area(hwnd: int) -> tuple:
     return int(r.left / scale), int(r.top / scale), int((r.right - r.left) / scale), int((r.bottom - r.top) / scale)
 
 
+def find_app_icon() -> str:
+    """Mencari berkas icon.ico baik saat berjalan sebagai skrip maupun frozen exe."""
+    base_dirs = []
+    if getattr(sys, "frozen", False):
+        base_dirs.append(getattr(sys, "_MEIPASS", ""))
+        base_dirs.append(os.path.dirname(sys.executable))
+    base_dirs.append(os.path.dirname(os.path.abspath(__file__)))
+
+    candidates = [
+        os.path.join("assets", "icon.ico"),
+        "app.ico",
+        os.path.join("static", "favicon.ico"),
+    ]
+    for b in base_dirs:
+        for c in candidates:
+            p = os.path.join(b, c)
+            if os.path.isfile(p):
+                return os.path.abspath(p)
+    return ""
+
+
+def apply_window_icon(hwnd: int):
+    """Menyematkan ikon kustom ke jendela native Windows (WM_SETICON)."""
+    if not sys.platform.startswith("win"):
+        return
+    icon_path = find_app_icon()
+    if not icon_path:
+        return
+    try:
+        user32 = ctypes.windll.user32
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        WM_SETICON = 0x0080
+        ICON_SMALL = 0
+        ICON_BIG = 1
+
+        h_icon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+        if h_icon_big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_icon_big)
+
+        h_icon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+        if h_icon_small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_icon_small)
+    except Exception:
+        pass
+
+
 class DesktopApi:
     """Dipanggil dari JS lewat window.pywebview.api saat tema berganti."""
 
@@ -62,6 +109,7 @@ class DesktopApi:
         if not sys.platform.startswith("win") or not self._window or not self._window.native:
             return
         hwnd = self._window.native.Handle.ToInt32()
+        apply_window_icon(hwnd)
         dwm = ctypes.windll.dwmapi
         # Atribut sudut dan warna tepi hanya berlaku di Windows 11, di Windows 10 diabaikan tanpa error
         dwm.DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ctypes.byref(ctypes.c_int(int(bool(is_dark)))), 4)

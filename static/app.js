@@ -13,7 +13,39 @@ const STORAGE = {
   draft: "atc-question-draft",
   // Rubrik dosen dan spesifikasi jawaban ikut disimpan, supaya batas kata dosen tidak hilang saat aplikasi dibuka ulang
   draftSetup: "atc-question-setup",
-  mode: "atc-mode"
+  mode: "atc-mode",
+  format: "atc-format",
+  taskType: "atc-task-type"
+};
+
+const TASK_TYPES = {
+  "ut-diskusi": {
+    badge: "Diskusi Forum UT",
+    badgeClass: "badge-emerald",
+    hint: "Jawaban reflektif mengalir untuk forum diskusi Tuton",
+    isUt: true,
+    defaultMode: "forum",
+    defaultFormat: "forum",
+    defaultTone: "opini reflektif",
+  },
+  "ut-tugas": {
+    badge: "Tugas Tutorial UT",
+    badgeClass: "badge-emerald",
+    hint: "Jawaban bernomor dengan sitasi modul dan berkas siap kumpul",
+    isUt: true,
+    defaultMode: "bahan",
+    defaultFormat: "list",
+    defaultTone: "akademis formal",
+  },
+  "umum": {
+    badge: "Tugas Kuliah Umum",
+    badgeClass: "badge-stone",
+    hint: "Format fleksibel untuk mahasiswa semua kampus",
+    isUt: false,
+    defaultMode: "bahan",
+    defaultFormat: "list",
+    defaultTone: "akademis formal",
+  },
 };
 
 const MODES = {
@@ -37,8 +69,9 @@ const FORMAT_DECIDED_TYPES = ["esai", "makalah", "terjemahan", "jawaban_singkat"
 const LENGTH_WORDS = { ringkas: 400, sedang: 950, panjang: 1800 };
 
 const State = {
-  step: 1,
+  step: 0,
   maxStep: 1,
+  taskType: null,
   mode: "jurnal",
   questionFileName: "",
   // Batas per soal yang berbeda tiap nomor dari lembar soal, misal soal 1 maksimal 200 dan soal 2 maksimal 300
@@ -136,6 +169,15 @@ const $ = (id) => document.getElementById(id);
 const dom = {
   statusBadge: $("api-status-badge"),
   stepper: $("stepper"),
+  stepperNav: $("stepper-nav"),
+  stepWelcome: $("step-welcome"),
+  btnSelectUtDiskusi: $("btn-select-ut-diskusi"),
+  btnSelectUtTugas: $("btn-select-ut-tugas"),
+  btnSelectUmum: $("btn-select-umum"),
+  activeTaskBar: $("active-task-bar"),
+  activeTaskBadge: $("active-task-badge"),
+  activeTaskHint: $("active-task-hint"),
+  btnChangeTaskType: $("btn-change-task-type"),
   alert: $("global-alert"),
   steps: [$("step-1"), $("step-2"), $("step-3")],
   formTask: $("form-task"),
@@ -452,8 +494,14 @@ const UI = {
   },
 
   showStep(n) {
-    dom.steps.forEach((section, idx) => section.classList.toggle("hidden", idx + 1 !== n));
-    UI.renderStepper();
+    const isWelcome = n === 0;
+    if (dom.stepWelcome) dom.stepWelcome.classList.toggle("hidden", !isWelcome);
+    if (dom.stepperNav) dom.stepperNav.classList.toggle("hidden", isWelcome);
+    dom.steps.forEach((section, idx) => section.classList.toggle("hidden", isWelcome || idx + 1 !== n));
+    if (!isWelcome) {
+      applyTaskTypeVisibility();
+      UI.renderStepper();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
@@ -1347,10 +1395,53 @@ function documentAsHtml() {
 
 function goStep(n) {
   State.step = n;
-  State.maxStep = Math.max(State.maxStep, n);
+  if (n > 0) State.maxStep = Math.max(State.maxStep, n);
   UI.clearAlert();
   UI.showStep(n);
   if (n === 2) UI.renderStep2();
+}
+
+function selectTaskType(type) {
+  const cfg = TASK_TYPES[type];
+  if (!cfg) return;
+  State.taskType = type;
+  storage.set(STORAGE.taskType, type);
+
+  // Pasang preset sesuai pilihan
+  setMode(cfg.defaultMode);
+  setRadio("format", cfg.defaultFormat);
+  setRadio("tone", cfg.defaultTone);
+  storage.set(STORAGE.format, cfg.defaultFormat);
+  storage.set(STORAGE.tone, cfg.defaultTone);
+  UI.renderSummaries();
+
+  applyTaskTypeVisibility();
+  goStep(1);
+}
+
+function applyTaskTypeVisibility() {
+  const cfg = TASK_TYPES[State.taskType] || TASK_TYPES["ut-tugas"];
+  if (!cfg) return;
+
+  if (dom.activeTaskBadge) {
+    dom.activeTaskBadge.textContent = cfg.badge;
+    dom.activeTaskBadge.className = `welcome-card-badge ${cfg.badgeClass} !mb-0`;
+  }
+  if (dom.activeTaskHint) {
+    dom.activeTaskHint.textContent = cfg.hint;
+  }
+
+  const isUt = Boolean(cfg.isUt);
+  if (dom.tutonEntry) {
+    dom.tutonEntry.classList.toggle("hidden", !(isUt && window.desktop));
+  }
+  if (dom.btnSnapRbv) {
+    dom.btnSnapRbv.classList.toggle("hidden", !(isUt && window.desktop));
+  }
+  const btnWriteTuton = $("btn-write-tuton");
+  if (btnWriteTuton) {
+    btnWriteTuton.classList.toggle("hidden", !(isUt && window.desktop));
+  }
 }
 
 function setMode(mode) {
@@ -2298,7 +2389,7 @@ async function startNewTask() {
   clearMaterialForm();
   UI.selectQuestionTab("type");
   State.maxStep = 1;
-  goStep(1);
+  goStep(0);
 }
 
 // ---------- Tema dan jendela desktop ----------
@@ -2405,20 +2496,17 @@ function init() {
   }));
   bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
   if (window.desktop) {
-    dom.tutonEntry.classList.remove("hidden");
     $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
     window.desktop.onTutonCapture(handleTutonCapture);
-    $("btn-write-tuton").classList.remove("hidden");
     $("btn-write-tuton").addEventListener("click", () => writeToTuton());
     if (dom.btnSnapRbv) {
-      dom.btnSnapRbv.classList.remove("hidden");
       dom.btnSnapRbv.addEventListener("click", () => window.desktop.captureRbvPage());
     }
     if (window.desktop.onRbvScreenshot) {
       window.desktop.onRbvScreenshot(enqueueRbvScreenshot);
     }
     window.addEventListener("keydown", (e) => {
-      if (e.key === "F9" && !e.repeat) {
+      if (e.key === "F9" && !e.repeat && State.taskType !== "umum") {
         e.preventDefault();
         window.desktop.captureRbvPage();
       }
@@ -2507,10 +2595,22 @@ function init() {
   dom.btnRegenerate.addEventListener("click", regenerateAll);
   $("btn-new-task").addEventListener("click", startNewTask);
 
+  // Pilihan kartu layar sambutan (State 0)
+  if (dom.btnSelectUtDiskusi) dom.btnSelectUtDiskusi.addEventListener("click", () => selectTaskType("ut-diskusi"));
+  if (dom.btnSelectUtTugas) dom.btnSelectUtTugas.addEventListener("click", () => selectTaskType("ut-tugas"));
+  if (dom.btnSelectUmum) dom.btnSelectUmum.addEventListener("click", () => selectTaskType("umum"));
+  if (dom.btnChangeTaskType) dom.btnChangeTaskType.addEventListener("click", () => goStep(0));
+
   // Preload Electron sudah memasang window.desktop sebelum skrip ini jalan
   if (window.desktop) enableDesktopChrome();
 
-  UI.showStep(1);
+  const savedTaskType = storage.get(STORAGE.taskType);
+  if (savedTaskType && TASK_TYPES[savedTaskType]) {
+    State.taskType = savedTaskType;
+  }
+
+  // Buka State 0 (Layar Sambutan) sebagai pintu masuk utama
+  goStep(0);
   checkSystemHealth();
 }
 

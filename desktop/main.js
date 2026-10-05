@@ -47,15 +47,18 @@ function waitForServer(port, timeoutMs = 30000) {
 }
 
 // Versi terpasang memakai exe backend hasil PyInstaller, versi dev memakai python langsung
+// stdin dibiarkan berupa pipe yang tidak pernah ditulis. Kalau Electron mati dengan cara apa pun,
+// Windows menutup pipe itu dan backend yang menunggu stdin langsung ikut berhenti.
 function startBackend(port) {
-  const options = { windowsHide: true, stdio: "ignore" };
+  const options = { windowsHide: true, stdio: ["pipe", "ignore", "ignore"] };
+  const args = [String(port), "--exit-with-parent"];
   if (app.isPackaged) {
     const exe = path.join(process.resourcesPath, "backend", "AsistenTugasCitraServer.exe");
     // .env disimpan di folder aplikasi, sebelah AsistenTugasCitra.exe
-    return spawn(exe, [String(port)], { ...options, cwd: path.dirname(process.execPath) });
+    return spawn(exe, args, { ...options, cwd: path.dirname(process.execPath) });
   }
   const python = process.env.PYTHON || "python";
-  return spawn(python, [path.join(ROOT_DIR, "run_app.py"), String(port)], { ...options, cwd: ROOT_DIR });
+  return spawn(python, [path.join(ROOT_DIR, "run_app.py"), ...args], { ...options, cwd: ROOT_DIR });
 }
 
 const loadingPage = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
@@ -132,8 +135,7 @@ if (!app.requestSingleInstanceLock()) {
 
 app.on("window-all-closed", () => app.quit());
 
-// ponytail: backend hanya ikut mati saat Electron keluar normal. Kalau Electron dibunuh paksa,
-// proses backend bisa tertinggal. Upgrade: backend memantau PID induk lalu keluar sendiri.
+// Keluar normal langsung matikan backend. Keluar paksa ditangani pipe stdin di startBackend.
 app.on("will-quit", () => {
   if (backend && backend.exitCode === null) backend.kill();
 });

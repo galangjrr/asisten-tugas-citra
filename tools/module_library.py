@@ -5,6 +5,8 @@ import re
 import uuid
 from typing import List, Dict, Any, Optional
 
+from tools.paths import STORAGE_DIR
+
 def get_saved_modules_dirs() -> List[str]:
     """Mengembalikan daftar direktori tempat berkas modul tersimpan dicari."""
     dirs = []
@@ -17,6 +19,8 @@ def get_saved_modules_dirs() -> List[str]:
         if meipass:
             dirs.append(os.path.join(meipass, "saved_modules"))
     
+        dirs.append(os.path.join(os.path.dirname(STORAGE_DIR), "saved_modules"))
+
     # 2. Direktori proyek saat ini
     cwd = os.getcwd()
     dirs.append(os.path.join(cwd, "saved_modules"))
@@ -41,7 +45,8 @@ def get_saved_modules_dirs() -> List[str]:
 def ensure_saved_modules_dir() -> str:
     """Memastikan direktori utama saved_modules ada dan mengembalikan path-nya."""
     if getattr(sys, "frozen", False):
-        target = os.path.join(os.path.dirname(sys.executable), "saved_modules")
+        # Folder exe bisa ada di Program Files yang tidak bisa ditulisi, jadi simpan di folder data LocalAppData
+        target = os.path.join(os.path.dirname(STORAGE_DIR), "saved_modules")
     else:
         target = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saved_modules")
     os.makedirs(target, exist_ok=True)

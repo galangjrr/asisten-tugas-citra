@@ -115,6 +115,18 @@ function isTutonUrl(url) {
   }
 }
 
+const LOGIN_HOSTS = ["login.microsoftonline.com", "login.live.com"];
+
+function isLoginPopup(url) {
+  if (url === "about:blank") return true;
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && LOGIN_HOSTS.includes(hostname);
+  } catch (err) {
+    return false;
+  }
+}
+
 // Jendela Tuton memakai sesi terpisah yang disimpan permanen, jadi login cukup sekali dan cookie Tuton
 // tidak bercampur dengan halaman Asisten. Password tidak pernah dibaca, login diketik sendiri oleh pengguna.
 function openTuton() {
@@ -139,8 +151,13 @@ function openTuton() {
     },
   });
   tutonWin.removeMenu();
-  // Tautan Tuton yang membuka tab baru tetap dibuka di jendela ini, tautan luar ke browser bawaan
   tutonWin.webContents.setWindowOpenHandler(({ url }) => {
+    // Login MyUT membuka popup Microsoft yang dimulai dari about:blank. Popup itu harus jadi jendela anak
+    // dengan sesi yang sama, kalau tidak halaman MyUT tidak pernah menerima hasil login dan tombol Masuk terlihat diam.
+    if (isLoginPopup(url) && isTutonUrl(tutonWin.webContents.getURL())) {
+      return { action: "allow", overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true } };
+    }
+    // Tautan Tuton yang membuka tab baru tetap dibuka di jendela ini, tautan luar ke browser bawaan
     if (isTutonUrl(url)) tutonWin.loadURL(url);
     else if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
     return { action: "deny" };

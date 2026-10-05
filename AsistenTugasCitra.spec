@@ -31,25 +31,24 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['webview'],
     noarchive=False,
     optimize=0,
 )
 pyz = PYZ(a.pure)
 
+# Onedir, bukan onefile: backend tidak perlu dibongkar ke Temp tiap kali dibuka, jadi startup cepat.
+# Hasilnya dist/AsistenTugasCitraServer/ yang dibundel electron-builder lewat desktop/package.json.
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
-    name='AsistenTugasCitra',
+    exclude_binaries=True,
+    name='AsistenTugasCitraServer',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -57,4 +56,13 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=icon_file,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='AsistenTugasCitraServer',
 )

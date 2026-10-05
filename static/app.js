@@ -2102,42 +2102,18 @@ async function startNewTask() {
 }
 
 // ---------- Tema dan jendela desktop ----------
-function syncDesktopTitlebar(isDark) {
-  if (window.pywebview && window.pywebview.api) window.pywebview.api.set_titlebar(isDark);
-}
-
 function applyTheme(isDark) {
   document.documentElement.classList.toggle("dark", isDark);
   document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-  syncDesktopTitlebar(isDark);
+  // Warna simbol tombol jendela native di shell Electron ikut tema
+  if (window.desktop) window.desktop.setTheme(isDark);
 }
 
-function setMaximizedIcon(isMaximized) {
-  $("icon-window-maximize").classList.toggle("hidden", isMaximized);
-  $("icon-window-restore").classList.toggle("hidden", !isMaximized);
-  const btn = $("btn-window-maximize");
-  btn.setAttribute("aria-label", isMaximized ? "Kembalikan ukuran jendela" : "Besarkan jendela");
-  btn.title = isMaximized ? "Kembalikan" : "Besarkan";
-}
-
-async function toggleMaximize() {
-  setMaximizedIcon(await window.pywebview.api.toggle_maximize());
-}
-
-// Jendela desktop tanpa bingkai: header aplikasi jadi title bar, tombol jendela dipasang di ujung kanan
+// Shell desktop Electron: header aplikasi jadi title bar, tombol jendela native menimpa ujung kanannya
 function enableDesktopChrome() {
-  const api = window.pywebview.api;
+  document.documentElement.classList.add("is-desktop");
   const inner = $("app-header-inner");
-  inner.classList.remove("max-w-6xl", "mx-auto", "pr-5");
-  inner.classList.add("pr-0");
-  $("window-controls").classList.replace("hidden", "flex");
-  document.querySelectorAll(".desktop-drag").forEach((node) => {
-    node.classList.add("pywebview-drag-region");
-    node.addEventListener("dblclick", toggleMaximize);
-  });
-  $("btn-window-minimize").addEventListener("click", () => api.minimize());
-  $("btn-window-maximize").addEventListener("click", toggleMaximize);
-  $("btn-window-close").addEventListener("click", () => api.close());
+  inner.classList.remove("max-w-6xl", "mx-auto");
 }
 
 // =====================================================================
@@ -2311,12 +2287,8 @@ function init() {
   dom.btnRegenerate.addEventListener("click", regenerateAll);
   $("btn-new-task").addEventListener("click", startNewTask);
 
-  // Di mode desktop, API pywebview baru siap setelah halaman dimuat
-  window.addEventListener("pywebviewready", () => {
-    enableDesktopChrome();
-    syncDesktopTitlebar(document.documentElement.classList.contains("dark"));
-    window.pywebview.api.fit_height(document.documentElement.scrollHeight);
-  });
+  // Preload Electron sudah memasang window.desktop sebelum skrip ini jalan
+  if (window.desktop) enableDesktopChrome();
 
   UI.showStep(1);
   checkSystemHealth();

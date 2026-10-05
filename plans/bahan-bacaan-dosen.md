@@ -6,7 +6,7 @@ Dokumen ini adalah cetak biru teknis resmi untuk dikerjakan oleh Claude. Berisi 
 
 ## 1. Konteks Runtime dan Lingkungan Eksekusi
 
-1. **Aplikasi Desktop PyWebView:** Aplikasi ini berjalan di desktop Windows dibungkus menggunakan `pywebview` melalui file `run_app.py`.
+1. **Aplikasi Desktop Electron:** Aplikasi ini berjalan di desktop Windows lewat shell Electron di folder `desktop/` yang menjalankan backend `run_app.py`.
 2. **Frontend Stack:** Single Page Application berbasis HTML semantik, Tailwind CSS CDN, dan Vanilla JavaScript murni di folder `static/`.
 3. **Backend Stack:** FastAPI lokal di alamat loopback `127.0.0.1`.
 4. **Penyimpanan Permanen:** Profil pengguna dan `localStorage` tersimpan permanen di direktori `%LOCALAPPDATA%\AsistenTugasCitra\webview`. Nilai nama, NIM, dan preferensi gaya bahasa aman tersimpan antar sesi aplikasi.
@@ -55,7 +55,7 @@ Penerapan arsitektur antarmuka difokuskan penuh pada prinsip berikut:
 ### 3.1 Header Aplikasi dan Kontrol Jendela Desktop
 - **Identitas Studio:** Logo ringkas ATC dengan lencana status API Gemini yang memiliki indikator lampu bernapas lembut (pulsing emerald saat siap, amber saat jeda).
 - **Pengalih Tema:** Tombol pengalih tema bulat ramping dengan transisi rotasi halus antara ikon matahari dan bulan.
-- **Kontrol Jendela Tanpa Bingkai:** Integrasi tombol perkecil, perbesar, dan tutup jendela yang menyatu rapi di pojok kanan atas khusus runtime pywebview.
+- **Kontrol Jendela Native:** Tombol perkecil, perbesar, dan tutup bawaan Windows lewat `titleBarOverlay` Electron yang transparan dan menyatu dengan header.
 
 ### 3.2 Stepper Timeline Tiga Tahap yang Interaktif
 Ganti tab kotak kaku dengan timeline horizontal modern yang elegan:

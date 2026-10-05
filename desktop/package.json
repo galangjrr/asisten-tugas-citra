@@ -1,0 +1,42 @@
+{
+  "name": "asisten-tugas-citra",
+  "productName": "Asisten Tugas Citra",
+  "version": "1.0.0",
+  "description": "Asisten Tugas Citra",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "backend": "cd .. && pyinstaller --noconfirm AsistenTugasCitra.spec",
+    "dist": "npm run backend && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "id.citra.asistentugas",
+    "executableName": "AsistenTugasCitra",
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/AsistenTugasCitraServer",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "icon": "../assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
+    "directories": {
+      "output": "release"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}

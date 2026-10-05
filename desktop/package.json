@@ -16,7 +16,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "tuton-preload.js"
+      "tuton-preload.js",
+      "tuton-fill.js"
     ],
     "extraResources": [
       {

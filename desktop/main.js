@@ -3,6 +3,7 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
+const { fillAnswer } = require("./tuton-fill");
 
 const HOST = "127.0.0.1";
 const ROOT_DIR = path.join(__dirname, "..");
@@ -200,7 +201,6 @@ async function captureRbvPage() {
       title: tutonWin.getTitle() || "Ruang Baca Virtual",
       url: tutonWin.webContents.getURL(),
     });
-    shell.beep();
   } catch (err) {
     console.error("Gagal menjepret halaman RBV:", err);
   } finally {
@@ -227,11 +227,11 @@ ipcMain.on("tuton-capture", (event, payload) => {
   win.focus();
 });
 
-// Naskah dari Asisten diteruskan ke jendela Tuton untuk disusun di kolom jawaban. Tidak ada yang dikirim ke server Tuton,
-// preload Tuton hanya mengisi editor dan pengguna sendiri yang menekan tombol kirim.
+// Naskah dari Asisten disusun di kolom jawaban Tuton. Tidak ada yang dikirim ke server Tuton,
+// fillAnswer hanya mengisi editor dan pengguna sendiri yang menekan tombol kirim.
 const FILL_TIMEOUT_MS = 8000;
 
-ipcMain.handle("fill-tuton", (event, payload) => {
+ipcMain.handle("fill-tuton", async (event, payload) => {
   if (!win || event.sender !== win.webContents) return { ok: false, message: "Permintaan ditolak." };
   if (!payload || typeof payload.html !== "string" || typeof payload.text !== "string") {
     return { ok: false, message: "Naskah kosong atau rusak." };
@@ -243,24 +243,25 @@ ipcMain.handle("fill-tuton", (event, payload) => {
     return { ok: false, message: "Jendela Tuton sedang tidak membuka halaman UT." };
   }
   const target = tutonWin;
-  return new Promise((resolve) => {
-    const onResult = (resultEvent, result) => {
-      if (target.isDestroyed() || resultEvent.sender !== target.webContents) return;
-      finish(result && typeof result === "object" ? result : { ok: false, message: "Jawaban jendela Tuton tidak dikenali." });
-    };
-    const timer = setTimeout(() => finish({ ok: false, message: "Jendela Tuton tidak menjawab. Tunggu halamannya selesai dimuat lalu coba lagi." }), FILL_TIMEOUT_MS);
-    function finish(result) {
-      clearTimeout(timer);
-      ipcMain.removeListener("tuton-fill-result", onResult);
-      if (result.ok && !target.isDestroyed()) {
-        if (target.isMinimized()) target.restore();
-        target.focus();
-      }
-      resolve(result);
-    }
-    ipcMain.on("tuton-fill-result", onResult);
-    target.webContents.send("tuton-fill", { html: payload.html, text: payload.text, force: Boolean(payload.force) });
-  });
+  const args = JSON.stringify({ html: payload.html, text: payload.text, force: Boolean(payload.force) });
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), FILL_TIMEOUT_MS));
+  let result;
+  try {
+    // Dijalankan di dunia utama halaman supaya bisa memakai API TinyMCE milik Moodle
+    result = await Promise.race([target.webContents.executeJavaScript(`(${fillAnswer})(${args})`, true), timeout]);
+  } catch (err) {
+    console.error("Gagal mengisi kolom jawaban Tuton:", err);
+  }
+  if (!result || typeof result !== "object") {
+    return { ok: false, message: "Kolom jawaban gagal diisi. Tunggu halaman Tuton selesai dimuat lalu coba lagi." };
+  }
+  if (result.ok && !target.isDestroyed()) {
+    if (target.isMinimized()) target.restore();
+    target.focus();
+    // Fokus keyboard dipindah ke halaman. Tanpa ini ketikan bisa jatuh ke bingkai jendela, Space membuka menu jendela.
+    target.webContents.focus();
+  }
+  return result;
 });
 
 ipcMain.on("set-theme", (event, isDark) => {

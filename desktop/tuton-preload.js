@@ -247,53 +247,6 @@ function mountLoginHint() {
   document.body.append(host);
 }
 
-// Kolom jawaban Moodle: TinyMCE di dalam iframe *_ifr, Atto berupa div contenteditable, atau textarea polos
-// seperti balasan cepat forum. Yang dipilih kolom pertama yang terlihat di area utama halaman.
-function findAnswerEditor() {
-  const scope = document.querySelector("#region-main") || document.body;
-  const visible = (node) => node.getClientRects().length > 0;
-  const frame = Array.from(scope.querySelectorAll("iframe[id$='_ifr']")).find(visible);
-  const frameBody = frame && frame.contentDocument && frame.contentDocument.body;
-  if (frameBody) return { node: frameBody, scrollTarget: frame, source: document.getElementById(frame.id.slice(0, -4)), html: true };
-  const atto = Array.from(scope.querySelectorAll(".editor_atto_content[contenteditable='true']")).find(visible);
-  if (atto) return { node: atto, scrollTarget: atto, source: document.getElementById(atto.id.replace(/editable$/, "")), html: true };
-  const area = Array.from(scope.querySelectorAll("textarea")).find((t) => visible(t) && !t.readOnly && !t.disabled);
-  if (area) return { node: area, scrollTarget: area, source: null, html: false };
-  return null;
-}
-
-// Hanya mengisi kolom jawaban. Tombol Kirim atau Simpan perubahan di Tuton tidak pernah disentuh.
-function fillAnswer({ html, text, force }) {
-  const editor = findAnswerEditor();
-  if (!editor) {
-    return { ok: false, message: "Kolom jawaban tidak ditemukan. Klik Balas di diskusi atau Tambah pengumpulan di tugas sampai kolom tulisnya muncul, lalu coba lagi." };
-  }
-  const { node, source } = editor;
-  const existing = editor.html ? node.textContent : node.value;
-  if (existing.trim() && !force) return { ok: false, needsConfirm: true };
-  if (editor.html) {
-    node.innerHTML = html;
-    // Textarea asli ikut diisi supaya isinya tetap ada walau editor belum sempat menyalin sendiri
-    if (source) source.value = html;
-  } else {
-    node.value = text;
-  }
-  node.dispatchEvent(new Event("input", { bubbles: true }));
-  if (source) source.dispatchEvent(new Event("change", { bubbles: true }));
-  editor.scrollTarget.scrollIntoView({ block: "center" });
-  return { ok: true };
-}
-
-ipcRenderer.on("tuton-fill", (_event, payload) => {
-  let result;
-  try {
-    result = fillAnswer(payload || {});
-  } catch (err) {
-    result = { ok: false, message: err.message || "Kolom jawaban gagal diisi." };
-  }
-  ipcRenderer.send("tuton-fill-result", result);
-});
-
 window.addEventListener("DOMContentLoaded", () => {
   mountButton();
   mountLoginHint();

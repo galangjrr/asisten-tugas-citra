@@ -84,3 +84,26 @@ def test_strip_markdown_ocr_output():
     )
     # Perkalian, nama berkas, dan tanda hubung biasa tidak boleh rusak
     assert strip_markdown("2*3*4 = 24, file nama_file_baru, 2 * 3 dan - poin") == "2*3*4 = 24, file nama_file_baru, 2 * 3 dan - poin"
+
+
+def test_clean_ocr_text_reflows_and_drops_images():
+    from tools.ocr_vision import clean_ocr_text
+    raw = (
+        "## Kegiatan Belajar 1\n\n"
+        "Morfologi   adalah cabang linguistik yang\nmempelajari bentuk kata dan pemben-\ntukannya dalam bahasa\nIndonesia.\n\n"
+        "Kata dasar menjadi titik awal.\n"
+        "Gambar 1.2 Struktur Kata Turunan\n"
+        "Sumber: Chaer (2008)\n"
+        "[Gambar: bagan pohon kata]\n"
+        "Gambar 1.2 menunjukkan proses afiksasi.\n\n"
+        "| Afiks | Contoh |\n|---|---|\n| me- | membaca |\n"
+        "1. Prefiks berada\ndi depan kata.\n2. Sufiks di belakang."
+    )
+    assert clean_ocr_text(raw) == (
+        "Kegiatan Belajar 1\n"
+        "Morfologi adalah cabang linguistik yang mempelajari bentuk kata dan pembentukannya dalam bahasa Indonesia.\n"
+        "Kata dasar menjadi titik awal.\n"
+        "Gambar 1.2 menunjukkan proses afiksasi.\n"
+        "Afiks | Contoh\nme- | membaca\n"
+        "1. Prefiks berada di depan kata.\n2. Sufiks di belakang."
+    )

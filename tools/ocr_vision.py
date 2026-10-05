@@ -104,6 +104,52 @@ def strip_markdown(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+# Keterangan gambar seperti "Gambar 1.2 Struktur Kata" dan baris sumbernya tidak dipakai sebagai bahan bacaan.
+# Kalimat isi seperti "Gambar 1.2 menunjukkan ..." tetap, karena kata setelah nomornya huruf kecil.
+IMAGE_LINE = re.compile(
+    r"^\[(?i:gambar|image|foto)[^\]]*\]$|^(?i:sumber|source)(?i:\s+gambar)?\s*:"
+    r"|^(?i:gambar|figure|foto)\s+\d+(?:\.\d+)*\.?(?:\s+[A-Z][^.]*\.?)?$"
+)
+TABLE_DIVIDER = re.compile(r"^\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?$")
+LIST_ITEM = re.compile(r"^(?:[-•]\s|\d{1,2}[.)]\s|\(\d{1,2}\)\s|[a-zA-Z][.)]\s)")
+SENTENCE_END = (".", "?", "!", ":", ";")
+
+
+def clean_ocr_text(text: str) -> str:
+    """Merapikan hasil OCR satu lembar bacaan jadi teks rapat seperti ketikan manusia.
+    Baris yang terpotong lebar halaman disambung, satu paragraf satu baris, tanpa baris kosong.
+    Gambar, keterangan gambar, dan sumbernya dibuang. Tabel jadi satu baris per baris tabel dengan pemisah ' | '."""
+    blocks = []
+    joined = False
+    for line in strip_markdown(text).split("\n"):
+        line = re.sub(r"[ \t ]+", " ", line).strip()
+        if not line or TABLE_DIVIDER.match(line) or IMAGE_LINE.match(line):
+            continue
+        if line.startswith("|") or line.endswith("|"):
+            line = " | ".join(cell.strip() for cell in line.strip("|").split("|"))
+        if not blocks or " | " in line or " | " in blocks[-1] or LIST_ITEM.match(line):
+            blocks.append(line)
+            joined = False
+            continue
+        prev = blocks[-1]
+        # ponytail: judul ditebak dari baris pendek tanpa tanda baca akhir, baris isi yang kebetulan pendek bisa ikut terpisah
+        is_heading = not joined and len(prev) < 60 and not prev.endswith(SENTENCE_END + (",",))
+        new_paragraph = (prev.endswith(SENTENCE_END) and not line[0].islower()) or (
+            line[0].isupper() and (is_heading or LIST_ITEM.match(prev))
+        )
+        if new_paragraph:
+            blocks.append(line)
+            joined = False
+        elif re.search(r"[a-z]-$", prev) and line[0].islower():
+            # Kata yang dipenggal di ujung baris disambung lagi tanpa tanda hubung
+            blocks[-1] = prev[:-1] + line
+            joined = True
+        else:
+            blocks[-1] = f"{prev} {line}"
+            joined = True
+    return "\n".join(blocks)
+
+
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
     """
     Mengekstrak teks materi dari gambar tangkapan layar modul kuliah.
@@ -123,7 +169,10 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan. "
         "Tulis sebagai teks polos tanpa format markdown: jangan pakai tanda ** atau * untuk tebal dan miring, "
         "tanda # untuk judul, garis --- pemisah, atau blok kode. Judul cukup ditulis di baris tersendiri, "
-        "daftar poin cukup diawali tanda - atau nomor. Pisahkan paragraf dengan satu baris kosong."
+        "daftar poin cukup diawali tanda - atau nomor. Sambung baris yang terpotong lebar halaman "
+        "sehingga satu paragraf ditulis utuh dalam satu baris, tanpa baris kosong di antaranya. "
+        "Jangan tulis atau deskripsikan gambar, foto, diagram, dan bagan, termasuk keterangan dan sumbernya. "
+        "Tulis tabel satu baris per baris tabel dengan pemisah ' | ', baris pertama berisi judul kolom."
     )
 
     try:
@@ -138,7 +187,7 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         print(f"Vision OCR gagal: {e}")
         return ""
 
-    return strip_markdown(response.text or "")
+    return clean_ocr_text(response.text or "")
 
 
 # Gambar di bawah ukuran ini biasanya ikon atau garis hiasan. Logo yang lebih besar disaring oleh balasan SKIP_IMAGE.

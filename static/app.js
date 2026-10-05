@@ -1287,9 +1287,9 @@ function findReferenceIndex(citation) {
   }));
 }
 
-function documentAsText() {
+function documentAsText({ withTitle = true } = {}) {
   const doc = State.doc;
-  const out = [doc.title.toUpperCase(), ""];
+  const out = withTitle ? [doc.title.toUpperCase(), ""] : [];
   if (doc.identityLines.length) out.push(...doc.identityLines, "");
   doc.sections.forEach((sec) => {
     if (sec.heading) out.push(sec.heading);
@@ -1304,6 +1304,41 @@ function documentAsText() {
     });
   }
   return out.join("\n").trim();
+}
+
+// Naskah untuk editor Tuton. Judul naskah dilewati karena forum dan tugas sudah punya kolom judul sendiri.
+// Baris berpemisah ' | ' disusun jadi tabel supaya tetap terbaca rapi di Tuton.
+function documentAsHtml() {
+  const doc = State.doc;
+  const out = [];
+  const para = (text) => out.push(`<p>${escapeHtml(text)}</p>`);
+  const bold = (text) => out.push(`<p><strong>${escapeHtml(text)}</strong></p>`);
+  doc.identityLines.forEach(para);
+  doc.sections.forEach((sec) => {
+    if (sec.heading) bold(sec.heading);
+    let rows = [];
+    const flushTable = () => {
+      if (!rows.length) return;
+      const body = rows.map((row) => `<tr>${row.split("|").map((cell) => `<td>${escapeHtml(cell.trim())}</td>`).join("")}</tr>`).join("");
+      out.push(`<table border="1" cellpadding="6" style="border-collapse: collapse;">${body}</table>`);
+      rows = [];
+    };
+    sec.content.split("\n").map((line) => line.trim()).filter(Boolean).forEach((line) => {
+      if (line.includes(" | ")) {
+        rows.push(line);
+        return;
+      }
+      flushTable();
+      para(line);
+    });
+    flushTable();
+  });
+  if (doc.references.length) {
+    const isEn = doc.language === "en";
+    bold(isEn ? "References" : "Daftar Pustaka");
+    doc.references.forEach((ref) => para(formatAcademicReferenceText(ref, isEn).fullText));
+  }
+  return out.join("");
 }
 
 // =====================================================================
@@ -2197,6 +2232,32 @@ async function copyDocument() {
   UI.toast("Naskah berhasil disalin");
 }
 
+// Naskah disusun di kolom jawaban Tuton yang sedang terbuka. Tombol kirim di Tuton tetap ditekan sendiri.
+async function writeToTuton(force = false) {
+  if (!State.doc) return;
+  const button = $("btn-write-tuton");
+  setBusy(button, true, "Menulis ke Tuton");
+  let result;
+  try {
+    result = await window.desktop.fillTuton({ html: documentAsHtml(), text: documentAsText({ withTitle: false }), force });
+  } catch (err) {
+    result = { ok: false, message: err.message || "Jendela Tuton tidak bisa dihubungi." };
+  } finally {
+    setBusy(button, false);
+  }
+  if (result.needsConfirm) {
+    const ok = await UI.confirm({
+      title: "Kolom jawaban Tuton sudah berisi",
+      message: "Tulisan yang sudah ada di kolom jawaban Tuton akan diganti naskah ini.",
+      okLabel: "Ganti tulisan",
+    });
+    if (ok) writeToTuton(true);
+    return;
+  }
+  if (result.ok) UI.toast("Jawaban sudah tersusun di Tuton. Periksa dulu, lalu kirim sendiri dari sana.");
+  else UI.showAlert("Belum bisa menulis ke Tuton", result.message);
+}
+
 function download(type) {
   if (State.taskId) window.location.href = `/api/download/${type}/${State.taskId}`;
 }
@@ -2347,6 +2408,8 @@ function init() {
     dom.tutonEntry.classList.remove("hidden");
     $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
     window.desktop.onTutonCapture(handleTutonCapture);
+    $("btn-write-tuton").classList.remove("hidden");
+    $("btn-write-tuton").addEventListener("click", () => writeToTuton());
     if (dom.btnSnapRbv) {
       dom.btnSnapRbv.classList.remove("hidden");
       dom.btnSnapRbv.addEventListener("click", () => window.desktop.captureRbvPage());

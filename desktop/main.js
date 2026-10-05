@@ -227,6 +227,42 @@ ipcMain.on("tuton-capture", (event, payload) => {
   win.focus();
 });
 
+// Naskah dari Asisten diteruskan ke jendela Tuton untuk disusun di kolom jawaban. Tidak ada yang dikirim ke server Tuton,
+// preload Tuton hanya mengisi editor dan pengguna sendiri yang menekan tombol kirim.
+const FILL_TIMEOUT_MS = 8000;
+
+ipcMain.handle("fill-tuton", (event, payload) => {
+  if (!win || event.sender !== win.webContents) return { ok: false, message: "Permintaan ditolak." };
+  if (!payload || typeof payload.html !== "string" || typeof payload.text !== "string") {
+    return { ok: false, message: "Naskah kosong atau rusak." };
+  }
+  if (!tutonWin || tutonWin.isDestroyed()) {
+    return { ok: false, message: "Jendela Tuton belum dibuka. Buka Tuton, masuk ke halaman balas diskusi atau isian tugas, lalu coba lagi." };
+  }
+  if (!isTutonUrl(tutonWin.webContents.getURL())) {
+    return { ok: false, message: "Jendela Tuton sedang tidak membuka halaman UT." };
+  }
+  const target = tutonWin;
+  return new Promise((resolve) => {
+    const onResult = (resultEvent, result) => {
+      if (target.isDestroyed() || resultEvent.sender !== target.webContents) return;
+      finish(result && typeof result === "object" ? result : { ok: false, message: "Jawaban jendela Tuton tidak dikenali." });
+    };
+    const timer = setTimeout(() => finish({ ok: false, message: "Jendela Tuton tidak menjawab. Tunggu halamannya selesai dimuat lalu coba lagi." }), FILL_TIMEOUT_MS);
+    function finish(result) {
+      clearTimeout(timer);
+      ipcMain.removeListener("tuton-fill-result", onResult);
+      if (result.ok && !target.isDestroyed()) {
+        if (target.isMinimized()) target.restore();
+        target.focus();
+      }
+      resolve(result);
+    }
+    ipcMain.on("tuton-fill-result", onResult);
+    target.webContents.send("tuton-fill", { html: payload.html, text: payload.text, force: Boolean(payload.force) });
+  });
+});
+
 ipcMain.on("set-theme", (event, isDark) => {
   const target = BrowserWindow.fromWebContents(event.sender);
   if (!target) return;

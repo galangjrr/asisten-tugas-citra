@@ -8,19 +8,21 @@ const MIN_IMAGE_BYTES = 2 * 1024;
 const MAX_IMAGES = 12;
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
-// Urutan pencarian isi soal. Forum diskusi Moodle 4 dan 3, lalu halaman tugas, lalu seluruh isi halaman.
-// ponytail: selector ini dari struktur Moodle bawaan. Kalau UT memakai tema khusus, sesuaikan di sini.
+// Urutan pencarian isi soal. Forum diskusi Moodle 4 dan 3, lalu deskripsi tugas, lalu seluruh isi halaman.
+// Tugas di tema Tuton UT (mb2iq) ada di .activity-header .generalbox, terpisah dari tanggal buka dan tenggat.
+// ponytail: forum diskusi di tema Tuton belum dicek di halaman asli, selector forum masih dari Moodle bawaan.
 const QUESTION_SELECTORS = [
   ".forumpost .post-content-container",
   ".forumpost .posting",
+  ".activity-header .generalbox",
   ".activity-description",
   "#intro",
-  "#region-main [role='main']",
   "#region-main",
 ];
 const TITLE_SELECTORS = [
   "[data-region-content='forum-post-core-subject']",
   ".discussionname",
+  "h2.activity-name",
   ".activity-header h2",
   "#region-main h2",
   ".page-header-headings h1",
@@ -95,7 +97,7 @@ function toText(root, images) {
     if (block) out.push("\n");
   };
   walk(root);
-  return out.join("").replace(/[ \t]+/g, " ").replace(/ ([.,;:?!])/g, "$1").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return out.join("").replace(/[ \t]+/g, " ").replace(/ ([.,;:?!])/g, "$1").replace(/ *\n */g, "\n").replace(/^(\d+\.|-)\n+/gm, "$1 ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function blobToDataUrl(blob) {
@@ -143,32 +145,19 @@ async function fetchAttachment(root) {
   return { name, data: await blobToDataUrl(blob) };
 }
 
-// Nama dan NIM dari halaman profil. Email mahasiswa UT berbentuk NIM@ecampus.ut.ac.id.
-// ponytail: tebakan dari pola email UT. Kalau NIM tidak tampil di profil, kolom NIM dibiarkan kosong.
-async function fetchStudent() {
-  try {
-    const res = await fetch(`${location.origin}/user/profile.php`, { credentials: "include" });
-    const page = new DOMParser().parseFromString(await res.text(), "text/html");
-    let name = firstText([".page-header-headings h1", ".page-context-header .page-header-headings", "h1"], page);
-    const email = page.querySelector("a[href^='mailto:']");
-    const local = email ? decodeURIComponent(email.getAttribute("href").slice(7)).split("@")[0] : "";
-    let nim = /^\d{8,10}$/.test(local) ? local : "";
-    // Sebagian akun menulis NIM di depan nama
-    const lead = name.match(/^(\d{8,10})\s*[-|]?\s*(.+)$/);
-    if (lead) {
-      nim = nim || lead[1];
-      name = lead[2];
-    }
-    return { name, nim };
-  } catch (err) {
-    return { name: "", nim: "" };
-  }
+// Menu akun Tuton menulis nama kapital diikuti NIM, misalnya "CITRA NUR ANNISSA 058215934"
+function readStudent() {
+  const raw = firstText([".usermenu .usertext", ".usertext"]);
+  const match = raw.match(/^(.*?)\s*(\d{8,10})$/);
+  const name = (match ? match[1] : raw).toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (c) => c.toUpperCase());
+  return { name, nim: match ? match[2] : "" };
 }
 
+// Breadcrumb Tuton: teks link berisi kode kelas seperti FSSI4105.4, atribut title berisi nama mata kuliah
 function courseInfo() {
   const courseLink = document.querySelector(".breadcrumb a[href*='/course/view.php']");
-  const name = firstText([".page-header-headings h1", ".page-context-header h1"]);
-  const label = [courseLink && courseLink.title, courseLink && courseLink.textContent, name, document.title].filter(Boolean).join(" ");
+  const name = (courseLink && clean(courseLink.title)) || firstText([".page-header-headings h1", ".page-context-header h1"]);
+  const label = [courseLink && courseLink.textContent, name, document.title].filter(Boolean).join(" ");
   return { name, label: clean(label) };
 }
 
@@ -177,8 +166,9 @@ async function capture() {
   if (!root) throw new Error("Isi soal tidak ditemukan di halaman ini.");
   const sources = [];
   const rawText = toText(root, sources);
-  const [{ text, images }, attachment, student] = await Promise.all([fetchImages(rawText, sources), fetchAttachment(root), fetchStudent()]);
+  const [{ text, images }, attachment] = await Promise.all([fetchImages(rawText, sources), fetchAttachment(root)]);
   const course = courseInfo();
+  const student = readStudent();
   return {
     url: location.href,
     title: firstText(TITLE_SELECTORS) || clean(document.title),

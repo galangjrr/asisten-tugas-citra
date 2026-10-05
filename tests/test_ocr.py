@@ -28,3 +28,45 @@ def test_ut_course_lookup_expanded_catalog():
     data2 = res2.json()
     assert data2["found"] is True
     assert "Morpho-Syntax" in data2["course"]["nama"]
+
+
+def test_smart_crop_book_spread_non_reader_fallback():
+    from tools.ocr_vision import smart_crop_book_spread
+    # Empty or small input
+    assert smart_crop_book_spread(b"") == b""
+    assert smart_crop_book_spread(b"123") == b"123"
+
+    # Non-reader image (e.g. solid color) should return original
+    import io
+    from PIL import Image
+    im = Image.new("RGB", (500, 500), color=(200, 200, 200))
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    original_bytes = buf.getvalue()
+    assert smart_crop_book_spread(original_bytes) == original_bytes
+
+
+def test_smart_crop_book_spread_crops_dark_frame():
+    import io
+    from PIL import Image
+    from tools.ocr_vision import smart_crop_book_spread
+
+    # Create mock reader image: dark frame around white center page
+    # Total 600x600, top 100 dark (y:0..100), bottom 100 dark (y:500..600), left 100 dark (x:0..100), right 100 dark (x:500..600)
+    im = Image.new("RGB", (600, 600), color=(20, 20, 30))
+    # Draw white center page
+    from PIL import ImageDraw
+    draw = ImageDraw.Draw(im)
+    draw.rectangle([100, 100, 500, 500], fill=(255, 255, 255))
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    raw = buf.getvalue()
+
+    cropped_raw = smart_crop_book_spread(raw)
+    cropped_im = Image.open(io.BytesIO(cropped_raw))
+    # Cropped image must be smaller than 600x600 and within the page area
+    assert cropped_im.size[0] < 600
+    assert cropped_im.size[1] < 600
+    assert cropped_im.size[0] > 200
+    assert cropped_im.size[1] > 200
+

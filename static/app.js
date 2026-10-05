@@ -203,6 +203,10 @@ const dom = {
   materialTextMeta: $("material-text-meta"),
   materialScreenshot: $("upload-material-screenshot"),
   materialOcrStatus: $("material-ocr-status"),
+  btnSnapRbv: $("btn-snap-rbv"),
+  rbvQueueStatus: $("rbv-queue-status"),
+  rbvQueueLabel: $("rbv-queue-label"),
+  rbvQueueCount: $("rbv-queue-count"),
   materialChunks: $("material-chunks"),
   materialChunkCount: $("material-chunk-count"),
   materialList: $("material-list"),
@@ -1905,6 +1909,92 @@ async function readScreenshot(file) {
   }
 }
 
+// Antrean tangkapan lembar Ruang Baca Virtual UT
+const rbvQueue = [];
+let isProcessingRbv = false;
+let rbvPageCounter = 0;
+
+async function enqueueRbvScreenshot(payload) {
+  if (!payload || !payload.data) return;
+  rbvPageCounter += 1;
+  const pageNum = rbvPageCounter;
+
+  // Pastikan sistem berada di Jalur B (Bahan Dosen atau Modul BMP)
+  if (State.mode !== "bahan") {
+    setMode("bahan");
+  }
+
+  // Deteksi kode mata kuliah dari judul tab atau halaman RBV bila judul bahan masih kosong
+  if (payload.title) {
+    const codeMatch = payload.title.match(/\b([A-Za-z]{4})\s*(\d{4})\b/);
+    if (codeMatch) {
+      applyDetectedCourse(codeMatch[1].toUpperCase() + codeMatch[2]);
+    }
+  }
+
+  rbvQueue.push({
+    pageNum,
+    dataUrl: payload.data,
+    title: payload.title || "Ruang Baca Virtual",
+  });
+
+  UI.toast(`Lembar ${pageNum} masuk antrean OCR`);
+  updateRbvQueueUI();
+
+  if (!isProcessingRbv) {
+    processRbvQueue();
+  }
+}
+
+function updateRbvQueueUI() {
+  if (!dom.rbvQueueStatus) return;
+  const count = rbvQueue.length;
+  if (count === 0 && !isProcessingRbv) {
+    dom.rbvQueueStatus.classList.add("hidden");
+    return;
+  }
+  dom.rbvQueueStatus.classList.remove("hidden");
+  if (dom.rbvQueueCount) {
+    dom.rbvQueueCount.textContent = count > 0 ? `${count} lagi` : "proses";
+  }
+}
+
+async function processRbvQueue() {
+  if (isProcessingRbv || rbvQueue.length === 0) return;
+  isProcessingRbv = true;
+  updateRbvQueueUI();
+
+  while (rbvQueue.length > 0) {
+    const item = rbvQueue.shift();
+    if (dom.rbvQueueLabel) {
+      dom.rbvQueueLabel.textContent = `Membaca Lembar ${item.pageNum} lewat OCR Gemini`;
+    }
+    updateRbvQueueUI();
+
+    try {
+      const data = await Api.extractScreenshot(item.dataUrl);
+      if (data && data.success && data.extracted_text) {
+        const text = data.extracted_text.trim();
+        const current = dom.materialText.value.trim();
+        const header = `--- Catatan BMP Lembar ${item.pageNum} ---`;
+        dom.materialText.value = current ? `${current}\n\n${header}\n${text}` : `${header}\n${text}`;
+        UI.renderMaterialPreview();
+        UI.toast(`Lembar ${item.pageNum} berhasil ditambahkan (${formatNumber(text.length)} karakter)`);
+      } else {
+        UI.toast(`Lembar ${item.pageNum} tidak terbaca jelas atau kosong`);
+      }
+    } catch (err) {
+      console.error("Gagal OCR lembar RBV:", err);
+      UI.toast(`Gagal membaca Lembar ${item.pageNum}: ${err.message || "kesalahan jaringan"}`);
+    } finally {
+      checkSystemHealth();
+    }
+  }
+
+  isProcessingRbv = false;
+  updateRbvQueueUI();
+}
+
 // ---------- Generate ----------
 let pipelineTimers = [];
 function runPipelineAnimation() {
@@ -2257,6 +2347,19 @@ function init() {
     dom.tutonEntry.classList.remove("hidden");
     $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
     window.desktop.onTutonCapture(handleTutonCapture);
+    if (dom.btnSnapRbv) {
+      dom.btnSnapRbv.classList.remove("hidden");
+      dom.btnSnapRbv.addEventListener("click", () => window.desktop.captureRbvPage());
+    }
+    if (window.desktop.onRbvScreenshot) {
+      window.desktop.onRbvScreenshot(enqueueRbvScreenshot);
+    }
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "F9" && !e.repeat) {
+        e.preventDefault();
+        window.desktop.captureRbvPage();
+      }
+    });
   }
   $("btn-replace-question-file").addEventListener("click", () => dom.questionFile.click());
   $("btn-edit-question-text").addEventListener("click", () => {

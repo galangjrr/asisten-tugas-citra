@@ -3,9 +3,90 @@ import os
 import json
 import base64
 import asyncio
+import numpy as np
 from PIL import Image
 from google.genai import types
 from tools.gemini_client import generate_with_fallback
+
+
+def smart_crop_book_spread(image_bytes: bytes) -> bytes:
+    """
+    Mendeteksi lembar buku putih di tengah jendela pembaca digital (seperti Ruang Baca Virtual UT)
+    dan memotong area konten naskah, membuang menu samping, bilah atas, dan strip thumbnail.
+    Jika gambar bukan dari jendela pembaca, gambar asli dikembalikan apa adanya.
+    """
+    if not image_bytes or len(image_bytes) < 100:
+        return image_bytes
+
+    try:
+        im = Image.open(io.BytesIO(image_bytes))
+        w, h = im.size
+        if w < 400 or h < 400:
+            return image_bytes
+
+        arr = np.array(im)
+        if arr.ndim < 3 or arr.shape[2] < 3:
+            return image_bytes
+
+        # Cek kontras bagian tengah untuk memastikan ini tampilan buku di dalam bingkai gelap
+        center_cols = arr[:, int(0.3 * w):int(0.7 * w), :3]
+        lum_y = np.mean(center_cols, axis=(1, 2))
+
+        # Harus ada bilah atas dan bawah yang gelap serta lembar tengah yang terang
+        has_dark_top = np.any(lum_y[:int(0.25 * h)] < 100)
+        has_dark_bottom = np.any(lum_y[int(0.75 * h):] < 100)
+        mid_y = h // 2
+        if not (has_dark_top and has_dark_bottom and lum_y[mid_y] > 170):
+            return image_bytes
+
+        # Telusuri batas vertikal lembar buku dari titik tengah
+        is_page_y = lum_y > 170
+        top_y = mid_y
+        while top_y > 0 and is_page_y[top_y]:
+            top_y -= 1
+        bottom_y = mid_y
+        while bottom_y < h - 1 and is_page_y[bottom_y]:
+            bottom_y += 1
+
+        if (bottom_y - top_y) < (0.3 * h):
+            return image_bytes
+
+        # Telusuri batas horizontal lembar buku
+        center_rows = arr[top_y:bottom_y, :, :3]
+        lum_x = np.mean(center_rows, axis=(0, 2))
+        is_page_x = lum_x > 170
+        mid_x = w // 2
+        if not is_page_x[mid_x]:
+            return image_bytes
+
+        left_x = mid_x
+        while left_x > 0 and is_page_x[left_x]:
+            left_x -= 1
+        right_x = mid_x
+        while right_x < w - 1 and is_page_x[right_x]:
+            right_x += 1
+
+        book_w = right_x - left_x
+        book_h = bottom_y - top_y
+        if book_w < (0.3 * w):
+            return image_bytes
+
+        # Potong margin dalam untuk membuang running header, bayangan lipatan buku, dan navigasi
+        crop_x1 = max(0, int(left_x + 0.03 * book_w))
+        crop_x2 = min(w, int(right_x - 0.04 * book_w))
+        crop_y1 = max(0, int(top_y + 0.06 * book_h))
+        crop_y2 = min(h, int(bottom_y - 0.03 * book_h))
+
+        if crop_x2 <= crop_x1 or crop_y2 <= crop_y1:
+            return image_bytes
+
+        cropped_im = im.crop((crop_x1, crop_y1, crop_x2, crop_y2))
+        out = io.BytesIO()
+        cropped_im.save(out, format="PNG")
+        return out.getvalue()
+    except Exception as e:
+        print(f"Pendeteksian crop buku dilewati: {e}")
+        return image_bytes
 
 
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
@@ -15,6 +96,8 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
     """
     if not image_bytes or len(image_bytes) < 100:
         return ""
+
+    image_bytes = smart_crop_book_spread(image_bytes)
 
     prompt = (
         "Kamu adalah sistem OCR akademis presisi tinggi. "

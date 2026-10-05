@@ -496,6 +496,10 @@
                 <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                   <label for="input-material-text" class="label !mb-0">Isi naskah</label>
                   <div class="flex items-center gap-2">
+                    <button type="button" id="btn-snap-rbv" class="hidden btn btn-secondary px-2.5 py-1 text-[11px]" title="Jepret halaman buku yang sedang dibuka di Ruang Baca Virtual atau tekan F9">
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><circle cx="15" cy="9" r="2"/></svg>
+                      Jepret RBV <span class="text-ink-3 font-normal">F9</span>
+                    </button>
                     <input type="file" id="upload-material-screenshot" accept="image/*" class="sr-only" tabindex="-1" aria-hidden="true">
                     <button type="button" id="btn-pick-material-screenshot" class="btn btn-ghost px-2.5 py-1 text-[11px]">
                       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
@@ -505,6 +509,13 @@
                 </div>
                 <div id="material-ocr-status" class="hidden mb-2 rounded-xl border border-line bg-subtle p-3" role="status">
                   <p class="text-xs font-semibold text-ink-2 mb-2">Membaca teks dari gambar lewat Gemini</p>
+                  <div class="progress-track" aria-hidden="true"><span class="progress-bar"></span></div>
+                </div>
+                <div id="rbv-queue-status" class="hidden mb-2 rounded-xl border border-line bg-subtle p-3" role="status">
+                  <div class="flex items-center justify-between text-xs font-semibold text-ink-2 mb-2">
+                    <span id="rbv-queue-label">Memproses antrean lembar RBV</span>
+                    <span id="rbv-queue-count" class="count-badge"></span>
+                  </div>
                   <div class="progress-track" aria-hidden="true"><span class="progress-bar"></span></div>
                 </div>
                 <textarea id="input-material-text" rows="8" class="field resize-y leading-relaxed" placeholder="Teks bahan otomatis masuk setelah berkas dibaca. Bisa juga ditempel manual."></textarea>

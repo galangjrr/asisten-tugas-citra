@@ -17,6 +17,11 @@ const DATA_DIR = path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "
 // Tuton UT berbasis Moodle. ATC_TUTON_URL hanya untuk uji lokal di mode dev.
 const TUTON_URL = (!app.isPackaged && process.env.ATC_TUTON_URL) || "https://elearning.ut.ac.id/";
 
+// ATC_DEBUG_PORT membuka port DevTools Protocol di 127.0.0.1 untuk inspeksi halaman, hanya di mode dev
+if (!app.isPackaged && /^\d+$/.test(process.env.ATC_DEBUG_PORT || "")) {
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.ATC_DEBUG_PORT);
+}
+
 let backend = null;
 let win = null;
 let tutonWin = null;
@@ -165,11 +170,52 @@ function openTuton() {
   tutonWin.on("closed", () => {
     tutonWin = null;
   });
+
+  // Tombol pintas F9 untuk jepret lembar bacaan RBV secara pasif dari luar tanpa menyentuh DOM
+  tutonWin.webContents.on("before-input-event", async (event, input) => {
+    if (input.type === "keyDown" && input.key === "F9" && !input.isAutoRepeat) {
+      event.preventDefault();
+      await captureRbvPage();
+    }
+  });
+
   tutonWin.loadURL(TUTON_URL);
+}
+
+let isCapturingRbv = false;
+
+async function captureRbvPage() {
+  if (isCapturingRbv) return;
+  if (!tutonWin || tutonWin.isDestroyed()) {
+    openTuton();
+    return;
+  }
+  if (!win || win.isDestroyed()) return;
+  isCapturingRbv = true;
+  try {
+    const image = await tutonWin.webContents.capturePage();
+    const dataUrl = image.toDataURL();
+    win.webContents.send("rbv-screenshot-captured", {
+      data: dataUrl,
+      title: tutonWin.getTitle() || "Ruang Baca Virtual",
+      url: tutonWin.webContents.getURL(),
+    });
+    shell.beep();
+  } catch (err) {
+    console.error("Gagal menjepret halaman RBV:", err);
+  } finally {
+    setTimeout(() => {
+      isCapturingRbv = false;
+    }, 250);
+  }
 }
 
 ipcMain.on("open-tuton", (event) => {
   if (win && event.sender === win.webContents) openTuton();
+});
+
+ipcMain.on("capture-rbv-page", (event) => {
+  if (win && event.sender === win.webContents) captureRbvPage();
 });
 
 // Hasil baca halaman hanya diterima dari jendela Tuton yang sedang membuka halaman UT

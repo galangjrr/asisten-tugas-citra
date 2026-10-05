@@ -4,5 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("desktop", {
   setTheme: (isDark) => ipcRenderer.send("set-theme", Boolean(isDark)),
   openTuton: () => ipcRenderer.send("open-tuton"),
+  captureRbvPage: () => ipcRenderer.send("capture-rbv-page"),
   onTutonCapture: (callback) => ipcRenderer.on("tuton-capture", (_event, payload) => callback(payload)),
+  onRbvScreenshot: (callback) => ipcRenderer.on("rbv-screenshot-captured", (_event, payload) => callback(payload)),
 });

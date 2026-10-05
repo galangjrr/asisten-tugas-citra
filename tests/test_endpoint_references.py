@@ -214,3 +214,16 @@ def test_endpoint_references_english(monkeypatch):
     assert any("Keynes, J. M., & Smith, J. (2023)." in r for r in ref_items)
     assert any("Journal of Economic Perspectives, 37(1), 45-60." in r for r in ref_items)
     assert any("https://doi.org/10.1257/jep.2023.37.1" in r for r in ref_items)
+
+
+def test_forum_discussion_has_no_identity_lines(monkeypatch):
+    async def fake_generator(**kwargs):
+        return {"title": "Diskusi 3", "language": "id", "sections": [{"heading": "", "content": "Kerja jarak jauh cocok untuk pekerjaan yang hasilnya terukur."}]}
+
+    monkeypatch.setattr(routes, "generate_academic_draft", fake_generator)
+    base = {"topic": "Bagaimana pendapat Anda tentang kerja jarak jauh?", "student_name": "Citra", "student_id": "048123456", "course_name": "Manajemen"}
+
+    forum = client.post("/api/generate", json={**base, "task_type": "ut-diskusi"}).json()
+    assert forum["identity_lines"] == []
+    tugas = client.post("/api/generate", json={**base, "task_type": "ut-tugas"}).json()
+    assert tugas["identity_lines"] == ["Nama: Citra", "NIM: 048123456", "Mata Kuliah: Manajemen"]

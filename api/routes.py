@@ -561,6 +561,9 @@ async def generate_task(payload: GenerateRequest):
     identity_labels = ("Name", "Student ID", "Course") if is_en else ("Nama", "NIM", "Mata Kuliah")
     identity_values = (payload.student_name, payload.student_id, payload.course_name)
     identity_lines = [f"{label}: {value.strip()}" for label, value in zip(identity_labels, identity_values) if value.strip()]
+    # Postingan forum diskusi tampil di bawah nama pengirim, jadi nama, NIM, dan mata kuliah tidak ditulis
+    if payload.task_type == "ut-diskusi":
+        identity_lines = []
 
     # Data lengkap disimpan supaya naskah bisa diedit dan ditulis ulang per bagian tanpa generate dari nol
     task = {

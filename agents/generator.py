@@ -632,11 +632,14 @@ async def generate_academic_draft(
         """
         elif is_reflective_opinion:
             student_voice_rules = """
-        RULES FOR REFLECTIVE OPINION & REAL-WORLD EXPERIENCE:
-        1. Adopt an articulate first-person voice ('In my view...', 'From my observation and reflection...', 'I believe...') combining personal reflection with grounded reasoning.
-        2. STRICTLY FORBIDDEN to include robotic boilerplate openings ('Hello Tutor') or conclusions ('In conclusion', 'That concludes my answer').
-        3. Ground arguments in realistic case observations or everyday experiences, supported seamlessly by empirical evidence and citations.
-        4. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era'.
+        RULES FOR REFLECTIVE OPINION:
+        1. Write like a student sharing a view in a class discussion forum: polite, warm, and flowing, as if explaining to classmates, not like a formal report.
+        2. The first paragraph states your stance or core answer in your own words. Vary how you express opinions. Phrases like 'In my view' or 'I believe' may appear at most once in the whole text, and NEVER open every paragraph with an opinion phrase.
+        3. Connect concepts from the sources to specific, imaginable examples such as a certain profession, situation, or event, then explain why the example supports your view. Avoid vague examples like 'in our surroundings' or 'many people'.
+        4. Short to medium paragraphs of about 3 to 5 sentences. Keep most sentences under 25 words, mix short and medium sentences, and use plain everyday words. No subheadings and no bullet points unless the question asks for points.
+        5. The last paragraph restates your view in plain words and gives one concrete suggestion or hope. FORBIDDEN closing labels such as 'My final stance', 'In conclusion', 'Ultimately', 'That concludes my answer', or 'Hope this helps'.
+        6. STRICTLY FORBIDDEN openings such as 'Hello Tutor' or 'Good morning'.
+        7. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era'.
         """
         else:
             student_voice_rules = """
@@ -677,12 +680,14 @@ async def generate_academic_draft(
         """
         elif is_reflective_opinion:
             student_voice_rules = """
-        ATURAN GAYA OPINI REFLEKTIF DAN PENGALAMAN NYATA:
-        1. Gunakan sudut pandang orang pertama yang reflektif dan lugas ('Menurut pandangan saya', 'Berdasarkan pengamatan saya', 'Saya menilai bahwa...').
-        2. DILARANG KERAS menyertakan sapaan pembuka formal ('Halo Tutor', 'Selamat pagi') atau penutup klise robotik ('Demikian jawaban saya', 'In conclusion').
-        3. Tautkan opini dan pengalaman kontekstual dengan bukti rujukan ilmiah dan sitasi secara membumi dan kokoh.
-        4. HINDARI bullet points berlebihan. Susun dalam paragraf-paragraf yang mengalir kohesif.
-        5. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat'.
+        ATURAN GAYA OPINI REFLEKTIF:
+        1. Tulis seperti mahasiswa yang berbagi pandangan di forum diskusi kelas: sopan, hangat, dan mengalir seperti menjelaskan ke teman sekelas, bukan seperti laporan resmi.
+        2. Paragraf pertama langsung menyatakan sikap atau jawaban inti dengan kalimat sendiri. Variasikan cara menyatakan pendapat. Frasa seperti 'Menurut saya' atau 'Saya melihat' paling banyak dipakai sekali di seluruh naskah, dan DILARANG membuka setiap paragraf dengan frasa pendapat.
+        3. Hubungkan konsep dari rujukan dengan contoh yang spesifik dan bisa dibayangkan, misalnya profesi, situasi, atau kejadian tertentu, lalu jelaskan kenapa contoh itu mendukung pendapatmu. Hindari contoh kabur seperti 'di lingkungan sekitar kita' atau 'banyak orang'.
+        4. Paragraf pendek sampai sedang, sekitar 3 sampai 5 kalimat. Sebagian besar kalimat di bawah 25 kata, campur kalimat pendek dengan kalimat sedang, dan pakai kata sehari-hari yang lazim diketik mahasiswa. Tanpa sub-judul dan tanpa daftar poin kecuali soal meminta poin.
+        5. Paragraf terakhir menegaskan lagi pendapatmu dengan kalimat biasa dan memberi satu saran atau harapan yang konkret. DILARANG label penutup seperti 'Sikap akhir saya', 'Demikian', 'Kesimpulannya', 'Pada akhirnya', atau 'Semoga bermanfaat'.
+        6. DILARANG sapaan pembuka seperti 'Halo Tutor', 'Selamat pagi', atau 'Izin menjawab'.
+        7. DILARANG menggunakan kata-kata klise sok pintar khas AI dan pujian berlebihan: 'krusial', 'esensial', 'ranah', 'sinergi', 'sangat ampuh', 'secara maksimal', 'dampak ganda', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'secara pribadi, saya melihat bahwa'.
         """
         else:
             student_voice_rules = """

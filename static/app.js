@@ -477,15 +477,12 @@ const UI = {
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
-  // Pilihan terakhir ditandai dan langsung difokus, jadi Enter cukup untuk melanjutkan tugas yang sama
+  // Pilihan terakhir cukup ditandai. Tidak difokus otomatis supaya Space tidak memilihnya tanpa sengaja.
   renderWelcome() {
-    let last = null;
     dom.taskTypeOptions.forEach((btn) => {
       const isLast = btn.dataset.taskType === State.taskType;
       btn.toggleAttribute("data-last", isLast);
-      if (isLast) last = btn;
     });
-    if (last) last.focus({ preventScroll: true });
   },
 
   renderTaskType() {
@@ -1331,10 +1328,10 @@ function findReferenceIndex(citation) {
   }));
 }
 
-function documentAsText({ withTitle = true } = {}) {
+function documentAsText({ withTitle = true, withIdentity = true } = {}) {
   const doc = State.doc;
   const out = withTitle ? [doc.title.toUpperCase(), ""] : [];
-  if (doc.identityLines.length) out.push(...doc.identityLines, "");
+  if (withIdentity && doc.identityLines.length) out.push(...doc.identityLines, "");
   doc.sections.forEach((sec) => {
     if (sec.heading) out.push(sec.heading);
     out.push(sec.content, "");
@@ -1352,12 +1349,12 @@ function documentAsText({ withTitle = true } = {}) {
 
 // Naskah untuk editor Tuton. Judul naskah dilewati karena forum dan tugas sudah punya kolom judul sendiri.
 // Baris berpemisah ' | ' disusun jadi tabel supaya tetap terbaca rapi di Tuton.
-function documentAsHtml() {
+function documentAsHtml({ withIdentity = true } = {}) {
   const doc = State.doc;
   const out = [];
   const para = (text) => out.push(`<p>${escapeHtml(text)}</p>`);
   const bold = (text) => out.push(`<p><strong>${escapeHtml(text)}</strong></p>`);
-  doc.identityLines.forEach(para);
+  if (withIdentity) doc.identityLines.forEach(para);
   doc.sections.forEach((sec) => {
     if (sec.heading) bold(sec.heading);
     let rows = [];
@@ -1411,6 +1408,8 @@ function selectTaskType(type) {
   storage.set(STORAGE.taskType, type);
   UI.renderTaskType();
   goStep(1);
+  // Fokus pindah ke kotak soal supaya ketikan berikutnya tidak menekan tombol lain. Halaman sudah digulir ke atas oleh goStep.
+  if (!dom.panelType.classList.contains("hidden")) dom.topic.focus({ preventScroll: true });
 }
 
 // Katalog mata kuliah UT dan perkakas Tuton tidak dipakai untuk kampus lain, kode kuliah mereka bisa mirip kode UT
@@ -2306,7 +2305,13 @@ async function writeToTuton(force = false) {
   setBusy(button, true, "Menulis ke Tuton");
   let result;
   try {
-    result = await window.desktop.fillTuton({ html: documentAsHtml(), text: documentAsText({ withTitle: false }), force });
+    // Postingan diskusi tampil di bawah nama pengirim, jadi blok nama dan NIM hanya dipakai untuk tugas
+    const withIdentity = !(State.taskType === "ut-diskusi" || State.mode === "forum");
+    result = await window.desktop.fillTuton({
+      html: documentAsHtml({ withIdentity }),
+      text: documentAsText({ withTitle: false, withIdentity }),
+      force,
+    });
   } catch (err) {
     result = { ok: false, message: err.message || "Jendela Tuton tidak bisa dihubungi." };
   } finally {
@@ -2462,7 +2467,10 @@ function init() {
     .forEach((input) => input.addEventListener("input", saveDraft));
 
   // Tab soal dengan navigasi panah kiri kanan
-  dom.tabType.addEventListener("click", () => UI.selectQuestionTab("type"));
+  dom.tabType.addEventListener("click", () => {
+    UI.selectQuestionTab("type");
+    dom.topic.focus();
+  });
   dom.tabUpload.addEventListener("click", () => UI.selectQuestionTab("upload"));
   [dom.tabType, dom.tabUpload].forEach((tab) => tab.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;

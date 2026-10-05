@@ -300,3 +300,14 @@ def test_generate_rejects_unknown_task_type():
 
     res = TestClient(app).post("/api/generate", json={"topic": "Jelaskan inflasi", "task_type": "kampus-x"})
     assert res.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_reflective_tone_avoids_template_opinion_phrases(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    await gen.generate_academic_draft("Bagaimana pendapat Anda tentang kerja jarak jauh?", [], tone="opini reflektif")
+    system = captured["system"]
+    assert "forum diskusi kelas" in system
+    # Frasa pendapat dibatasi supaya tidak berulang di tiap paragraf seperti template
+    assert "paling banyak dipakai sekali" in system
+    assert "'Menurut pandangan saya', 'Berdasarkan pengamatan saya'" not in system

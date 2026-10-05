@@ -70,3 +70,17 @@ def test_smart_crop_book_spread_crops_dark_frame():
     assert cropped_im.size[0] > 200
     assert cropped_im.size[1] > 200
 
+
+
+def test_strip_markdown_ocr_output():
+    from tools.ocr_vision import strip_markdown
+    raw = (
+        "```\n## Kegiatan Belajar 1\n\n**Morfologi** adalah *ilmu* tentang __bentuk__ kata.\n\n---\n\n"
+        "* poin satu\n+ poin dua\n> kutipan `istilah`\n***\n```"
+    )
+    assert strip_markdown(raw) == (
+        "Kegiatan Belajar 1\n\nMorfologi adalah ilmu tentang bentuk kata.\n\n"
+        "- poin satu\n- poin dua\nkutipan istilah"
+    )
+    # Perkalian, nama berkas, dan tanda hubung biasa tidak boleh rusak
+    assert strip_markdown("2*3*4 = 24, file nama_file_baru, 2 * 3 dan - poin") == "2*3*4 = 24, file nama_file_baru, 2 * 3 dan - poin"

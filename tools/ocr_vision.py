@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import json
 import base64
 import asyncio
@@ -89,6 +90,20 @@ def smart_crop_book_spread(image_bytes: bytes) -> bytes:
         return image_bytes
 
 
+def strip_markdown(text: str) -> str:
+    """Membuang tanda format markdown dari balasan OCR supaya teks terbaca seperti ketikan biasa.
+    Tanda bintang atau garis bawah yang menempel ke kata atau angka, seperti 2*3 atau nama_file, tidak disentuh."""
+    text = re.sub(r"^[ \t]*```[^\n]*\n?", "", text, flags=re.M)
+    text = re.sub(r"^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$", "", text, flags=re.M)
+    text = re.sub(r"^[ \t]*#{1,6}[ \t]+", "", text, flags=re.M)
+    text = re.sub(r"^[ \t]*>[ \t]?", "", text, flags=re.M)
+    text = re.sub(r"^([ \t]*)[*+][ \t]+", r"\1- ", text, flags=re.M)
+    for mark in (r"\*\*", "__", r"\*", "_"):
+        text = re.sub(rf"(?<![\w*]){mark}(?=[^\s*_])(.+?)(?<=[^\s*_]){mark}(?![\w*])", r"\1", text)
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
     """
     Mengekstrak teks materi dari gambar tangkapan layar modul kuliah.
@@ -105,7 +120,10 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         "poin penjelasan, atau daftar bahasan yang ada pada gambar tangkapan layar modul ini. "
         "Abaikan watermark pengguna atau hak cipta kampus seperti 'User: ... HAK CIPTA UT'. "
         "Abaikan tombol navigasi penampil seperti nomor halaman di luar teks materi. "
-        "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan."
+        "Kembalikan teks materi aslinya secara utuh, rapi, dan mudah dibaca tanpa komentar tambahan. "
+        "Tulis sebagai teks polos tanpa format markdown: jangan pakai tanda ** atau * untuk tebal dan miring, "
+        "tanda # untuk judul, garis --- pemisah, atau blok kode. Judul cukup ditulis di baris tersendiri, "
+        "daftar poin cukup diawali tanda - atau nomor. Pisahkan paragraf dengan satu baris kosong."
     )
 
     try:
@@ -120,7 +138,7 @@ async def extract_text_from_image(image_bytes: bytes, mime_type: str = "image/pn
         print(f"Vision OCR gagal: {e}")
         return ""
 
-    return response.text.strip()
+    return strip_markdown(response.text or "")
 
 
 # Gambar di bawah ukuran ini biasanya ikon atau garis hiasan. Logo yang lebih besar disaring oleh balasan SKIP_IMAGE.

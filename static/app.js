@@ -1976,7 +1976,7 @@ async function processRbvQueue() {
       if (data && data.success && data.extracted_text) {
         const text = data.extracted_text.trim();
         const current = dom.materialText.value.trim();
-        const header = `--- Catatan BMP Lembar ${item.pageNum} ---`;
+        const header = `Catatan BMP Lembar ${item.pageNum}`;
         dom.materialText.value = current ? `${current}\n\n${header}\n${text}` : `${header}\n${text}`;
         UI.renderMaterialPreview();
         UI.toast(`Lembar ${item.pageNum} berhasil ditambahkan (${formatNumber(text.length)} karakter)`);

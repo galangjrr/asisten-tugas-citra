@@ -141,6 +141,15 @@
                 <span class="btn btn-primary mt-5 px-5 py-2.5 text-xs pointer-events-none">Pilih berkas soal</span>
               </button>
 
+              <!-- Hanya di aplikasi desktop: soal dibaca langsung dari halaman Tuton yang sedang dibuka -->
+              <div id="tuton-entry" class="hidden mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-subtle px-5 py-4">
+                <div class="flex-1 min-w-[14rem]">
+                  <p class="text-sm font-semibold text-ink">Soal ada di Tuton?</p>
+                  <p class="text-xs text-ink-2 mt-0.5 leading-relaxed">Login di jendela Tuton, buka halaman diskusi atau tugas, lalu klik Pakai soal ini di pojok kanan bawah. Nama, NIM, dan mata kuliah ikut terisi.</p>
+                </div>
+                <button type="button" id="btn-open-tuton" class="btn btn-secondary px-4 py-2 text-xs">Buka Tuton</button>
+              </div>
+
               <div id="question-uploading" class="hidden rounded-2xl border border-line bg-subtle p-5" role="status" aria-live="polite">
                 <p id="question-uploading-text" class="text-xs font-semibold text-ink-2 mb-4">Membaca lembar soal</p>
                 <div class="space-y-2.5" aria-hidden="true">

@@ -921,6 +921,14 @@ async def parse_question_document(file_bytes: bytes, filename: str) -> Dict[str,
             text, images = await read_pdf_file(file_bytes)
             file_type = "pdf"
 
+    return await structure_question_text(text, images, filename, file_type)
+
+
+async def structure_question_text(text: str, images: list, filename: str, file_type: str) -> Dict[str, Any]:
+    """
+    Memilah teks soal mentah menjadi soal, rubrik, kode mata kuliah, dan spesifikasi jawaban.
+    Dipakai berkas unggahan maupun halaman Tuton. Gambar ke-n ditandai [[GAMBAR_n]] di teks.
+    """
     clean_text = strip_time_limit_lines(text).strip()
     detected_code = extract_course_code_from_text(clean_text)
 

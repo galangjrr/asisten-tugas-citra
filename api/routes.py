@@ -10,7 +10,7 @@ from api.schemas import (
     HealthResponse, SearchRequest, SearchResponse, GenerateRequest, GenerateResponse,
     PaperItem, ManualModuleRequest, UTCourseLookupResponse,
     ExtractScreenshotRequest, ExtractScreenshotResponse,
-    ParseQuestionDocRequest, ParseQuestionDocResponse,
+    ParseQuestionWebRequest, ParseQuestionDocResponse,
     TaskEditRequest, SectionRewriteRequest, TaskUpdateResponse,
     ParseReadingDocResponse, PublicationLookupRequest, PublicationLookupResponse,
     SavedModuleItem, SavedModuleListResponse, LoadSavedModuleRequest
@@ -20,7 +20,7 @@ from tools.pdf_downloader import download_paper_pdf
 from tools.pdf_parser import extract_text_with_pages
 from tools.ut_catalog import lookup_ut_course
 from tools.ocr_vision import extract_text_from_image
-from tools.question_reader import parse_question_document
+from tools.question_reader import parse_question_document, structure_question_text
 from tools.reading_doc_reader import read_reading_doc, split_marked_pages, MAX_READING_DOC_BYTES
 from tools.content_chunker import chunk_paragraphs
 from tools.publication_lookup import lookup_publication
@@ -398,6 +398,29 @@ async def extract_screenshot(payload: ExtractScreenshotRequest):
     )
 
 
+# Batas per gambar soal dari Tuton, setara foto layar resolusi tinggi
+MAX_WEB_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+def question_response(res: Dict[str, Any], filename: str, fail_message: str) -> ParseQuestionDocResponse:
+    if not res.get("success"):
+        return ParseQuestionDocResponse(success=False, filename=filename, file_type=res.get("file_type", ""), text="", message=fail_message)
+    return ParseQuestionDocResponse(
+        success=True,
+        filename=filename,
+        file_type=res.get("file_type", ""),
+        text=res.get("text", ""),
+        questions=res.get("questions", res.get("text", "")),
+        detected_guidelines=res.get("detected_guidelines", ""),
+        char_count=res.get("char_count", 0),
+        detected_course_code=res.get("detected_course_code"),
+        word_count_hint=res.get("word_count_hint"),
+        answer_spec=res.get("answer_spec"),
+        answer_spec_source=res.get("answer_spec_source"),
+        message=f"Berhasil membaca {res.get('char_count', 0)} karakter dari {filename}."
+    )
+
+
 @router.post("/upload-question-file", response_model=ParseQuestionDocResponse)
 async def upload_question_file(file: UploadFile = File(...)):
     """Membaca berkas soal dosen (PDF, DOCX, TXT) via multipart upload tanpa memotong isi."""
@@ -411,71 +434,27 @@ async def upload_question_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Berkas kosong atau rusak.")
 
     res = await parse_question_document(content, filename)
-    if not res.get("success"):
-        return ParseQuestionDocResponse(
-            success=False,
-            filename=filename,
-            file_type=res.get("file_type", ""),
-            text="",
-            message="Gagal mengekstrak teks dari berkas. Pastikan dokumen tidak terkunci kata sandi."
-        )
-
-    return ParseQuestionDocResponse(
-        success=True,
-        filename=filename,
-        file_type=res.get("file_type", ""),
-        text=res.get("text", ""),
-        questions=res.get("questions", res.get("text", "")),
-        detected_guidelines=res.get("detected_guidelines", ""),
-        char_count=res.get("char_count", 0),
-        detected_course_code=res.get("detected_course_code"),
-        word_count_hint=res.get("word_count_hint"),
-        answer_spec=res.get("answer_spec"),
-        answer_spec_source=res.get("answer_spec_source"),
-        message=f"Berhasil membaca {res.get('char_count', 0)} karakter dari berkas {filename}."
-    )
+    return question_response(res, filename, "Gagal mengekstrak teks dari berkas. Pastikan dokumen tidak terkunci kata sandi.")
 
 
-@router.post("/parse-question-doc", response_model=ParseQuestionDocResponse)
-async def parse_question_doc_base64(payload: ParseQuestionDocRequest):
-    """Membaca berkas soal dosen via base64 encoded data."""
-    raw_b64 = payload.file_base64
-    if "," in raw_b64:
-        raw_b64 = raw_b64.split(",", 1)[1]
+@router.post("/parse-question-web", response_model=ParseQuestionDocResponse)
+async def parse_question_web(payload: ParseQuestionWebRequest):
+    """Membaca soal dari halaman Tuton yang sudah diubah jadi teks plus gambar, lewat pemilah yang sama dengan berkas."""
+    images = []
+    for item in payload.images:
+        try:
+            blob = base64.b64decode(item.data_base64.split(",", 1)[-1], validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Data gambar soal dari Tuton tidak valid.")
+        if len(blob) > MAX_WEB_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Salah satu gambar soal di Tuton lebih dari 8MB.")
+        if not item.mime.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Lampiran gambar soal bukan berkas gambar.")
+        images.append((blob, item.mime))
 
-    try:
-        file_bytes = base64.b64decode(raw_b64)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Format data berkas tidak valid.")
-
-    res = await parse_question_document(file_bytes, payload.filename)
-    if not res.get("success"):
-        return ParseQuestionDocResponse(
-            success=False,
-            filename=payload.filename,
-            file_type=res.get("file_type", ""),
-            text="",
-            message="Gagal mengekstrak teks dari berkas."
-        )
-
-    return ParseQuestionDocResponse(
-        success=True,
-        filename=payload.filename,
-        file_type=res.get("file_type", ""),
-        text=res.get("text", ""),
-        questions=res.get("questions", res.get("text", "")),
-        detected_guidelines=res.get("detected_guidelines", ""),
-        char_count=res.get("char_count", 0),
-        detected_course_code=res.get("detected_course_code"),
-        word_count_hint=res.get("word_count_hint"),
-        answer_spec=res.get("answer_spec"),
-        answer_spec_source=res.get("answer_spec_source"),
-        message=f"Berhasil membaca {res.get('char_count', 0)} karakter dari berkas {payload.filename}."
-    )
-
-
-
-
+    filename = payload.title.strip() or "Halaman Tuton"
+    res = await structure_question_text(payload.text, images, filename, "tuton")
+    return question_response(res, filename, "Halaman Tuton ini tidak berisi teks soal.")
 
 
 @router.post("/search", response_model=SearchResponse)

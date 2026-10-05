@@ -14,8 +14,12 @@ const SYMBOL_COLOR = { light: "#57534e", dark: "#d6d3d1" };
 // Folder data permanen: .env, tugas tersimpan, dan profil Chromium. Tidak ikut terhapus saat aplikasi di-update.
 const DATA_DIR = path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "AsistenTugasCitra");
 
+// Tuton UT berbasis Moodle. ATC_TUTON_URL hanya untuk uji lokal di mode dev.
+const TUTON_URL = (!app.isPackaged && process.env.ATC_TUTON_URL) || "https://elearning.ut.ac.id/";
+
 let backend = null;
 let win = null;
+let tutonWin = null;
 
 // Profil Chromium disimpan permanen supaya localStorage seperti nama dan NIM tetap ingat
 app.setPath("userData", path.join(DATA_DIR, "electron"));
@@ -100,6 +104,65 @@ function createWindow() {
 
   win.loadURL(loadingPage);
 }
+
+function isTutonUrl(url) {
+  try {
+    const { protocol, hostname, origin } = new URL(url);
+    if (!app.isPackaged && process.env.ATC_TUTON_URL && origin === new URL(process.env.ATC_TUTON_URL).origin) return true;
+    return protocol === "https:" && (hostname === "ut.ac.id" || hostname.endsWith(".ut.ac.id"));
+  } catch (err) {
+    return false;
+  }
+}
+
+// Jendela Tuton memakai sesi terpisah yang disimpan permanen, jadi login cukup sekali dan cookie Tuton
+// tidak bercampur dengan halaman Asisten. Password tidak pernah dibaca, login diketik sendiri oleh pengguna.
+function openTuton() {
+  if (tutonWin && !tutonWin.isDestroyed()) {
+    if (tutonWin.isMinimized()) tutonWin.restore();
+    tutonWin.focus();
+    return;
+  }
+  tutonWin = new BrowserWindow({
+    width: 1100,
+    height: 820,
+    minWidth: 400,
+    minHeight: 500,
+    title: "Tuton UT",
+    icon: app.isPackaged ? undefined : path.join(ROOT_DIR, "assets", "icon.ico"),
+    autoHideMenuBar: true,
+    webPreferences: {
+      partition: "persist:tuton",
+      preload: path.join(__dirname, "tuton-preload.js"),
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+  tutonWin.removeMenu();
+  // Tautan Tuton yang membuka tab baru tetap dibuka di jendela ini, tautan luar ke browser bawaan
+  tutonWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (isTutonUrl(url)) tutonWin.loadURL(url);
+    else if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  tutonWin.on("closed", () => {
+    tutonWin = null;
+  });
+  tutonWin.loadURL(TUTON_URL);
+}
+
+ipcMain.on("open-tuton", (event) => {
+  if (win && event.sender === win.webContents) openTuton();
+});
+
+// Hasil baca halaman hanya diterima dari jendela Tuton yang sedang membuka halaman UT
+ipcMain.on("tuton-capture", (event, payload) => {
+  if (!tutonWin || event.sender !== tutonWin.webContents || !isTutonUrl(event.senderFrame.url)) return;
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send("tuton-capture", payload);
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
 
 ipcMain.on("set-theme", (event, isDark) => {
   const target = BrowserWindow.fromWebContents(event.sender);

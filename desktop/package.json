@@ -15,7 +15,8 @@
     "executableName": "AsistenTugasCitra",
     "files": [
       "main.js",
-      "preload.js"
+      "preload.js",
+      "tuton-preload.js"
     ],
     "extraResources": [
       {

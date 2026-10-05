@@ -171,9 +171,16 @@ class ExtractScreenshotResponse(BaseModel):
     message: str = ""
 
 
-class ParseQuestionDocRequest(BaseModel):
-    filename: str
-    file_base64: str
+class WebQuestionImage(BaseModel):
+    data_base64: str
+    mime: str = "image/png"
+
+
+class ParseQuestionWebRequest(BaseModel):
+    """Soal yang dibaca dari halaman Tuton. Gambar ke-n ditandai [[GAMBAR_n]] di text."""
+    title: str = Field("", max_length=300)
+    text: str = Field(..., min_length=3, max_length=60000)
+    images: List[WebQuestionImage] = Field(default_factory=list, max_length=12)
 
 
 class ParseQuestionDocResponse(BaseModel):

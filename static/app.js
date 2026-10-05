@@ -113,6 +113,7 @@ const Api = {
   },
   health: () => Api.request("/api/health"),
   uploadQuestion: (file) => Api.upload("/api/upload-question-file", file),
+  parseQuestionWeb: (payload) => Api.postJson("/api/parse-question-web", payload),
   parseReadingDoc: (file) => Api.upload("/api/parse-reading-doc", file),
   saveMaterial: (payload) => Api.postJson("/api/manual-module", payload),
   lookupPublication: (title, author) => Api.postJson("/api/lookup-publication", { title, author: author || null }),
@@ -147,6 +148,7 @@ const dom = {
   panelUpload: $("panel-upload"),
   questionFile: $("upload-question-file"),
   questionDropzone: $("question-dropzone"),
+  tutonEntry: $("tuton-entry"),
   questionUploading: $("question-uploading"),
   questionUploadingText: $("question-uploading-text"),
   questionPreview: $("question-preview"),
@@ -473,6 +475,7 @@ const UI = {
     const hasFile = Boolean(State.questionFileName && dom.topic.value.trim());
     dom.questionUploading.classList.toggle("hidden", !loading);
     dom.questionDropzone.classList.toggle("hidden", loading || hasFile);
+    dom.tutonEntry.classList.toggle("hidden", !window.desktop || loading || hasFile);
     dom.questionPreview.classList.toggle("hidden", loading || !hasFile);
     if (loading) dom.questionUploadingText.textContent = loadingMessage;
     if (!loading && hasFile) UI.renderQuestionPreview(dom.topic.value);
@@ -1447,6 +1450,38 @@ async function applyDetectedCourse(code) {
   }
 }
 
+// Defensive UI: soal yang sudah diketik tidak ditimpa diam diam
+async function confirmReplaceQuestion(source) {
+  if (dom.topic.value.trim().length < 3) return true;
+  return UI.confirm({
+    title: "Timpa soal yang sudah ada?",
+    message: `Teks soal di kotak ketik akan diganti isi ${source}. Draf lama tidak bisa dikembalikan.`,
+    okLabel: "Ganti soal"
+  });
+}
+
+// Soal dari berkas maupun halaman Tuton dibaca lewat jalur yang sama
+async function readQuestion(label, loadingMessage, request, retry) {
+  UI.selectQuestionTab("upload");
+  UI.renderUploadPanel(loadingMessage);
+  try {
+    const data = await request();
+    if (!data.success || !data.text) throw new ApiError(data.message || "Teks dokumen tidak dapat diekstrak.", 422);
+    State.questionFileName = label;
+    setQuestionText(formatQuestionText(data.questions || data.text));
+    if (data.detected_guidelines) dom.instructions.value = data.detected_guidelines;
+    applyAnswerSpec(data.answer_spec, data.answer_spec_source);
+    if (data.detected_course_code) applyDetectedCourse(data.detected_course_code);
+    UI.renderUploadPanel();
+    UI.toast(data.detected_guidelines ? "Soal terbaca, rubrik dosen dipisahkan" : "Soal berhasil dibaca");
+  } catch (err) {
+    UI.renderUploadPanel();
+    UI.showError("Soal belum terbaca", err, retry);
+  } finally {
+    checkSystemHealth();
+  }
+}
+
 async function handleQuestionFile(file) {
   if (!file) return;
   const ext = "." + (file.name || "").split(".").pop().toLowerCase();
@@ -1454,34 +1489,49 @@ async function handleQuestionFile(file) {
     UI.showAlert("Format berkas soal belum didukung", "Unggah lembar soal dalam format PDF, Word .docx, TXT, atau screenshot PNG dan JPG.");
     return;
   }
-  // Defensive UI: soal yang sudah diketik tidak ditimpa diam diam
-  if (dom.topic.value.trim().length >= 3) {
-    const ok = await UI.confirm({
-      title: "Timpa soal yang sudah ada?",
-      message: `Teks soal di kotak ketik akan diganti isi berkas ${file.name}. Draf lama tidak bisa dikembalikan.`,
-      okLabel: "Ganti dengan berkas"
-    });
-    if (!ok) return;
-  }
+  if (!(await confirmReplaceQuestion(`berkas ${file.name}`))) return;
+  readQuestion(file.name, `Membaca ${file.name}. Soal bergambar atau hasil scan bisa butuh setengah menit.`,
+    () => Api.uploadQuestion(file), () => handleQuestionFile(file));
+}
 
-  UI.selectQuestionTab("upload");
-  UI.renderUploadPanel(`Membaca ${file.name}. Soal bergambar atau hasil scan bisa butuh setengah menit.`);
-  try {
-    const data = await Api.uploadQuestion(file);
-    if (!data.success || !data.text) throw new ApiError(data.message || "Teks dokumen tidak dapat diekstrak.", 422);
-    State.questionFileName = data.filename;
-    setQuestionText(formatQuestionText(data.questions || data.text));
-    if (data.detected_guidelines) dom.instructions.value = data.detected_guidelines;
-    applyAnswerSpec(data.answer_spec, data.answer_spec_source);
-    if (data.detected_course_code) applyDetectedCourse(data.detected_course_code);
-    UI.renderUploadPanel();
-    UI.toast(data.detected_guidelines ? "Soal terbaca, rubrik dosen dipisahkan" : "Lembar soal berhasil dibaca");
-  } catch (err) {
-    UI.renderUploadPanel();
-    UI.showError("Lembar soal belum terbaca", err, () => handleQuestionFile(file));
-  } finally {
-    checkSystemHealth();
+function dataUrlToFile(dataUrl, name) {
+  const [head, body] = dataUrl.split(",");
+  const mime = (head.match(/data:([^;]+)/) || [])[1] || "application/octet-stream";
+  const bytes = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  return new File([bytes], name, { type: mime });
+}
+
+// Identitas dari Tuton hanya mengisi kolom yang masih kosong supaya isian manual tidak tertimpa
+function fillIdentityIfEmpty(input, key, value) {
+  if (!value || input.value.trim()) return;
+  input.value = value;
+  storage.set(key, value);
+}
+
+// Kiriman dari tombol Pakai soal ini di jendela Tuton
+async function handleTutonCapture(capture) {
+  if (!capture) return;
+  fillIdentityIfEmpty(dom.studentName, STORAGE.name, capture.studentName);
+  fillIdentityIfEmpty(dom.studentId, STORAGE.nim, capture.studentId);
+  const code = (capture.courseLabel || "").match(/\b([A-Za-z]{4})\s*(\d{4})\b/);
+  if (code) applyDetectedCourse(code[1].toUpperCase() + code[2]);
+  else if (capture.courseName && !dom.courseName.value.trim()) dom.courseName.value = capture.courseName;
+  UI.renderSummaries();
+
+  const title = capture.title || "halaman Tuton";
+  if (!capture.attachment && (capture.text || "").trim().length < 3) {
+    UI.showAlert("Soal belum ketemu di halaman ini", "Buka halaman diskusi atau tugas yang berisi soal, lalu klik Pakai soal ini lagi.");
+    return;
   }
+  if (!(await confirmReplaceQuestion(`halaman Tuton ${title}`))) return;
+
+  const attachment = capture.attachment;
+  const request = attachment
+    ? () => Api.uploadQuestion(dataUrlToFile(attachment.data, attachment.name))
+    : () => Api.parseQuestionWeb({ title, text: capture.text, images: capture.images || [] });
+  readQuestion(`Tuton · ${title}`,
+    attachment ? `Membaca lampiran ${attachment.name} dari Tuton.` : `Membaca soal dari Tuton${capture.images && capture.images.length ? " beserta gambarnya" : ""}.`,
+    request, () => handleTutonCapture(capture));
 }
 
 function requireQuestion() {
@@ -2204,6 +2254,10 @@ function init() {
     next.focus();
   }));
   bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
+  if (window.desktop) {
+    $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
+    window.desktop.onTutonCapture(handleTutonCapture);
+  }
   $("btn-replace-question-file").addEventListener("click", () => dom.questionFile.click());
   $("btn-edit-question-text").addEventListener("click", () => {
     UI.selectQuestionTab("type");

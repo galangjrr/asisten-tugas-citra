@@ -610,3 +610,45 @@ async def test_screenshot_question_goes_through_scan_path(monkeypatch):
 def test_tidy_guidelines_closes_ocr_blank_lines():
     from tools.question_reader import tidy_guidelines
     assert tidy_guidelines("Instruksi Umum\n\n\nSilakan baca cerpen.\n \nMaksimal 800 kata.\n") == "Instruksi Umum\nSilakan baca cerpen.\nMaksimal 800 kata."
+
+
+def test_parse_question_web_sends_images_to_ai(monkeypatch):
+    """Gambar dari halaman Tuton wajib sampai ke AI dan deskripsinya menggantikan penanda di soal."""
+    import base64
+    import tools.question_reader as qr
+
+    seen = {}
+
+    async def fake_structure(raw_text, images=()):
+        seen["images"] = list(images)
+        return {
+            "question_topic": "1. Jelaskan grafik permintaan berikut. [[GAMBAR_0]]",
+            "guidelines": "Jawaban minimal 300 kata.",
+            "course_code": "ESPA4122",
+            "image_descriptions": {0: "kurva permintaan turun dari kiri atas ke kanan bawah"},
+            "answer_spec": None,
+        }
+
+    monkeypatch.setattr(qr, "structure_assignment_with_ai", fake_structure)
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 4000
+    response = client.post("/api/parse-question-web", json={
+        "title": "Diskusi 3 ESPA4122",
+        "text": "1. Jelaskan grafik permintaan berikut. [[GAMBAR_0]]\nJawaban minimal 300 kata.",
+        "images": [{"data_base64": base64.b64encode(png).decode(), "mime": "image/png"}],
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert seen["images"] == [(png, "image/png")]
+    assert data["success"] is True
+    assert data["file_type"] == "tuton"
+    assert data["detected_course_code"] == "ESPA4122"
+    assert "[Gambar: kurva permintaan turun" in data["questions"]
+    assert "[[GAMBAR_0]]" not in data["questions"]
+
+
+def test_parse_question_web_rejects_bad_image():
+    response = client.post("/api/parse-question-web", json={
+        "text": "1. Jelaskan konsep elastisitas permintaan.",
+        "images": [{"data_base64": "bukan base64 !!", "mime": "image/png"}],
+    })
+    assert response.status_code == 400

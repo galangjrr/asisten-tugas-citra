@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const { spawn } = require("node:child_process");
+const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
 
@@ -10,11 +11,14 @@ const TITLEBAR_HEIGHT = 56;
 // Warna simbol tombol jendela mengikuti token teks sekunder stone-600 dan dark stone-300
 const SYMBOL_COLOR = { light: "#57534e", dark: "#d6d3d1" };
 
+// Folder data permanen: .env, tugas tersimpan, dan profil Chromium. Tidak ikut terhapus saat aplikasi di-update.
+const DATA_DIR = path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "AsistenTugasCitra");
+
 let backend = null;
 let win = null;
 
 // Profil Chromium disimpan permanen supaya localStorage seperti nama dan NIM tetap ingat
-app.setPath("userData", path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "AsistenTugasCitra", "electron"));
+app.setPath("userData", path.join(DATA_DIR, "electron"));
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -54,8 +58,9 @@ function startBackend(port) {
   const args = [String(port), "--exit-with-parent"];
   if (app.isPackaged) {
     const exe = path.join(process.resourcesPath, "backend", "AsistenTugasCitraServer.exe");
-    // .env disimpan di folder aplikasi, sebelah AsistenTugasCitra.exe
-    return spawn(exe, args, { ...options, cwd: path.dirname(process.execPath) });
+    // Backend membaca .env dari cwd, jadi cwd diarahkan ke folder data permanen
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    return spawn(exe, args, { ...options, cwd: DATA_DIR });
   }
   const python = process.env.PYTHON || "python";
   return spawn(python, [path.join(ROOT_DIR, "run_app.py"), ...args], { ...options, cwd: ROOT_DIR });

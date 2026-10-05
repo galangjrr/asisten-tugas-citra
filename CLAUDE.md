@@ -6,7 +6,7 @@ Dokumen ini adalah instruksi operasional resmi dan kontrak kerja untuk Claude sa
 
 ## 1. Identitas Proyek dan Lingkungan Kerja
 - **Nama Aplikasi:** Asisten Tugas Citra (ATC)
-- **Bentuk Aplikasi:** Aplikasi desktop Windows dengan shell Electron di folder `desktop/`. Electron menjalankan backend `run_app.py` sebagai proses terpisah, versi rilis memakai `AsistenTugasCitraServer.exe` hasil PyInstaller onedir. Build installer: `cd desktop && npm run dist`.
+- **Bentuk Aplikasi:** Aplikasi desktop Windows dengan shell Electron di folder `desktop/`. Electron menjalankan backend `run_app.py` sebagai proses terpisah, versi rilis memakai `AsistenTugasCitraServer.exe` hasil PyInstaller onedir. Build installer: `cd desktop && npm run dist`. Versi rilis membaca `.env` dari `%LOCALAPPDATA%\AsistenTugasCitra\.env`, versi dev dari root proyek.
 - **Frontend Stack:** Single Page Application berbasis HTML semantik di `static/index.html`, Tailwind CSS via CDN, font Plus Jakarta Sans dan Newsreader serif, serta Vanilla JavaScript di `static/app.js`.
 - **Backend Stack:** FastAPI lokal di `127.0.0.1` dengan Python 3.11+.
 - **Penyimpanan Profil Webview:** Profil dan `localStorage` tersimpan permanen di `%LOCALAPPDATA%\AsistenTugasCitra\electron`.

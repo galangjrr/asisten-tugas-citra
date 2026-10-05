@@ -10,6 +10,8 @@ class HealthResponse(BaseModel):
     ai_state: str = "no_key"
     active_model: Optional[str] = None
     retry_in: Optional[int] = None
+    # Lokasi .env yang dibaca backend, ditampilkan di UI saat API key belum disetel
+    env_file: Optional[str] = None
 
 
 class PaperItem(BaseModel):

@@ -54,6 +54,7 @@ async def check_health():
         ai_state=ai["state"],
         active_model=ai["model"],
         retry_in=ai["retry_in"],
+        env_file=os.path.abspath(".env"),
     )
 
 

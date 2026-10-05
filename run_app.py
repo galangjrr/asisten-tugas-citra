@@ -28,8 +28,12 @@ def main():
     ports = [a for a in args if a.isdigit()]
     port = int(ports[0]) if ports else 8000
 
+    # Exe backend tidak punya jendela. Dibuka langsung dari Explorer cuma jadi server hantu, jadi tolak.
+    if getattr(sys, "frozen", False) and not watch_parent:
+        sys.exit("Buka aplikasi lewat AsistenTugasCitra.exe, bukan exe backend.")
+
     # Mode skrip: pindah ke folder proyek supaya .env dan berkas lokal kebaca.
-    # Mode exe: Electron sudah mengatur cwd ke folder aplikasi tempat .env disimpan.
+    # Mode exe: Electron sudah mengatur cwd ke %LOCALAPPDATA%\AsistenTugasCitra tempat .env disimpan.
     if not getattr(sys, "frozen", False):
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
 

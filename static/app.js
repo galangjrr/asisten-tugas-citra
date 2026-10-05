@@ -1347,7 +1347,7 @@ async function checkSystemHealth() {
     } else if (data.ai_state === "unavailable") {
       UI.renderStatus("is-down", "Model tidak tersedia", null, "Semua model Gemini menolak akun ini. Cek kuota atau API key di Google AI Studio.");
     } else {
-      UI.renderStatus("is-paused", "API key belum disetel", null, "Isi GEMINI_API_KEY di berkas .env lalu buka ulang aplikasi.");
+      UI.renderStatus("is-paused", "API key belum disetel", null, `Isi GEMINI_API_KEY di ${data.env_file || "berkas .env"} lalu buka ulang aplikasi.`);
     }
   } catch (err) {
     UI.renderStatus("is-down", "Server offline", null, "Server lokal tidak merespons.");

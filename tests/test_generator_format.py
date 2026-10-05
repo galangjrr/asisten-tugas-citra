@@ -278,3 +278,25 @@ async def test_citation_rules_stay_natural(monkeypatch):
     # Aturan lama yang memaksa sitasi di mana-mana tidak boleh balik lagi
     assert "WAJIB 100%" not in system and "Modul 3, hlm. 3.14" not in system
     assert "WAJIB DISITASI" not in captured["user"]
+
+
+@pytest.mark.anyio
+async def test_task_type_sets_campus_context(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    await gen.generate_academic_draft("Jelaskan konsep inflasi.", [], task_type="umum")
+    assert "bukan Universitas Terbuka" in captured["system"]
+
+    await gen.generate_academic_draft("Jelaskan konsep inflasi.", [], task_type="ut-diskusi")
+    assert "Tuton" in captured["system"] and "bukan Universitas Terbuka" not in captured["system"]
+
+    # Klien lama tanpa jenis tugas tidak diberi konteks kampus apa pun
+    await gen.generate_academic_draft("Jelaskan konsep inflasi.", [])
+    assert "KONTEKS KAMPUS" not in captured["system"]
+
+
+def test_generate_rejects_unknown_task_type():
+    from fastapi.testclient import TestClient
+    from api.main import app
+
+    res = TestClient(app).post("/api/generate", json={"topic": "Jelaskan inflasi", "task_type": "kampus-x"})
+    assert res.status_code == 422

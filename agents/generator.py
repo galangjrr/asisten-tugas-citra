@@ -208,6 +208,28 @@ DIRECT_ANSWER_LABELS = {
 }
 
 
+# Konteks kampus dari layar sambutan. Kampus umum dilarang menyebut istilah UT supaya naskah tidak terbaca salah alamat.
+TASK_TYPE_RULES = {
+    "ut-diskusi": (
+        "Tugas ini tanggapan forum diskusi Tutorial Online (Tuton) Universitas Terbuka. Tulis sebagai postingan diskusi mahasiswa "
+        "yang langsung menanggapi pertanyaan inisiasi dengan sudut pandang sendiri yang didukung konsep, tanpa salam pembuka panjang dan tanpa judul bab."
+    ),
+    "ut-tugas": (
+        "Tugas ini Tugas Tutorial Universitas Terbuka yang dinilai tutor per nomor soal. Jawab setiap nomor sampai tuntas sesuai perintahnya, "
+        "dan jadikan modul BMP dasar konsep utama bila tersedia."
+    ),
+    "umum": (
+        "Tugas ini tugas kuliah di kampus umum, bukan Universitas Terbuka. DILARANG menyebut Universitas Terbuka, UT, Tuton, BMP, "
+        "atau tutor. Sebut pengajar sebagai dosen."
+    ),
+}
+
+
+def task_type_rule(task_type: Optional[str]) -> str:
+    rule = TASK_TYPE_RULES.get(task_type or "")
+    return f"\n    KONTEKS KAMPUS:\n    - {rule}\n" if rule else ""
+
+
 async def generate_academic_draft(
     topic: str,
     papers_with_content: List[Dict[str, Any]],
@@ -220,6 +242,7 @@ async def generate_academic_draft(
     student_name: str = "",
     course_name: str = "",
     quote_citations: bool = False,
+    task_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh.
@@ -826,7 +849,7 @@ async def generate_academic_draft(
     - {course_line}Isi 'title' dengan nama tugas sesuai lembar soal, misalnya 'Tugas 1 Bahasa Inggris Niaga', atau topik utama soal jika lembar soal tidak menyebut nama tugas. DILARANG judul generik seperti 'Numbered Assignment Answers', 'Jawaban Tugas Kuliah', atau 'Academic Discussion'.
     - {signer_rule}
     - Identitas mahasiswa (nama, NIM, mata kuliah) sudah dicetak otomatis di bawah judul. DILARANG menulisnya lagi di isi naskah.
-    """
+    """ + task_type_rule(task_type)
 
     system_instruction = f"""
     Kamu adalah mahasiswa berprestasi yang sedang menulis naskah tugas kuliah ilmiah berkualitas tinggi. Tugasmu menyusun tulisan yang berbobot, kritis, membumi, dan sepenuhnya bebas dari ciri khas tulisan AI.
@@ -1084,6 +1107,7 @@ async def rewrite_section(
     guidelines: str = "",
     student_name: str = "",
     quote_citations: bool = True,
+    task_type: Optional[str] = None,
 ) -> Dict[str, str]:
     """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
     if not 0 <= index < len(sections):
@@ -1127,7 +1151,7 @@ async def rewrite_section(
     - {signer_rule}
     - Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading.
     - DILARANG memakai em dash, en dash, atau LaTeX. Pisahkan paragraf dengan \n\n.
-    {TEXT_FIDELITY_RULES}
+    {TEXT_FIDELITY_RULES}{task_type_rule(task_type)}
     FORMAT KELUARAN (JSON MURNI): {{"content": "..."}}
     """
     user_prompt = f"""

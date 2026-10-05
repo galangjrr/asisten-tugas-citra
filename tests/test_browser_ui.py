@@ -34,6 +34,8 @@ def test_browser_ui_end_to_end():
             "1. Jelaskan konsep dasar manajemen rantai pasok dan perannya dalam efisiensi operasional organisasi.\n"
             "2. Berikan contoh strategi mitigasi risiko disrupsi pasokan pada industri manufaktur."
         )
+        # Layar sambutan: pilih jenis tugas dulu sebelum Tahap 1 tampil
+        page.locator("[data-task-type='ut-tugas']").click()
         page.locator("#input-topic").fill(topic)
 
         page.locator("#details-identity summary").click()

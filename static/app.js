@@ -14,38 +14,14 @@ const STORAGE = {
   // Rubrik dosen dan spesifikasi jawaban ikut disimpan, supaya batas kata dosen tidak hilang saat aplikasi dibuka ulang
   draftSetup: "atc-question-setup",
   mode: "atc-mode",
-  format: "atc-format",
   taskType: "atc-task-type"
 };
 
+// Jenis tugas dari layar sambutan. Memilih jenis baru memasang jalur dan gaya bawaannya, perkakas UT hanya tampil untuk mahasiswa UT.
 const TASK_TYPES = {
-  "ut-diskusi": {
-    badge: "Diskusi Forum UT",
-    badgeClass: "badge-emerald",
-    hint: "Jawaban reflektif mengalir untuk forum diskusi Tuton",
-    isUt: true,
-    defaultMode: "forum",
-    defaultFormat: "forum",
-    defaultTone: "opini reflektif",
-  },
-  "ut-tugas": {
-    badge: "Tugas Tutorial UT",
-    badgeClass: "badge-emerald",
-    hint: "Jawaban bernomor dengan sitasi modul dan berkas siap kumpul",
-    isUt: true,
-    defaultMode: "bahan",
-    defaultFormat: "list",
-    defaultTone: "akademis formal",
-  },
-  "umum": {
-    badge: "Tugas Kuliah Umum",
-    badgeClass: "badge-stone",
-    hint: "Format fleksibel untuk mahasiswa semua kampus",
-    isUt: false,
-    defaultMode: "bahan",
-    defaultFormat: "list",
-    defaultTone: "akademis formal",
-  },
+  "ut-diskusi": { label: "Diskusi forum Tuton", hint: "jawaban opini untuk forum mingguan", isUt: true, mode: "forum", tone: "opini reflektif" },
+  "ut-tugas": { label: "Tugas tutorial UT", hint: "jawaban per nomor dengan rujukan modul BMP", isUt: true, mode: "bahan", tone: "akademis formal" },
+  umum: { label: "Tugas kuliah umum", hint: "tanpa perkakas Tuton dan istilah UT", isUt: false, mode: "bahan", tone: "akademis formal" },
 };
 
 const MODES = {
@@ -171,13 +147,11 @@ const dom = {
   stepper: $("stepper"),
   stepperNav: $("stepper-nav"),
   stepWelcome: $("step-welcome"),
-  btnSelectUtDiskusi: $("btn-select-ut-diskusi"),
-  btnSelectUtTugas: $("btn-select-ut-tugas"),
-  btnSelectUmum: $("btn-select-umum"),
-  activeTaskBar: $("active-task-bar"),
-  activeTaskBadge: $("active-task-badge"),
+  taskTypeOptions: document.querySelectorAll("[data-task-type]"),
+  activeTaskLabel: $("active-task-label"),
   activeTaskHint: $("active-task-hint"),
   btnChangeTaskType: $("btn-change-task-type"),
+  labelMaterialTitle: $("label-material-title"),
   alert: $("global-alert"),
   steps: [$("step-1"), $("step-2"), $("step-3")],
   formTask: $("form-task"),
@@ -495,14 +469,35 @@ const UI = {
 
   showStep(n) {
     const isWelcome = n === 0;
-    if (dom.stepWelcome) dom.stepWelcome.classList.toggle("hidden", !isWelcome);
-    if (dom.stepperNav) dom.stepperNav.classList.toggle("hidden", isWelcome);
+    dom.stepWelcome.classList.toggle("hidden", !isWelcome);
+    dom.stepperNav.classList.toggle("hidden", isWelcome);
     dom.steps.forEach((section, idx) => section.classList.toggle("hidden", isWelcome || idx + 1 !== n));
-    if (!isWelcome) {
-      applyTaskTypeVisibility();
-      UI.renderStepper();
-    }
+    if (isWelcome) UI.renderWelcome();
+    else UI.renderStepper();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  },
+
+  // Pilihan terakhir ditandai dan langsung difokus, jadi Enter cukup untuk melanjutkan tugas yang sama
+  renderWelcome() {
+    let last = null;
+    dom.taskTypeOptions.forEach((btn) => {
+      const isLast = btn.dataset.taskType === State.taskType;
+      btn.toggleAttribute("data-last", isLast);
+      if (isLast) last = btn;
+    });
+    if (last) last.focus({ preventScroll: true });
+  },
+
+  renderTaskType() {
+    const cfg = TASK_TYPES[State.taskType] || TASK_TYPES["ut-tugas"];
+    const showUtTools = cfg.isUt && Boolean(window.desktop);
+    dom.activeTaskLabel.textContent = cfg.label;
+    dom.activeTaskHint.textContent = `, ${cfg.hint}`;
+    dom.tutonEntry.classList.toggle("hidden", !showUtTools);
+    if (dom.btnSnapRbv) dom.btnSnapRbv.classList.toggle("hidden", !showUtTools);
+    $("btn-write-tuton").classList.toggle("hidden", !showUtTools);
+    dom.labelMaterialTitle.textContent = cfg.isUt ? "Judul naskah atau kode mata kuliah UT" : "Judul naskah";
+    dom.materialTitle.placeholder = cfg.isUt ? "Robohnya Surau Kami, atau MKWU4108" : "Robohnya Surau Kami";
   },
 
   // ---------- Soal ----------
@@ -1321,7 +1316,8 @@ function buildGeneratePayload(paperIds) {
     quote_citations: dom.quoteCitations.checked,
     student_name: dom.studentName.value.trim(),
     student_id: dom.studentId.value.trim(),
-    course_name: dom.courseName.value.trim()
+    course_name: dom.courseName.value.trim(),
+    task_type: State.taskType
   };
 }
 
@@ -1404,44 +1400,22 @@ function goStep(n) {
 function selectTaskType(type) {
   const cfg = TASK_TYPES[type];
   if (!cfg) return;
+  // Memilih ulang jenis yang sama tidak menimpa jalur dan gaya yang sudah diubah sendiri
+  if (type !== State.taskType) {
+    setMode(cfg.mode);
+    setRadio("tone", cfg.tone);
+    storage.set(STORAGE.tone, cfg.tone);
+    UI.renderSummaries();
+  }
   State.taskType = type;
   storage.set(STORAGE.taskType, type);
-
-  // Pasang preset sesuai pilihan
-  setMode(cfg.defaultMode);
-  setRadio("format", cfg.defaultFormat);
-  setRadio("tone", cfg.defaultTone);
-  storage.set(STORAGE.format, cfg.defaultFormat);
-  storage.set(STORAGE.tone, cfg.defaultTone);
-  UI.renderSummaries();
-
-  applyTaskTypeVisibility();
+  UI.renderTaskType();
   goStep(1);
 }
 
-function applyTaskTypeVisibility() {
-  const cfg = TASK_TYPES[State.taskType] || TASK_TYPES["ut-tugas"];
-  if (!cfg) return;
-
-  if (dom.activeTaskBadge) {
-    dom.activeTaskBadge.textContent = cfg.badge;
-    dom.activeTaskBadge.className = `welcome-card-badge ${cfg.badgeClass} !mb-0`;
-  }
-  if (dom.activeTaskHint) {
-    dom.activeTaskHint.textContent = cfg.hint;
-  }
-
-  const isUt = Boolean(cfg.isUt);
-  if (dom.tutonEntry) {
-    dom.tutonEntry.classList.toggle("hidden", !(isUt && window.desktop));
-  }
-  if (dom.btnSnapRbv) {
-    dom.btnSnapRbv.classList.toggle("hidden", !(isUt && window.desktop));
-  }
-  const btnWriteTuton = $("btn-write-tuton");
-  if (btnWriteTuton) {
-    btnWriteTuton.classList.toggle("hidden", !(isUt && window.desktop));
-  }
+// Katalog mata kuliah UT dan perkakas Tuton tidak dipakai untuk kampus lain, kode kuliah mereka bisa mirip kode UT
+function isUtTask() {
+  return State.taskType !== "umum";
 }
 
 function setMode(mode) {
@@ -1568,6 +1542,7 @@ function resetAnswerSpec() {
 
 // Kode mata kuliah UT dari lembar soal mengisi nama mata kuliah dan judul bahan bila masih kosong
 async function applyDetectedCourse(code) {
+  if (!isUtTask()) return;
   try {
     const data = await Api.utLookup(code);
     if (!data.found || !data.exact) return;
@@ -1640,6 +1615,7 @@ function fillIdentityIfEmpty(input, key, value) {
 // Kiriman dari tombol Pakai soal ini di jendela Tuton
 async function handleTutonCapture(capture) {
   if (!capture) return;
+  if (State.step === 0) selectTaskType(/\/mod\/forum\//.test(capture.url || "") ? "ut-diskusi" : "ut-tugas");
   fillIdentityIfEmpty(dom.studentName, STORAGE.name, capture.studentName);
   fillIdentityIfEmpty(dom.studentId, STORAGE.nim, capture.studentId);
   const code = (capture.courseLabel || "").match(/\b([A-Za-z]{4})\s*(\d{4})\b/);
@@ -1988,7 +1964,7 @@ function attachUtLookup() {
   const lookup = async () => {
     const query = dom.materialTitle.value.trim();
     // Hanya pola yang mirip kode mata kuliah, supaya judul cerpen biasa tidak memicu saran UT
-    if (!/[A-Za-z]{3,4}\s*-?\s*\d{2,4}/.test(query)) return UI.renderUtResult(null);
+    if (!isUtTask() || !/[A-Za-z]{3,4}\s*-?\s*\d{2,4}/.test(query)) return UI.renderUtResult(null);
     if (query === lastQuery) return;
     lastQuery = query;
     dom.materialUtSpinner.classList.remove("hidden");
@@ -2506,7 +2482,7 @@ function init() {
       window.desktop.onRbvScreenshot(enqueueRbvScreenshot);
     }
     window.addEventListener("keydown", (e) => {
-      if (e.key === "F9" && !e.repeat && State.taskType !== "umum") {
+      if (e.key === "F9" && !e.repeat && isUtTask()) {
         e.preventDefault();
         window.desktop.captureRbvPage();
       }
@@ -2595,21 +2571,16 @@ function init() {
   dom.btnRegenerate.addEventListener("click", regenerateAll);
   $("btn-new-task").addEventListener("click", startNewTask);
 
-  // Pilihan kartu layar sambutan (State 0)
-  if (dom.btnSelectUtDiskusi) dom.btnSelectUtDiskusi.addEventListener("click", () => selectTaskType("ut-diskusi"));
-  if (dom.btnSelectUtTugas) dom.btnSelectUtTugas.addEventListener("click", () => selectTaskType("ut-tugas"));
-  if (dom.btnSelectUmum) dom.btnSelectUmum.addEventListener("click", () => selectTaskType("umum"));
-  if (dom.btnChangeTaskType) dom.btnChangeTaskType.addEventListener("click", () => goStep(0));
+  // Layar sambutan
+  dom.taskTypeOptions.forEach((btn) => btn.addEventListener("click", () => selectTaskType(btn.dataset.taskType)));
+  dom.btnChangeTaskType.addEventListener("click", () => goStep(0));
 
   // Preload Electron sudah memasang window.desktop sebelum skrip ini jalan
   if (window.desktop) enableDesktopChrome();
 
   const savedTaskType = storage.get(STORAGE.taskType);
-  if (savedTaskType && TASK_TYPES[savedTaskType]) {
-    State.taskType = savedTaskType;
-  }
-
-  // Buka State 0 (Layar Sambutan) sebagai pintu masuk utama
+  if (TASK_TYPES[savedTaskType]) State.taskType = savedTaskType;
+  UI.renderTaskType();
   goStep(0);
   checkSystemHealth();
 }

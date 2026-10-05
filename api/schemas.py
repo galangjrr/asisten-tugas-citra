@@ -77,6 +77,8 @@ class GenerateRequest(BaseModel):
     course_name: str = Field(default="", max_length=150)
     # False: kutipan langsung cukup bertanda petik tanpa sitasi kurung, misal (Cather, 1896, hlm. 5)
     quote_citations: bool = False
+    # Jenis tugas dari layar sambutan. Kosong berarti klien lama, prompt tidak diberi konteks kampus.
+    task_type: Optional[Literal["ut-diskusi", "ut-tugas", "umum"]] = None
 
 
 class EvidenceItem(BaseModel):

@@ -90,70 +90,76 @@
 
     <div id="global-alert" class="hidden mb-6" role="alert"></div>
 
-    <!-- ===================== LAYAR SAMBUTAN (STATE 0) ===================== -->
+    <!-- ===================== LAYAR SAMBUTAN ===================== -->
     <section id="step-welcome" aria-labelledby="welcome-title" class="step-panel">
-      <header class="mb-10 text-center max-w-2xl mx-auto">
-        <p class="eyebrow mb-2">Studio Tugas Akademik</p>
-        <h1 id="welcome-title" class="display-title text-2xl sm:text-3xl font-extrabold tracking-tight">Pilih jenis tugas yang mau dikerjakan</h1>
-        <p class="lede text-sm sm:text-base text-ink-2 mt-2">Pilih alur yang sesuai dengan kebutuhan tugasmu hari ini untuk menyiapkan perkakas yang tepat.</p>
-      </header>
+      <div class="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-8 lg:gap-16 items-start max-w-5xl">
+        <header class="lg:sticky lg:top-24 lg:pt-2">
+          <p class="eyebrow">Sebelum mulai</p>
+          <h1 id="welcome-title" class="display-title">Mulai dari jenis tugasnya</h1>
+          <p class="lede">Pilihan ini menyiapkan perkakas yang pas. Mahasiswa UT dapat jalan pintas ke Tuton dan Ruang Baca Virtual, mahasiswa kampus lain dapat tampilan bersih dan naskah tanpa istilah UT.</p>
+          <p class="mt-5 text-xs text-ink-3">Bisa diganti kapan saja lewat tombol Ganti di Tahap 1.</p>
+        </header>
 
-      <div class="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto items-stretch">
-        <!-- Kartu 1: Diskusi Forum UT -->
-        <button type="button" id="btn-select-ut-diskusi" class="welcome-card group">
-          <div class="welcome-card-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div class="space-y-7">
+          <div role="group" aria-labelledby="welcome-group-ut">
+            <h2 id="welcome-group-ut" class="welcome-group">Universitas Terbuka</h2>
+            <ul class="welcome-list">
+            <li>
+              <button type="button" class="welcome-option welcome-option-ut" data-task-type="ut-diskusi">
+                <span class="welcome-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="min-w-0 flex-1">
+                  <span class="welcome-option-title">Diskusi forum Tuton</span>
+                  <span class="welcome-option-desc">Tanggapan opini yang mengalir untuk diskusi mingguan. Bisa langsung disusun ke kolom balasan Tuton tanpa ikut terkirim.</span>
+                  <span class="welcome-option-meta">Jalur forum, tanpa pencarian jurnal</span>
+                </span>
+                <span class="welcome-option-last">Terakhir dipakai</span>
+                <svg class="welcome-option-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="welcome-option welcome-option-ut" data-task-type="ut-tugas">
+                <span class="welcome-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h8"/><path d="M8 11h8"/></svg></span>
+                <span class="min-w-0 flex-1">
+                  <span class="welcome-option-title">Tugas tutorial 1, 2, dan 3</span>
+                  <span class="welcome-option-desc">Jawaban per nomor yang bersandar pada modul BMP, lengkap dengan jepret Ruang Baca Virtual dan berkas Word atau PDF siap unggah.</span>
+                  <span class="welcome-option-meta">Jalur bahan dosen atau modul</span>
+                </span>
+                <span class="welcome-option-last">Terakhir dipakai</span>
+                <svg class="welcome-option-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </li>
+            </ul>
           </div>
-          <span class="welcome-card-badge badge-emerald">Khusus Mahasiswa UT</span>
-          <h2 class="welcome-card-title">Diskusi Forum UT</h2>
-          <p class="welcome-card-desc">Jawaban reflektif dan mengalir untuk diskusi mingguan Tuton. Siap disalin atau ditulis otomatis langsung ke editor e-learning.</p>
-          <div class="welcome-card-cta">
-            <span>Mulai Diskusi UT</span>
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          <div role="group" aria-labelledby="welcome-group-umum">
+            <h2 id="welcome-group-umum" class="welcome-group">Kampus lain</h2>
+            <ul class="welcome-list">
+            <li>
+              <button type="button" class="welcome-option" data-task-type="umum">
+                <span class="welcome-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
+                <span class="min-w-0 flex-1">
+                  <span class="welcome-option-title">Tugas kuliah umum</span>
+                  <span class="welcome-option-desc">Soal dari LMS mana saja. Bedah bahan bacaan dosen atau cari jurnal OpenAlex, dan naskahnya bebas dari istilah UT.</span>
+                  <span class="welcome-option-meta">Jalur bahan dosen, bisa diganti ke jurnal</span>
+                </span>
+                <span class="welcome-option-last">Terakhir dipakai</span>
+                <svg class="welcome-option-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </li>
+            </ul>
           </div>
-        </button>
-
-        <!-- Kartu 2: Tugas Tutorial UT -->
-        <button type="button" id="btn-select-ut-tugas" class="welcome-card group">
-          <div class="welcome-card-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-          </div>
-          <span class="welcome-card-badge badge-emerald">Khusus Mahasiswa UT</span>
-          <h2 class="welcome-card-title">Tugas Tutorial UT</h2>
-          <p class="welcome-card-desc">Jawaban terstruktur untuk Tugas 1, 2, dan 3. Lengkap dengan sitasi Buku Materi Pokok, jepret Ruang Baca Virtual, dan berkas Word atau PDF.</p>
-          <div class="welcome-card-cta">
-            <span>Mulai Tugas UT</span>
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </div>
-        </button>
-
-        <!-- Kartu 3: Tugas Kuliah Umum -->
-        <button type="button" id="btn-select-umum" class="welcome-card group">
-          <div class="welcome-card-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-          </div>
-          <span class="welcome-card-badge badge-stone">Semua Kampus</span>
-          <h2 class="welcome-card-title">Tugas Kuliah Umum</h2>
-          <p class="welcome-card-desc">Untuk mahasiswa kampus umum. Bebas unggah soal dari LMS apa saja, bedah bahan bacaan dosen, riset jurnal OpenAlex, dan cetak dokumen A4.</p>
-          <div class="welcome-card-cta">
-            <span>Mulai Tugas Umum</span>
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </div>
-        </button>
+        </div>
       </div>
     </section>
 
     <!-- ===================== TAHAP 1 ===================== -->
     <section id="step-1" aria-labelledby="step-1-title" class="step-panel hidden">
-      <!-- Bilah status tugas aktif dengan tombol kembali ke layar sambutan -->
-      <div id="active-task-bar" class="mb-6 flex flex-wrap items-center justify-between gap-3 p-3.5 px-4 rounded-2xl border border-line bg-subtle">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <span id="active-task-badge" class="welcome-card-badge badge-emerald !mb-0">Tugas Tutorial UT</span>
-          <span id="active-task-hint" class="text-xs text-ink-2 truncate">Format bernomor dengan sitasi modul dan berkas A4</span>
-        </div>
-        <button type="button" id="btn-change-task-type" class="btn btn-secondary px-3 py-1.5 text-xs whitespace-nowrap">
-          Ganti jenis tugas
-        </button>
+      <!-- Jenis tugas aktif dari layar sambutan, dengan jalan kembali untuk menggantinya -->
+      <div id="active-task-bar" class="mb-6 flex items-center justify-between gap-3 rounded-xl border border-line bg-subtle pl-4 pr-1.5 py-1.5">
+        <p class="min-w-0 truncate text-xs text-ink-2">
+          <span class="text-ink-3">Jenis tugas</span>
+          <strong id="active-task-label" class="ml-1 font-semibold text-ink">Tugas tutorial UT</strong><span id="active-task-hint" class="hidden sm:inline"></span>
+        </p>
+        <button type="button" id="btn-change-task-type" class="btn btn-ghost px-3 py-1.5 text-xs" aria-label="Ganti jenis tugas">Ganti</button>
       </div>
 
       <header class="mb-8 max-w-3xl">
@@ -529,7 +535,7 @@
             </div>
             <div class="grid sm:grid-cols-2 gap-4">
               <div class="sm:col-span-2">
-                <label for="input-material-title" class="label">Judul naskah atau kode mata kuliah UT</label>
+                <label for="input-material-title" id="label-material-title" class="label">Judul naskah atau kode mata kuliah UT</label>
                 <div class="relative">
                   <input type="text" id="input-material-title" maxlength="300" autocomplete="off" class="field pr-9" placeholder="Robohnya Surau Kami, atau MKWU4108">
                   <span id="material-ut-spinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 spinner" aria-hidden="true"></span>

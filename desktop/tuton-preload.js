@@ -241,4 +241,23 @@ function mountButton() {
   document.body.append(host);
 }
 
-window.addEventListener("DOMContentLoaded", mountButton);
+// Login Tuton lewat akun Microsoft UT. NIM tanpa @ecampus.ut.ac.id dibaca Microsoft sebagai nomor telepon
+// lalu login berhenti di layar konfirmasi nomor. Isian login tidak disentuh, cukup diberi petunjuk.
+function mountLoginHint() {
+  if (location.hostname !== "login.microsoftonline.com" || document.getElementById("atc-login-hint")) return;
+  const host = document.createElement("div");
+  host.id = "atc-login-hint";
+  const shadow = host.attachShadow({ mode: "closed" });
+  shadow.innerHTML = `
+    <style>
+      .hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2147483647; width: max-content; max-width: min(520px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 12px; background: #1c1917; color: #fafaf9; font: 500 13px/1.5 "Plus Jakarta Sans", "Segoe UI", sans-serif; box-shadow: 0 10px 24px -10px rgba(12, 10, 9, 0.6); }
+      b { color: #6ee7b7; font-weight: 600; }
+    </style>
+    <div class="hint" role="note">Masuk pakai email kampus <b>NIM@ecampus.ut.ac.id</b>, contohnya 048123456@ecampus.ut.ac.id. Kalau cuma NIM, Microsoft mengira itu nomor telepon.</div>`;
+  document.body.append(host);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  mountButton();
+  mountLoginHint();
+});

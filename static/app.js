@@ -475,7 +475,6 @@ const UI = {
     const hasFile = Boolean(State.questionFileName && dom.topic.value.trim());
     dom.questionUploading.classList.toggle("hidden", !loading);
     dom.questionDropzone.classList.toggle("hidden", loading || hasFile);
-    dom.tutonEntry.classList.toggle("hidden", !window.desktop || loading || hasFile);
     dom.questionPreview.classList.toggle("hidden", loading || !hasFile);
     if (loading) dom.questionUploadingText.textContent = loadingMessage;
     if (!loading && hasFile) UI.renderQuestionPreview(dom.topic.value);
@@ -2255,6 +2254,7 @@ function init() {
   }));
   bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
   if (window.desktop) {
+    dom.tutonEntry.classList.remove("hidden");
     $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
     window.desktop.onTutonCapture(handleTutonCapture);
   }

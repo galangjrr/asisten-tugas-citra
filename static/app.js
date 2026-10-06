@@ -172,8 +172,8 @@ const dom = {
   questionPreviewMeta: $("question-preview-meta"),
   questionFileName: $("question-file-name"),
   questionCharBadge: $("question-char-badge"),
-  toneSummary: $("tone-summary"),
   detailsTone: $("details-tone"),
+  notesSummary: $("notes-summary"),
   detailsSpec: $("details-spec"),
   specSummary: $("spec-summary"),
   specNote: $("answer-spec-note"),
@@ -577,8 +577,8 @@ const UI = {
   },
 
   renderSummaries() {
-    const tone = document.querySelector('input[name="tone"]:checked');
-    dom.toneSummary.textContent = tone ? tone.closest("label").querySelector("b").textContent : "";
+    // Petunjuk dari lembar soal masuk diam diam ke catatan dosen, jadi ringkasannya memberi tahu kalau sudah terisi
+    dom.notesSummary.textContent = dom.instructions.value.trim() ? "Terisi" : "Opsional";
 
     const parts = [];
     const typeOption = dom.specAnswerType.selectedOptions[0];
@@ -2469,6 +2469,7 @@ function init() {
   });
   [dom.instructions, dom.specQuestionCount, dom.specAnswerType, dom.specLanguage, dom.specWordLimit, dom.specWordScope, dom.specWordKind]
     .forEach((input) => input.addEventListener("input", saveDraft));
+  dom.instructions.addEventListener("input", UI.renderSummaries);
 
   // Tab soal dengan navigasi panah kiri kanan
   dom.tabType.addEventListener("click", () => {

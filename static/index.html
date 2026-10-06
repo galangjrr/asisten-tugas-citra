@@ -299,52 +299,62 @@
               </label>
             </div>
           </fieldset>
-        </div>
 
-        <!-- Kolom kanan: setelan lanjutan dan tombol aksi -->
-        <aside class="space-y-4 lg:sticky lg:top-20" aria-label="Setelan naskah">
-          <div class="panel !p-0 overflow-hidden">
-            <h2 class="px-5 pt-5 pb-3 panel-title"><span class="sec-num">03</span>Gaya dan identitas</h2>
+          <!-- Seksi 3: Gaya dan format. Lebar penuh supaya pilihan tidak berdesakan di kolom samping. -->
+          <section class="panel !p-0 overflow-hidden" aria-labelledby="sec-style-title">
+            <div class="px-6 pt-6">
+              <h2 id="sec-style-title" class="panel-title"><span class="sec-num">03</span>Gaya dan format naskah</h2>
+              <p class="panel-sub">Gaya bahasa menentukan suara tulisan, termasuk saat naskah ditulis ulang di Tahap 3. Format dan panjang biasanya terisi sendiri dari lembar soal.</p>
+            </div>
 
-            <details id="details-tone" class="disclosure">
-              <summary>
-                <span class="disclosure-label">Gaya bahasa</span>
-                <span id="tone-summary" class="disclosure-value"></span>
-              </summary>
-              <div class="disclosure-body">
-                <div role="radiogroup" aria-label="Gaya bahasa mahasiswa" class="flex flex-col gap-2">
-                  <label class="chip"><input type="radio" name="tone" value="opini reflektif" class="sr-only"><span><b>Opini reflektif</b><small>Gaya menurut saya, pas untuk forum</small></span></label>
-                  <label class="chip"><input type="radio" name="tone" value="akademis formal" class="sr-only"><span><b>Akademis formal lugas</b><small>Bahasa ilmiah standar tugas kuliah</small></span></label>
-                  <label class="chip"><input type="radio" name="tone" value="analisis kritis" class="sr-only"><span><b>Analisis kritis tajam</b><small>Komparasi teori dan kasus</small></span></label>
-                  <label class="chip"><input type="radio" name="tone" value="eksploratif" class="sr-only"><span><b>Eksploratif mengalir</b><small>Esai bebas bertutur</small></span></label>
-                  <label class="chip"><input type="radio" name="tone" value="surat personal" class="sr-only"><span><b>Surat personal</b><small>Tugas korespondensi praktis</small></span></label>
-                </div>
+            <div id="details-tone" class="px-6 pt-5 pb-6">
+              <p class="label" id="tone-label">Gaya bahasa</p>
+              <div role="radiogroup" aria-labelledby="tone-label" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                <label class="chip"><input type="radio" name="tone" value="opini reflektif" class="sr-only"><span><b>Opini reflektif</b><small>Pendapat pribadi yang hangat, pas untuk forum diskusi</small></span></label>
+                <label class="chip"><input type="radio" name="tone" value="akademis formal" class="sr-only"><span><b>Akademis formal lugas</b><small>Bahasa baku standar tugas kuliah</small></span></label>
+                <label class="chip"><input type="radio" name="tone" value="analisis kritis" class="sr-only"><span><b>Analisis kritis tajam</b><small>Membandingkan teori dan kasus lalu mengambil sikap</small></span></label>
+                <label class="chip"><input type="radio" name="tone" value="eksploratif" class="sr-only"><span><b>Eksploratif mengalir</b><small>Esai bertutur yang menelusuri gagasan</small></span></label>
+                <label class="chip"><input type="radio" name="tone" value="surat personal" class="sr-only"><span><b>Surat personal</b><small>Tugas berbentuk surat dengan salam pembuka dan penutup</small></span></label>
               </div>
-            </details>
+            </div>
 
             <details id="details-spec" class="disclosure">
               <summary>
                 <span class="disclosure-label">Format dan panjang</span>
                 <span id="spec-summary" class="disclosure-value"></span>
               </summary>
-              <div class="disclosure-body space-y-4">
+              <div class="disclosure-body space-y-6">
                 <p id="answer-spec-note" class="note" aria-live="polite"></p>
 
-                <div>
-                  <label for="spec-answer-type" class="label">Jenis jawaban</label>
-                  <select id="spec-answer-type" class="field">
-                    <option value="">Otomatis sesuai soal</option>
-                    <option value="jawaban_bernomor">Uraian per nomor soal</option>
-                    <option value="jawaban_singkat">Jawaban singkat atau hitungan</option>
-                    <option value="uraian">Uraian atau analisis bebas</option>
-                    <option value="esai">Esai mengalir</option>
-                    <option value="makalah">Makalah berbab</option>
-                    <option value="terjemahan">Terjemahan</option>
-                  </select>
+                <div class="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label for="spec-answer-type" class="label">Jenis jawaban</label>
+                    <select id="spec-answer-type" class="field">
+                      <option value="">Otomatis sesuai soal</option>
+                      <option value="jawaban_bernomor">Uraian per nomor soal</option>
+                      <option value="jawaban_singkat">Jawaban singkat atau hitungan</option>
+                      <option value="uraian">Uraian atau analisis bebas</option>
+                      <option value="esai">Esai mengalir</option>
+                      <option value="makalah">Makalah berbab</option>
+                      <option value="terjemahan">Terjemahan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="spec-question-count" class="label">Jumlah soal</label>
+                    <input type="number" id="spec-question-count" min="1" max="50" placeholder="Otomatis" inputmode="numeric" class="field tabular-nums">
+                  </div>
+                  <div>
+                    <label for="spec-language" class="label">Bahasa naskah</label>
+                    <select id="spec-language" class="field">
+                      <option value="">Otomatis</option>
+                      <option value="id">Indonesia</option>
+                      <option value="en">Inggris</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div id="format-wrapper">
-                  <p class="label" id="format-label">Format luaran</p>
+                  <p class="label" id="format-label">Susunan naskah</p>
                   <div role="radiogroup" aria-labelledby="format-label" class="flex flex-wrap gap-1.5">
                     <label class="pill"><input type="radio" name="format" value="otomatis" class="sr-only" checked><span>Otomatis</span></label>
                     <label class="pill"><input type="radio" name="format" value="makalah" class="sr-only"><span>Makalah Bab I sampai III</span></label>
@@ -354,63 +364,50 @@
                   </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label for="spec-question-count" class="label">Jumlah soal</label>
-                    <input type="number" id="spec-question-count" min="1" max="50" placeholder="Otomatis" inputmode="numeric" class="field tabular-nums">
-                  </div>
-                  <div>
-                    <label for="spec-language" class="label">Bahasa</label>
-                    <select id="spec-language" class="field">
-                      <option value="">Otomatis</option>
-                      <option value="id">Indonesia</option>
-                      <option value="en">Inggris</option>
+                <fieldset>
+                  <legend class="label">Batas kata dari dosen</legend>
+                  <div class="flex flex-wrap items-center gap-2 text-sm text-ink-2">
+                    <label for="spec-word-kind" class="sr-only">Jenis batas</label>
+                    <select id="spec-word-kind" aria-describedby="spec-word-summary" class="field !w-auto">
+                      <option value="max">Paling banyak</option>
+                      <option value="min">Paling sedikit</option>
+                    </select>
+                    <label for="spec-word-limit" class="sr-only">Jumlah kata</label>
+                    <input type="number" id="spec-word-limit" min="10" max="10000" step="10" placeholder="Tidak ada" inputmode="numeric" aria-describedby="spec-word-summary" class="field !w-32 tabular-nums">
+                    <span>kata untuk</span>
+                    <label for="spec-word-scope" class="sr-only">Berlaku untuk</label>
+                    <select id="spec-word-scope" aria-describedby="spec-word-summary" class="field !w-auto">
+                      <option value="total">seluruh jawaban</option>
+                      <option value="per_soal">setiap soal</option>
                     </select>
                   </div>
-                  <div>
-                    <label for="spec-word-limit" class="label">Batas kata dosen</label>
-                    <input type="number" id="spec-word-limit" min="10" max="10000" step="10" placeholder="Tidak ada" inputmode="numeric" aria-describedby="spec-word-summary" class="field tabular-nums">
-                  </div>
-                  <div>
-                    <label for="spec-word-scope" class="label">Berlaku untuk</label>
-                    <select id="spec-word-scope" aria-describedby="spec-word-summary" class="field">
-                      <option value="total">Total jawaban</option>
-                      <option value="per_soal">Per soal</option>
-                    </select>
-                  </div>
-                  <div class="col-span-2">
-                    <label for="spec-word-kind" class="label">Jenis batas</label>
-                    <select id="spec-word-kind" aria-describedby="spec-word-summary" class="field">
-                      <option value="max">Maksimal, tidak boleh lewat</option>
-                      <option value="min">Minimal, tidak boleh kurang</option>
-                    </select>
-                  </div>
-                </div>
+                  <p id="spec-word-summary" class="text-xs text-ink-2 tabular-nums mt-2" aria-live="polite"></p>
+                </fieldset>
 
-                <div id="length-target-wrapper" class="grid grid-cols-2 gap-3">
-                  <div class="col-span-2">
-                    <label for="select-length" class="label">Target panjang</label>
-                    <select id="select-length" class="field">
-                      <option value="ringkas">Ringkas, sekitar 400 kata</option>
-                      <option value="sedang" selected>Sedang, sekitar 950 kata</option>
-                      <option value="panjang">Panjang, sekitar 1.800 kata</option>
-                      <option value="kustom">Tentukan sendiri</option>
+                <div class="grid sm:grid-cols-2 gap-3">
+                  <div id="length-target-wrapper" class="space-y-3">
+                    <div>
+                      <label for="select-length" class="label">Target panjang</label>
+                      <select id="select-length" class="field">
+                        <option value="ringkas">Ringkas, sekitar 400 kata</option>
+                        <option value="sedang" selected>Sedang, sekitar 950 kata</option>
+                        <option value="panjang">Panjang, sekitar 1.800 kata</option>
+                        <option value="kustom">Tentukan sendiri</option>
+                      </select>
+                    </div>
+                    <div id="custom-words-wrapper" class="hidden">
+                      <label for="input-custom-words" class="label">Jumlah kata target</label>
+                      <input type="number" id="input-custom-words" min="200" max="5000" step="50" value="1200" inputmode="numeric" class="field tabular-nums">
+                    </div>
+                  </div>
+                  <div>
+                    <label for="select-depth" class="label">Kedalaman penjelasan</label>
+                    <select id="select-depth" class="field">
+                      <option value="standar">Standar, seimbang</option>
+                      <option value="ringkas">Padat dan langsung ke inti</option>
+                      <option value="elaboratif">Mendalam dengan alasan dan bukti</option>
                     </select>
                   </div>
-                  <div id="custom-words-wrapper" class="hidden col-span-2">
-                    <label for="input-custom-words" class="label">Jumlah kata target</label>
-                    <input type="number" id="input-custom-words" min="200" max="5000" step="50" value="1200" inputmode="numeric" class="field tabular-nums">
-                  </div>
-                </div>
-                <p id="spec-word-summary" class="text-xs text-ink-2 tabular-nums" aria-live="polite"></p>
-
-                <div>
-                  <label for="select-depth" class="label">Kedalaman penjelasan</label>
-                  <select id="select-depth" class="field">
-                    <option value="standar">Standar, seimbang</option>
-                    <option value="ringkas">Padat dan langsung ke inti</option>
-                    <option value="elaboratif">Mendalam dengan alasan dan bukti</option>
-                  </select>
                 </div>
 
                 <label for="input-quote-citations" class="flex items-start gap-2.5 cursor-pointer">
@@ -420,12 +417,18 @@
                     <span id="quote-citations-hint" class="block text-[11px] text-ink-3 mt-0.5">Contoh "..." (Cather, 1896, hlm. 5). Matikan jika dosen cukup meminta tanda petik.</span>
                   </span>
                 </label>
+              </div>
+            </details>
 
-                <div>
-                  <label for="input-instructions" class="label">Catatan atau rubrik dosen <span class="font-normal text-ink-3">opsional</span></label>
-                  <textarea id="input-instructions" rows="6" class="field resize-y leading-relaxed [field-sizing:content] min-h-[9rem] max-h-[28rem]" placeholder="Fokus pada studi kasus lima tahun terakhir, atau bahas menurut modul 3"></textarea>
-                  <p class="text-[11px] text-ink-3 mt-1">Petunjuk dari lembar soal otomatis masuk ke sini.</p>
-                </div>
+            <details id="details-notes" class="disclosure">
+              <summary>
+                <span class="disclosure-label">Catatan atau rubrik dosen</span>
+                <span id="notes-summary" class="disclosure-value">Opsional</span>
+              </summary>
+              <div class="disclosure-body">
+                <label for="input-instructions" class="sr-only">Catatan atau rubrik dosen</label>
+                <textarea id="input-instructions" rows="6" class="field resize-y leading-relaxed [field-sizing:content] min-h-[9rem] max-h-[28rem]" placeholder="Fokus pada studi kasus lima tahun terakhir, atau bahas menurut modul 3"></textarea>
+                <p class="text-[11px] text-ink-3 mt-1">Petunjuk dari lembar soal otomatis masuk ke sini.</p>
               </div>
             </details>
 
@@ -434,31 +437,29 @@
                 <span class="disclosure-label">Identitas mahasiswa</span>
                 <span id="identity-summary" class="disclosure-value"></span>
               </summary>
-              <div class="disclosure-body space-y-3">
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label for="input-student-name" class="label !mb-0">Nama lengkap</label>
-                    <span class="saved-badge">Tersimpan otomatis</span>
+              <div class="disclosure-body">
+                <div class="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label for="input-student-name" class="label">Nama lengkap</label>
+                    <input type="text" id="input-student-name" maxlength="100" autocomplete="name" placeholder="Rahma Putri Lestari" class="field">
                   </div>
-                  <input type="text" id="input-student-name" maxlength="100" autocomplete="name" placeholder="Rahma Putri Lestari" class="field">
-                </div>
-                <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <label for="input-student-id" class="label !mb-0">NIM</label>
-                    <span class="saved-badge">Tersimpan otomatis</span>
+                  <div>
+                    <label for="input-student-id" class="label">NIM</label>
+                    <input type="text" id="input-student-id" maxlength="30" autocomplete="off" inputmode="numeric" placeholder="048127356" class="field tabular-nums">
                   </div>
-                  <input type="text" id="input-student-id" maxlength="30" autocomplete="off" inputmode="numeric" placeholder="048127356" class="field tabular-nums">
+                  <div>
+                    <label for="input-course-name" class="label">Mata kuliah</label>
+                    <input type="text" id="input-course-name" maxlength="150" autocomplete="off" placeholder="Pengantar Ilmu Komunikasi" class="field">
+                  </div>
                 </div>
-                <div>
-                  <label for="input-course-name" class="label">Mata kuliah</label>
-                  <input type="text" id="input-course-name" maxlength="150" autocomplete="off" placeholder="Pengantar Ilmu Komunikasi" class="field">
-                </div>
-                <p class="text-[11px] text-ink-3">Dicetak di bawah judul dan jadi nama berkas unduhan.</p>
+                <p class="text-[11px] text-ink-3 mt-2">Dicetak di bawah judul dan jadi nama berkas unduhan. Nama dan NIM tersimpan otomatis untuk tugas berikutnya.</p>
               </div>
             </details>
-          </div>
+          </section>
+        </div>
 
-          <!-- Seksi 4: Tombol aksi dinamis -->
+        <!-- Kolom kanan: tombol aksi tetap terlihat saat menggulir -->
+        <aside class="lg:sticky lg:top-20" aria-label="Aksi tugas">
           <div class="panel">
             <button type="submit" id="btn-primary-action" class="btn btn-primary w-full px-5 py-3.5 text-sm">
               <span id="primary-action-label">Lanjut: Cari Jurnal Ilmiah</span>

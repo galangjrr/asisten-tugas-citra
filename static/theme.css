@@ -325,8 +325,9 @@ select.field { cursor: pointer; }
 
 /* ---------- Chip dan pill radio ---------- */
 .chip, .pill { cursor: pointer; }
+.chip { display: block; }
 .chip > span {
-  display: flex; flex-direction: column; gap: 1px; padding: 0.625rem 0.75rem; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 1px; height: 100%; padding: 0.625rem 0.75rem; border-radius: 10px;
   border: 1px solid var(--color-border-subtle); transition: all 150ms var(--ease-out);
 }
 .chip b { font-size: 0.8125rem; font-weight: 600; color: var(--color-text-primary); }
@@ -347,7 +348,7 @@ select.field { cursor: pointer; }
 .disclosure { border-top: 1px solid var(--color-border-subtle); }
 .disclosure > summary {
   list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-  padding: 0.875rem 1.25rem; cursor: pointer; transition: background-color 150ms ease;
+  padding: 0.875rem 1.5rem; cursor: pointer; transition: background-color 150ms ease;
 }
 .disclosure > summary::-webkit-details-marker, .disclosure-panel > summary::-webkit-details-marker { display: none; }
 .disclosure > summary:hover { background: var(--color-surface-subtle); }
@@ -360,7 +361,7 @@ select.field { cursor: pointer; }
 .disclosure[open] > summary::after { transform: rotate(225deg) translateY(-1px); }
 .disclosure-label { font-size: 0.8125rem; font-weight: 600; }
 .disclosure-value { margin-left: auto; font-size: 11px; color: var(--color-text-tertiary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 11rem; }
-.disclosure-body { padding: 0.25rem 1.25rem 1.25rem; }
+.disclosure-body { padding: 0.25rem 1.5rem 1.5rem; }
 .disclosure-panel > summary { list-style: none; }
 .disclosure-panel > summary:hover { background: var(--color-surface-subtle); }
 

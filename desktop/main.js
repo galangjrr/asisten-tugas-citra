@@ -5,6 +5,7 @@ const net = require("node:net");
 const path = require("node:path");
 const { fillAnswer } = require("./tuton-fill");
 const { parseUsertext, parseDashboard } = require("./tuton-account");
+const { findBookFrame } = require("./rbv-frame");
 
 const HOST = "127.0.0.1";
 const ROOT_DIR = path.join(__dirname, "..");
@@ -202,6 +203,21 @@ function listenF9(contents) {
   });
 }
 
+// Di pembaca RBV hanya bingkai lembar buku yang dipotret. Halaman lain, atau jika bingkai tidak ketemu, dipotret utuh.
+async function bookFrameRect(contents) {
+  try {
+    if (new URL(contents.getURL()).hostname !== "pustaka.ut.ac.id") return undefined;
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+    const frame = await Promise.race([contents.executeJavaScript(`(${findBookFrame})()`, true), timeout]);
+    if (!frame || frame.width < 100 || frame.height < 100) return undefined;
+    // Ukuran dari halaman dalam piksel CSS, capturePage memakai piksel jendela, jadi dikali zoom halaman
+    const zoom = contents.getZoomFactor();
+    return { x: Math.round(frame.x * zoom), y: Math.round(frame.y * zoom), width: Math.round(frame.width * zoom), height: Math.round(frame.height * zoom) };
+  } catch (err) {
+    return undefined;
+  }
+}
+
 let isCapturingRbv = false;
 
 async function captureRbvPage(target) {
@@ -216,7 +232,7 @@ async function captureRbvPage(target) {
   try {
     // Jendela yang diminimize tidak digambar ulang, hasil jepretnya kosong
     if (source.isMinimized()) source.restore();
-    const image = await source.webContents.capturePage();
+    const image = await source.webContents.capturePage(await bookFrameRect(source.webContents));
     if (image.isEmpty()) {
       win.webContents.send("rbv-screenshot-captured", { error: "Halaman RBV belum tampil di layar. Buka jendela bukunya, lalu tekan F9 lagi." });
       return;

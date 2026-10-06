@@ -18,7 +18,8 @@
       "preload.js",
       "tuton-preload.js",
       "tuton-fill.js",
-      "tuton-account.js"
+      "tuton-account.js",
+      "rbv-frame.js"
     ],
     "extraResources": [
       {

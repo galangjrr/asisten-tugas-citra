@@ -102,9 +102,11 @@ function createWindow() {
   });
   win.removeMenu();
 
-  // Tautan eksternal seperti DOI dibuka di browser bawaan, bukan di jendela aplikasi
+  // Tautan Tuton dan RBV dibuka di jendela Tuton supaya login, F9, dan Pakai soal ini tetap jalan.
+  // Tautan eksternal lain seperti DOI dibuka di browser bawaan, bukan di jendela aplikasi.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
+    if (isTutonUrl(url)) openTuton(url);
+    else if (url.startsWith("http://") || url.startsWith("https://")) shell.openExternal(url);
     return { action: "deny" };
   });
 
@@ -135,10 +137,12 @@ function isLoginPopup(url) {
 
 // Jendela Tuton memakai sesi terpisah yang disimpan permanen, jadi login cukup sekali dan cookie Tuton
 // tidak bercampur dengan halaman Asisten. Password tidak pernah dibaca, login diketik sendiri oleh pengguna.
-function openTuton() {
+function openTuton(url = TUTON_URL) {
   if (tutonWin && !tutonWin.isDestroyed()) {
     if (tutonWin.isMinimized()) tutonWin.restore();
     tutonWin.focus();
+    // Pindah situs saja, misal Tuton ke RBV. Halaman Tuton yang sedang dibuka, mungkin berisi jawaban setengah jadi, tidak dimuat ulang.
+    if (new URL(url).hostname !== new URL(tutonWin.webContents.getURL() || url).hostname) tutonWin.loadURL(url);
     return;
   }
   tutonWin = new BrowserWindow({
@@ -180,7 +184,7 @@ function openTuton() {
     }
   });
 
-  tutonWin.loadURL(TUTON_URL);
+  tutonWin.loadURL(url);
 }
 
 let isCapturingRbv = false;
@@ -209,10 +213,6 @@ async function captureRbvPage() {
     }, 250);
   }
 }
-
-ipcMain.on("open-tuton", (event) => {
-  if (win && event.sender === win.webContents) openTuton();
-});
 
 ipcMain.on("capture-rbv-page", (event) => {
   if (win && event.sender === win.webContents) captureRbvPage();

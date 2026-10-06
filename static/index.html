@@ -244,13 +244,16 @@
               </div>
             </div>
 
-            <!-- Hanya di aplikasi desktop: soal dibaca langsung dari halaman Tuton, tampil di kedua tab -->
+            <!-- Jalan pintas tugas UT. Aplikasi desktop membukanya di jendela Tuton, browser biasa di tab baru. -->
             <div id="tuton-entry" class="hidden mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-subtle px-5 py-4">
               <div class="flex-1 min-w-[14rem]">
                 <p class="text-sm font-semibold text-ink">Soal ada di Tuton?</p>
-                <p class="text-xs text-ink-2 mt-0.5 leading-relaxed">Login pakai email NIM@ecampus.ut.ac.id, buka halaman diskusi atau tugas, lalu klik Pakai soal ini di pojok kanan bawah. Nama, NIM, dan mata kuliah ikut terisi.</p>
+                <p id="tuton-entry-hint" class="text-xs text-ink-2 mt-0.5 leading-relaxed"></p>
               </div>
-              <button type="button" id="btn-open-tuton" class="btn btn-secondary px-4 py-2 text-xs">Buka Tuton</button>
+              <div class="flex flex-wrap gap-2">
+                <a href="https://elearning.ut.ac.id/" target="_blank" rel="noopener" class="btn btn-secondary px-4 py-2 text-xs">Buka Tuton</a>
+                <a href="https://pustaka.ut.ac.id/lib/ruangbaca/" target="_blank" rel="noopener" class="btn btn-secondary px-4 py-2 text-xs">Buka RBV</a>
+              </div>
             </div>
           </section>
 

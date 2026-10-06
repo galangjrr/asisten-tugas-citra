@@ -490,7 +490,11 @@ const UI = {
     const showUtTools = cfg.isUt && Boolean(window.desktop);
     dom.activeTaskLabel.textContent = cfg.label;
     dom.activeTaskHint.textContent = `, ${cfg.hint}`;
-    dom.tutonEntry.classList.toggle("hidden", !showUtTools);
+    // Tautan Tuton dan RBV tetap muncul di browser biasa. Baca soal otomatis dan jepret RBV hanya ada di aplikasi desktop.
+    dom.tutonEntry.classList.toggle("hidden", !cfg.isUt);
+    $("tuton-entry-hint").textContent = window.desktop
+      ? "Login pakai email NIM@ecampus.ut.ac.id, buka halaman diskusi atau tugas, lalu klik Pakai soal ini di pojok kanan bawah. Nama, NIM, dan mata kuliah ikut terisi."
+      : "Login pakai email NIM@ecampus.ut.ac.id, salin teks soal dari halaman diskusi atau tugas, lalu tempel di tab Ketik langsung.";
     if (dom.btnSnapRbv) dom.btnSnapRbv.classList.toggle("hidden", !showUtTools);
     $("btn-write-tuton").classList.toggle("hidden", !showUtTools);
     dom.labelMaterialTitle.textContent = cfg.isUt ? "Judul naskah atau kode mata kuliah UT" : "Judul naskah";
@@ -2480,7 +2484,6 @@ function init() {
   }));
   bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
   if (window.desktop) {
-    $("btn-open-tuton").addEventListener("click", () => window.desktop.openTuton());
     window.desktop.onTutonCapture(handleTutonCapture);
     $("btn-write-tuton").addEventListener("click", () => writeToTuton());
     if (dom.btnSnapRbv) {

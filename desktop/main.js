@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, session, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -82,10 +82,20 @@ const loadingPage = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctyp
 <html><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0c0a09;color:#a8a29e;font:500 13px 'Segoe UI',sans-serif;-webkit-app-region:drag">
 Menyiapkan Asisten Tugas Citra</body></html>`)}`;
 
+// Lebar jendela sebagai bagian dari lebar layar. Tuton lebih lebar supaya bentangan dua lembar RBV dan menu sampingnya muat.
+const ASSISTANT_WIDTH_RATIO = 0.7;
+const TUTON_WIDTH_RATIO = 0.85;
+
+// Tinggi penuh area kerja layar tanpa taskbar, lebar proporsional dari lebar layar, di tengah layar tempat kursor berada
+function windowBounds(widthRatio) {
+  const { x, y, width, height } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const w = Math.round(width * widthRatio);
+  return { x: x + Math.round((width - w) / 2), y, width: w, height };
+}
+
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200,
-    height: 820,
+    ...windowBounds(ASSISTANT_WIDTH_RATIO),
     minWidth: 400,
     minHeight: 500,
     title: "Asisten Tugas Citra",
@@ -148,8 +158,7 @@ function openTuton(url = TUTON_URL) {
     return;
   }
   tutonWin = new BrowserWindow({
-    width: 1100,
-    height: 820,
+    ...windowBounds(TUTON_WIDTH_RATIO),
     minWidth: 400,
     minHeight: 500,
     title: "Tuton UT",
@@ -207,12 +216,23 @@ function listenF9(contents) {
 async function bookFrameRect(contents) {
   try {
     if (new URL(contents.getURL()).hostname !== "pustaka.ut.ac.id") return undefined;
-    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
-    const frame = await Promise.race([contents.executeJavaScript(`(${findBookFrame})()`, true), timeout]);
+    const find = () => Promise.race([
+      contents.executeJavaScript(`(${findBookFrame})()`, true),
+      new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]);
+    // Pembaca yang masih menggambar atau menata ulang lembar belum punya bingkai, jadi dicoba sekali lagi sesaat kemudian
+    let frame = await find();
+    if (!frame) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      frame = await find();
+    }
     if (!frame || frame.width < 100 || frame.height < 100) return undefined;
     // Ukuran dari halaman dalam piksel CSS, capturePage memakai piksel jendela, jadi dikali zoom halaman
     const zoom = contents.getZoomFactor();
-    return { x: Math.round(frame.x * zoom), y: Math.round(frame.y * zoom), width: Math.round(frame.width * zoom), height: Math.round(frame.height * zoom) };
+    return {
+      x: Math.round(frame.x * zoom), y: Math.round(frame.y * zoom), width: Math.round(frame.width * zoom), height: Math.round(frame.height * zoom),
+      clipped: Boolean(frame.clipped),
+    };
   } catch (err) {
     return undefined;
   }
@@ -232,7 +252,8 @@ async function captureRbvPage(target) {
   try {
     // Jendela yang diminimize tidak digambar ulang, hasil jepretnya kosong
     if (source.isMinimized()) source.restore();
-    const image = await source.webContents.capturePage(await bookFrameRect(source.webContents));
+    const frame = await bookFrameRect(source.webContents);
+    const image = await source.webContents.capturePage(frame && { x: frame.x, y: frame.y, width: frame.width, height: frame.height });
     if (image.isEmpty()) {
       win.webContents.send("rbv-screenshot-captured", { error: "Halaman RBV belum tampil di layar. Buka jendela bukunya, lalu tekan F9 lagi." });
       return;
@@ -241,6 +262,7 @@ async function captureRbvPage(target) {
       data: image.toDataURL(),
       title: source.getTitle() || "Ruang Baca Virtual",
       url: source.webContents.getURL(),
+      note: frame && frame.clipped ? "Sebagian lembar tertutup menu pembaca. Tutup menu samping RBV lalu tekan F9 lagi supaya teksnya utuh." : "",
     });
   } catch (err) {
     console.error("Gagal menjepret halaman RBV:", err);

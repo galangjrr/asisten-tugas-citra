@@ -2247,7 +2247,7 @@ async function enqueueRbvScreenshot(payload) {
     title: payload.title || "Ruang Baca Virtual",
   });
 
-  UI.toast(`Lembar ${pageNum} masuk antrean OCR`);
+  UI.toast(payload.note ? `Lembar ${pageNum} masuk antrean OCR. ${payload.note}` : `Lembar ${pageNum} masuk antrean OCR`);
   updateRbvQueueUI();
 
   if (!isProcessingRbv) {

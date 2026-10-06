@@ -79,6 +79,8 @@ class GenerateRequest(BaseModel):
     quote_citations: bool = False
     # list_only: rujukan cukup di daftar pustaka, badan naskah tanpa sitasi seperti (Prakosa, 2022). Sering diminta di forum Tuton.
     citation_style: Literal["in_text", "list_only"] = "in_text"
+    # Kode mata kuliah UT yang dikenali katalog. Dipakai untuk daftar pustaka modul BMP saat tidak ada rujukan dipilih.
+    course_code: Optional[str] = Field(default=None, max_length=12)
     # Jenis tugas dari layar sambutan. Kosong berarti klien lama, prompt tidak diberi konteks kampus.
     task_type: Optional[Literal["ut-diskusi", "ut-tugas", "umum"]] = None
 

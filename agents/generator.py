@@ -157,6 +157,21 @@ TEXT_FIDELITY_RULES = """
     - DILARANG menambah fakta tokoh yang tidak tertulis, seperti nama keluarga, umur, pekerjaan, hubungan, atau kejadian.
     - Jenis tindakan tokoh harus sama dengan teks. Pertanyaan tidak boleh ditulis sebagai tuntutan, permintaan sebagai perintah, dugaan sebagai kepastian, atau keinginan sebagai tindakan yang benar-benar terjadi.
     - Kata sifat untuk watak tokoh harus berdasar deskripsi atau tindakan di teks. Jika itu tafsiranmu, tandai sebagai tafsiran, misal 'terkesan' atau 'dapat dibaca sebagai'.
+    - Angka, data, dan fakta yang tidak tertulis di teks soal atau bahan DILARANG ditulis seolah berasal dari teks, termasuk melanjutkan atau mengubah angka di teks, misal teks menyebut enam miliar lalu ditulis naik ke tujuh miliar. Ilustrasi tetap boleh asal jelas hanya permisalan.
+"""
+
+# Soal yang meminta menemukan dan membetulkan kesalahan di teks, data, atau pernyataan. Butuh kata kerja mencari atau
+# membetulkan di dekat kata kesalahan, atau kalimat 'berisi N kesalahan', supaya esai tentang 'sampling error' tidak ikut.
+ERROR_TASK = re.compile(
+    r"(?i)\b(?:find|identify|spot|locate|correct|fix|temukan|carilah|cari|tunjukkan|identifikasi\w*|betulkan|perbaiki\w*|koreksi\w*)\b"
+    r"[^.?!\n]{0,60}\b(?:mistakes?|errors?|kesalahan|keliru|yang\s+salah)\b"
+    r"|\b(?:contains?|has|have|terdapat|ada|memuat)\s+(?:\w+\s+){0,2}(?:mistakes?|errors?|kesalahan)\b"
+)
+ERROR_TASK_RULES = """
+    SOAL MENCARI DAN MEMBETULKAN KESALAHAN (MENGATUR SUSUNAN JAWABAN, NADA TETAP MENGIKUTI PROFIL GAYA):
+    - Jumlah temuan WAJIB sama dengan jumlah kesalahan yang disebut soal. Pilih kesalahan yang jelas melanggar aturan tata bahasa, makna, hitungan, atau konsep, bukan pilihan kata yang sebenarnya masih benar.
+    - Tulis per temuan dengan nomor 1, 2, dan seterusnya, masing-masing di baris baru dengan \\n. Isi tiap temuan: bagian yang salah dikutip persis dari teks, koreksinya, kalimat utuh yang sudah dibetulkan, lalu alasan yang menyebut aturan atau makna yang dilanggar.
+    - Satu kalimat pengantar singkat boleh. DILARANG paragraf penutup yang hanya mengulang atau memuji perbaikan. Aturan paragraf penutup di profil gaya tidak berlaku untuk soal ini.
 """
 
 
@@ -862,6 +877,8 @@ async def generate_academic_draft(
     - Abaikan petunjuk waktu pengerjaan seperti 'Waktu: 30 menit'. Batas waktu tidak menentukan panjang, kedalaman, atau isi jawaban.
     """
     length_rules += TEXT_FIDELITY_RULES
+    if ERROR_TASK.search(topic):
+        length_rules += ERROR_TASK_RULES
 
     if is_math:
         length_rules += """
@@ -1065,6 +1082,9 @@ async def generate_academic_draft(
     # Model kadang tetap menempel sitasi yang tidak diminta pengguna
     for sec in sections:
         sec["content"] = finalize_text(sec["content"], quote_citations, citation_style)
+    # Postingan forum satu bagian tidak butuh judul bagian, model kadang tetap membuatnya seperti 'IDENTIFYING MISTAKES'
+    if task_type == "ut-diskusi" and len(sections) == 1:
+        sections[0]["heading"] = ""
     # Heading bagian wajib dikunci persis sesuai tulisan dosen, model sering menambah nomor atau kata BAB
     if format_type == "wajib" and len(sections) == len(required_sections):
         for name, sec in zip(required_sections, sections):

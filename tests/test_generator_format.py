@@ -331,6 +331,40 @@ async def test_tone_profile_comes_last_and_citations_follow_sources(monkeypatch)
     assert "ATURAN SITASI YANG WAJAR" in captured["system"] and "sitasi tetap ditulis sesuai ATURAN SITASI" in captured["system"]
 
 
+def test_error_finding_tasks_are_detected_without_catching_essays_about_errors():
+    from agents.generator import ERROR_TASK
+    hits = [
+        "The following text contains 2 mistakes. Can you find them and what words should appear instead?",
+        "Temukan tiga kesalahan pencatatan pada jurnal umum berikut lalu betulkan.",
+        "Identifikasilah kalimat yang salah dalam paragraf di bawah ini.",
+        "Correct the errors in the following code.",
+        "Terdapat dua kesalahan ejaan pada teks berikut.",
+    ]
+    misses = [
+        "Explain the difference between sampling error and non-sampling error.",
+        "Jelaskan salah satu teori motivasi menurut Maslow.",
+        "Bagaimana pendapat Anda tentang kesalahan kebijakan fiskal tahun 1998?",
+        "Write an essay about learning from mistakes.",
+    ]
+    assert all(ERROR_TASK.search(t) for t in hits)
+    assert not any(ERROR_TASK.search(t) for t in misses)
+
+
+@pytest.mark.anyio
+async def test_error_task_rules_and_forum_heading(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    result = await gen.generate_academic_draft("The following text contains 2 mistakes. Can you find them? Explain your argument clearly.",
+                                               [], tone="opini reflektif", task_type="ut-diskusi")
+    assert "SOAL MENCARI DAN MEMBETULKAN KESALAHAN" in captured["system"]
+    assert "seolah berasal dari teks" in captured["system"]
+    # Forum satu bagian tidak diberi judul bagian, tugas biasa tetap memakai judul dari model
+    assert result["sections"][0]["heading"] == ""
+
+    result = await gen.generate_academic_draft("Jelaskan konsep inflasi.", [], task_type="ut-tugas")
+    assert "SOAL MENCARI DAN MEMBETULKAN KESALAHAN" not in captured["system"]
+    assert result["sections"][0]["heading"] == "1. A"
+
+
 def test_letter_greeting_and_signoff_get_their_own_lines():
     import agents.generator as gen
     assert gen.LETTER_GREETING.sub(r"\1\n\n", "Dear Sarah, It has been so long.") == "Dear Sarah,\n\nIt has been so long."

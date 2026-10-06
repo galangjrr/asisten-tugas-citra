@@ -103,6 +103,19 @@ async def test_rewrite_is_a_conservative_revision(monkeypatch):
     assert "isi dan kutipan tetap sama" in captured["user"]
 
 
+def test_course_module_reference_only_when_list_only_without_sources():
+    from api.schemas import GenerateRequest
+    base = {"topic": "Find the mistakes.", "task_type": "ut-diskusi", "citation_style": "list_only", "course_code": "FSSI4107"}
+    ref = routes.course_module_reference(GenerateRequest(**base))
+    assert len(ref) == 1 and ref[0]["authors"] == ["Universitas Terbuka"] and ref[0]["year"] is None
+    assert "FSSI4107 Intermediate Reading" in ref[0]["title"]
+    # Sitasi di dalam teks, rujukan dipilih, kampus umum, atau kode tak dikenal: tidak ada referensi otomatis
+    assert routes.course_module_reference(GenerateRequest(**{**base, "citation_style": "in_text"})) == []
+    assert routes.course_module_reference(GenerateRequest(**{**base, "paper_ids": ["x"]})) == []
+    assert routes.course_module_reference(GenerateRequest(**{**base, "task_type": "umum"})) == []
+    assert routes.course_module_reference(GenerateRequest(**{**base, "course_code": "ABCD9999"})) == []
+
+
 @pytest.mark.anyio
 async def test_paragraph_rewrite_leaves_other_paragraphs_untouched(monkeypatch):
     import agents.generator as gen

@@ -1462,6 +1462,7 @@ function buildGeneratePayload(paperIds) {
     answer_spec: readAnswerSpec(),
     quote_citations: dom.citation.value === "kutipan",
     citation_style: dom.citation.value === "daftar" ? "list_only" : "in_text",
+    course_code: State.courseCode || null,
     student_name: dom.studentName.value.trim(),
     student_id: dom.studentId.value.trim(),
     course_name: dom.courseName.value.trim(),

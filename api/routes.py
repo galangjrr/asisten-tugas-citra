@@ -489,6 +489,35 @@ async def search_papers(payload: SearchRequest):
     )
 
 
+def course_module_reference(payload: GenerateRequest) -> List[dict]:
+    """
+    Jalur forum tidak melewati pemilihan rujukan. Jika pengguna meminta daftar pustaka saja, modul BMP mata kuliahnya
+    dicantumkan dari katalog. Isinya tidak dibaca model, jadi badan naskah tetap tanpa sitasi.
+    Katalog tidak memuat penulis dan tahun, jadi ditulis atas nama Universitas Terbuka dengan tahun n.d., bukan dikarang.
+    """
+    if payload.paper_ids or payload.citation_style != "list_only" or payload.task_type not in ("ut-diskusi", "ut-tugas"):
+        return []
+    lookup = lookup_ut_course(payload.course_code or "")
+    if not (lookup.get("found") and lookup.get("exact") and lookup.get("course")):
+        return []
+    course = lookup["course"]
+    return [{
+        "id": f"bmp_{course['kode'].lower()}",
+        "title": course["formatted_title"],
+        "authors": ["Universitas Terbuka"],
+        "year": None,
+        "venue": "Buku Materi Pokok (BMP) Universitas Terbuka",
+        "doi": "",
+        "pdf_url": "",
+        "abstract": "",
+        "scholar_url": "https://pustaka.ut.ac.id/",
+        "is_ut_bmp": True,
+        "is_manual_module": True,
+        "has_full_pdf": False,
+        "pages_content": [],
+    }]
+
+
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_task(payload: GenerateRequest):
     """Mengunduh berkas naskah terpilih, mengekstrak isi teks, dan merangkai draf tugas."""
@@ -573,11 +602,13 @@ async def generate_task(payload: GenerateRequest):
     if payload.task_type == "ut-diskusi":
         identity_lines = []
 
+    references = selected_papers or course_module_reference(payload)
+
     # Data lengkap disimpan supaya naskah bisa diedit dan ditulis ulang per bagian tanpa generate dari nol
     task = {
         "title": title,
         "sections": sections,
-        "references": selected_papers,
+        "references": references,
         "language": language,
         "identity_lines": identity_lines,
         "topic": payload.topic,
@@ -646,7 +677,7 @@ async def generate_task(payload: GenerateRequest):
         title=title,
         word_count=total_words,
         sections=sections,
-        references=selected_papers,
+        references=references,
         evidence=evidence_list,
         identity_lines=identity_lines,
         language=language,

@@ -311,3 +311,31 @@ async def test_reflective_tone_avoids_template_opinion_phrases(monkeypatch):
     # Frasa pendapat dibatasi supaya tidak berulang di tiap paragraf seperti template
     assert "paling banyak dipakai sekali" in system
     assert "'Menurut pandangan saya', 'Berdasarkan pengamatan saya'" not in system
+
+
+@pytest.mark.anyio
+async def test_tone_profile_comes_last_and_citations_follow_sources(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    # Forum tanpa rujukan: surat tetap bersapaan, sitasi dilarang
+    await gen.generate_academic_draft("Write a letter to an old friend about your life now.", [], tone="surat personal")
+    system = captured["system"]
+    assert "PROFIL GAYA SURAT PERSONAL" in system and "Sapaan pembuka dan salam penutup surat WAJIB ada" in system
+    assert "MODE TANPA RUJUKAN" in system
+    # Profil gaya ditaruh setelah aturan sitasi supaya jadi penentu suara terakhir yang dibaca model
+    assert system.index("PROFIL GAYA SURAT PERSONAL") > system.index("MODE TANPA RUJUKAN")
+    assert "ilmiah berkualitas tinggi" not in system and "rigorous academic" not in system
+
+    # Rujukan dipilih: sitasi tetap wajib walau gayanya surat
+    paper = {"title": "Friendship", "authors": ["Ana Ruiz"], "year": 2021, "pages_content": [{"page_number": 3, "text": "Isi."}]}
+    await gen.generate_academic_draft("Write a letter to an old friend about your life now.", [paper], tone="surat personal")
+    assert "ATURAN SITASI YANG WAJAR" in captured["system"] and "sitasi tetap ditulis sesuai ATURAN SITASI" in captured["system"]
+
+
+def test_letter_greeting_and_signoff_get_their_own_lines():
+    import agents.generator as gen
+    assert gen.LETTER_GREETING.sub(r"\1\n\n", "Dear Sarah, It has been so long.") == "Dear Sarah,\n\nIt has been so long."
+    assert gen.LETTER_SIGNOFF.sub(r"\n\n\1\n\2", "See you soon. Warm regards, Citra.") == "See you soon.\n\nWarm regards,\nCitra"
+    # Surat yang sudah rapi dan kalimat biasa tidak disentuh
+    tidy = "Dear Sarah,\n\nHi.\n\nYour friend,\nCitra"
+    assert gen.LETTER_GREETING.sub(r"\1\n\n", tidy) == tidy and gen.LETTER_SIGNOFF.sub(r"\n\n\1\n\2", tidy) == tidy
+    assert gen.LETTER_SIGNOFF.sub(r"\n\n\1\n\2", "I would love to, Citra said.") == "I would love to, Citra said."

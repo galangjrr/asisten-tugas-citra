@@ -2220,6 +2220,10 @@ let isProcessingRbv = false;
 let rbvPageCounter = 0;
 
 async function enqueueRbvScreenshot(payload) {
+  if (payload && payload.error) {
+    UI.toast(payload.error);
+    return;
+  }
   if (!payload || !payload.data) return;
   rbvPageCounter += 1;
   const pageNum = rbvPageCounter;

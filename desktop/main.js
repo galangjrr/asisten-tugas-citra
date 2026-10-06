@@ -176,38 +176,59 @@ function openTuton(url = TUTON_URL) {
   tutonWin.on("closed", () => {
     tutonWin = null;
   });
-
-  // Tombol pintas F9 untuk jepret lembar bacaan RBV secara pasif dari luar tanpa menyentuh DOM
-  tutonWin.webContents.on("before-input-event", async (event, input) => {
-    if (input.type === "keyDown" && input.key === "F9" && !input.isAutoRepeat) {
-      event.preventDefault();
-      await captureRbvPage();
-    }
+  tutonWin.on("focus", () => { rbvTarget = tutonWin; });
+  listenF9(tutonWin.webContents);
+  // Pembaca buku RBV bisa terbuka sebagai jendela anak. Jendela itu ikut mendengar F9 dan jadi sasaran jepret.
+  tutonWin.webContents.on("did-create-window", (child) => {
+    child.removeMenu();
+    listenF9(child.webContents);
+    child.on("focus", () => { rbvTarget = child; });
+    rbvTarget = child;
   });
 
   tutonWin.loadURL(url);
 }
 
+// Jendela Tuton atau jendela anaknya yang terakhir difokus, jadi F9 dari jendela Asisten memotret halaman yang sedang dibaca
+let rbvTarget = null;
+
+// Tombol pintas F9 untuk jepret lembar bacaan RBV secara pasif dari luar tanpa menyentuh DOM
+function listenF9(contents) {
+  contents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && input.key === "F9" && !input.isAutoRepeat) {
+      event.preventDefault();
+      captureRbvPage(BrowserWindow.fromWebContents(contents));
+    }
+  });
+}
+
 let isCapturingRbv = false;
 
-async function captureRbvPage() {
+async function captureRbvPage(target) {
   if (isCapturingRbv) return;
-  if (!tutonWin || tutonWin.isDestroyed()) {
+  const source = [target, rbvTarget, tutonWin].find((w) => w && !w.isDestroyed());
+  if (!source) {
     openTuton();
     return;
   }
   if (!win || win.isDestroyed()) return;
   isCapturingRbv = true;
   try {
-    const image = await tutonWin.webContents.capturePage();
-    const dataUrl = image.toDataURL();
+    // Jendela yang diminimize tidak digambar ulang, hasil jepretnya kosong
+    if (source.isMinimized()) source.restore();
+    const image = await source.webContents.capturePage();
+    if (image.isEmpty()) {
+      win.webContents.send("rbv-screenshot-captured", { error: "Halaman RBV belum tampil di layar. Buka jendela bukunya, lalu tekan F9 lagi." });
+      return;
+    }
     win.webContents.send("rbv-screenshot-captured", {
-      data: dataUrl,
-      title: tutonWin.getTitle() || "Ruang Baca Virtual",
-      url: tutonWin.webContents.getURL(),
+      data: image.toDataURL(),
+      title: source.getTitle() || "Ruang Baca Virtual",
+      url: source.webContents.getURL(),
     });
   } catch (err) {
     console.error("Gagal menjepret halaman RBV:", err);
+    win.webContents.send("rbv-screenshot-captured", { error: "Halaman RBV gagal dijepret. Coba tekan F9 lagi." });
   } finally {
     setTimeout(() => {
       isCapturingRbv = false;

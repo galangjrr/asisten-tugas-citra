@@ -230,6 +230,113 @@ def task_type_rule(task_type: Optional[str]) -> str:
     return f"\n    KONTEKS KAMPUS:\n    - {rule}\n" if rule else ""
 
 
+# Penekanan tambahan untuk gaya yang memakai aturan suara mahasiswa umum. Tanpa ini tiga pilihan gaya menghasilkan prompt yang sama.
+TONE_FOCUS = {
+    "formal": (
+        "GAYA AKADEMIS FORMAL LUGAS: Pakai bahasa Indonesia baku dan kalimat efektif. Hindari kata santai seperti 'banget', 'nggak', atau 'aku'. "
+        "Pakai 'saya' hanya jika soal meminta pendapat. Kalimat pertama tiap paragraf memuat gagasan utamanya, lalu penjelasan dan bukti.",
+        "FORMAL ACADEMIC TONE: Use standard formal academic English with no contractions or slang. Use first person only when the question asks "
+        "for an opinion. The first sentence of each paragraph states its main idea, followed by explanation and evidence.",
+    ),
+    "kritis": (
+        "GAYA ANALISIS KRITIS TAJAM: Jangan hanya menjelaskan, tapi menimbang. Bandingkan paling sedikit dua sudut pandang, teori, atau kasus, "
+        "sebut kelebihan dan kelemahannya, lalu ambil sikap yang jelas beserta alasannya. Uji setiap klaim: kapan berlaku, untuk siapa, dan apa batasannya.",
+        "SHARP CRITICAL ANALYSIS TONE: Do not just explain, weigh. Compare at least two viewpoints, theories, or cases, name their strengths and "
+        "weaknesses, then take a clear position with reasons. Test every claim: when it holds, for whom, and what its limits are.",
+    ),
+    "eksploratif": (
+        "GAYA EKSPLORATIF MENGALIR: Tulis seperti esai bertutur yang menelusuri gagasan langkah demi langkah. Boleh dibuka dengan pertanyaan, "
+        "pengamatan, atau situasi konkret, lalu dikembangkan pelan-pelan. Perpindahan antarparagraf terasa alami, bukan daftar poin. 'Saya' boleh dipakai secukupnya.",
+        "EXPLORATORY FLOWING TONE: Write like a narrative essay that explores the idea step by step. You may open with a question, an observation, "
+        "or a concrete situation, then develop it gradually. Transitions between paragraphs feel natural, not like a list. First person is fine in moderation.",
+    ),
+}
+
+
+def voice_rules(tone: str, is_en: bool) -> str:
+    """Aturan gaya bahasa dari pilihan Tahap 1. Dipakai saat menulis naskah dan setiap kali naskah ditulis ulang supaya gayanya tidak bergeser."""
+    tone_lower = (tone or "").lower()
+    is_personal_letter = any(k in tone_lower for k in ["surat", "letter", "korespondensi"])
+    is_reflective_opinion = any(k in tone_lower for k in ["reflektif", "opini", "reflective", "opinion"])
+    if is_en:
+        if is_personal_letter:
+            student_voice_rules = """
+        RULES FOR PERSONAL LETTER / CORRESPONDENCE TONE:
+        1. Adopt the voice of an articulate student or thinker writing a thoughtful, warm, and engaging letter to a friend, colleague, or mentor.
+        2. Open with a natural personal greeting appropriate to the letter format (e.g. 'Dear Friend,', 'Dear Editor,').
+        3. Discuss and reflect on the topic conversationally using first-person perspective ('I have been reflecting on...', 'In my view...'), while naturally interweaving the scholarly findings and citations as insights from your reading.
+        4. Close with a warm, natural sign-off (e.g. 'Warm regards,', 'Sincerely,') rather than robotic boilerplate.
+        5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster'.
+        """
+        elif is_reflective_opinion:
+            student_voice_rules = """
+        RULES FOR REFLECTIVE OPINION:
+        1. Write like a student sharing a view in a class discussion forum: polite, warm, and flowing, as if explaining to classmates, not like a formal report.
+        2. The first paragraph states your stance or core answer in your own words. Vary how you express opinions. Phrases like 'In my view' or 'I believe' may appear at most once in the whole text, and NEVER open every paragraph with an opinion phrase.
+        3. Connect concepts from the sources to specific, imaginable examples such as a certain profession, situation, or event, then explain why the example supports your view. Avoid vague examples like 'in our surroundings' or 'many people'.
+        4. Short to medium paragraphs of about 3 to 5 sentences. Keep most sentences under 25 words, mix short and medium sentences, and use plain everyday words. No subheadings and no bullet points unless the question asks for points.
+        5. The last paragraph restates your view in plain words and gives one concrete suggestion or hope. FORBIDDEN closing labels such as 'My final stance', 'In conclusion', 'Ultimately', 'That concludes my answer', or 'Hope this helps'.
+        6. STRICTLY FORBIDDEN openings such as 'Hello Tutor' or 'Good morning'.
+        7. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era'.
+        """
+        else:
+            student_voice_rules = """
+        RULES FOR GENUINE STUDENT VOICE AND TONE:
+        1. Adopt the voice of an articulate, genuine university student who truly understands the subject matter.
+        2. STRICTLY FORBIDDEN to include any opening salutations (e.g. 'Hello Tutor', 'Dear Lecturer', 'Good morning').
+        3. STRICTLY FORBIDDEN to include robotic boilerplate conclusions (e.g. 'In conclusion', 'That concludes my answer', 'Hope this helps').
+        4. Begin immediately with the opening paragraph or first heading.
+        5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster', 'moreover' at the start of every sentence.
+        6. When the assignment asks for personal preference or opinion (e.g., 'explain your personal preference'), write naturally using first-person perspective ('I prefer...', 'In my view...') backed by solid reasoning and scholarly evidence.
+        7. Provide clear reasoning with grounded, concrete examples.
+        """
+    else:
+        if is_personal_letter:
+            student_voice_rules = """
+        ATURAN GAYA SURAT PRIBADI DAN KORESPONDENSI:
+        1. Gunakan gaya penulisan surat pribadi yang hangat, akrab, reflektif, dan mengalir santai kepada sahabat, rekan, atau kolega.
+        2. Awali naskah dengan sapaan pembuka surat yang wajar dan bersahabat (contoh: 'Kepada Sahabatku,', 'Halo Kawan,', atau 'Salam Hangat,').
+        3. Tulis dari sudut pandang orang pertama ('saya' atau 'aku') secara reflektif, membagikan pemikiran dan pengalaman pribadi sambil menganyam rujukan ilmiah dan sitasi sebagai bahan bacaan menarik yang kamu temukan.
+        4. Akhiri dengan salam penutup surat yang hangat dan wajar (contoh: 'Salam hangat,', 'Sahabatmu,') tanpa kalimat klise kaku robotik.
+        5. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'menggarisbawahi'.
+        """
+        elif is_reflective_opinion:
+            student_voice_rules = """
+        ATURAN GAYA OPINI REFLEKTIF:
+        1. Tulis seperti mahasiswa yang berbagi pandangan di forum diskusi kelas: sopan, hangat, dan mengalir seperti menjelaskan ke teman sekelas, bukan seperti laporan resmi.
+        2. Paragraf pertama langsung menyatakan sikap atau jawaban inti dengan kalimat sendiri. Variasikan cara menyatakan pendapat. Frasa seperti 'Menurut saya' atau 'Saya melihat' paling banyak dipakai sekali di seluruh naskah, dan DILARANG membuka setiap paragraf dengan frasa pendapat.
+        3. Hubungkan konsep dari rujukan dengan contoh yang spesifik dan bisa dibayangkan, misalnya profesi, situasi, atau kejadian tertentu, lalu jelaskan kenapa contoh itu mendukung pendapatmu. Hindari contoh kabur seperti 'di lingkungan sekitar kita' atau 'banyak orang'.
+        4. Paragraf pendek sampai sedang, sekitar 3 sampai 5 kalimat. Sebagian besar kalimat di bawah 25 kata, campur kalimat pendek dengan kalimat sedang, dan pakai kata sehari-hari yang lazim diketik mahasiswa. Tanpa sub-judul dan tanpa daftar poin kecuali soal meminta poin.
+        5. Paragraf terakhir menegaskan lagi pendapatmu dengan kalimat biasa dan memberi satu saran atau harapan yang konkret. DILARANG label penutup seperti 'Sikap akhir saya', 'Demikian', 'Kesimpulannya', 'Pada akhirnya', atau 'Semoga bermanfaat'.
+        6. DILARANG sapaan pembuka seperti 'Halo Tutor', 'Selamat pagi', atau 'Izin menjawab'.
+        7. DILARANG menggunakan kata-kata klise sok pintar khas AI dan pujian berlebihan: 'krusial', 'esensial', 'ranah', 'sinergi', 'sangat ampuh', 'secara maksimal', 'dampak ganda', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'secara pribadi, saya melihat bahwa'.
+        """
+        else:
+            student_voice_rules = """
+        ATURAN GAYA DAN NADA BICARA MAHASISWA ASLI:
+        1. Gunakan suara mahasiswa tulen yang benar-benar memahami materi, bukan ensiklopedia kaku atau robot bot.
+        2. DILARANG KERAS menyertakan sapaan pembuka apapun (seperti 'Halo Tutor', 'Selamat pagi', 'Terima kasih atas pertanyaannya').
+        3. DILARANG KERAS menyertakan kata penutup klise apapun (seperti 'Demikian jawaban saya', 'In conclusion', 'Semoga membantu').
+        4. Langsung mulai dari inti pembahasan atau judul bagian pertama.
+        5. HINDARI struktur daftar poin (bullet points) tebal yang berlebihan. Utamakan paragraf-paragraf yang bersih, mengalir logis, dan saling terhubung.
+        6. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'menggarisbawahi', 'menatap masa depan', 'dalam era modern ini'.
+        7. Tulis secara alami dari sudut pandang pemikiran mahasiswa (boleh menggunakan 'saya' jika relevan untuk analisis tugas atau pandangan pribadi).
+        8. Berikan penalaran yang jelas dengan contoh konkret dan membumi.
+        """
+    focus = next((pair[1 if is_en else 0] for key, pair in TONE_FOCUS.items() if key in tone_lower), "")
+    return student_voice_rules + (f"        {focus}\n" if focus else "")
+
+
+def revision_style_rules(tone: str, is_en: bool) -> str:
+    """Revisi dan penyesuaian panjang memakai aturan gaya yang sama dengan naskah awal supaya suaranya tidak kembali ke gaya umum."""
+    return f"""
+    GAYA DAN IDENTITAS DARI PILIHAN MAHASISWA (WAJIB DIPERTAHANKAN):
+    - Pertahankan gaya bahasa, sudut pandang, dan nada versi sekarang. DILARANG mengubahnya jadi lebih kaku, lebih santai, atau gaya lain.
+    - Aturan sapaan pembuka dan salam penutup di bawah hanya berlaku untuk bagian pertama dan terakhir naskah.
+    - DILARANG menambah identitas mahasiswa seperti nama, NIM, atau mata kuliah yang tidak ada di versi sekarang.
+    {voice_rules(tone, is_en)}"""
+
+
 async def generate_academic_draft(
     topic: str,
     papers_with_content: List[Dict[str, Any]],
@@ -272,9 +379,7 @@ async def generate_academic_draft(
     else:
         is_en = detect_language(topic, custom_instructions) == "en"
     estimated_pages = max(1, round(target_words / 280))
-    tone_lower = (tone or "").lower()
-    is_personal_letter = any(k in tone_lower for k in ["surat", "letter", "korespondensi"])
-    is_reflective_opinion = any(k in tone_lower for k in ["reflektif", "opini", "reflective", "opinion"])
+    is_personal_letter = any(k in (tone or "").lower() for k in ["surat", "letter", "korespondensi"])
 
     if is_personal_letter and format_type == "otomatis":
         format_type = "esai"
@@ -621,37 +726,6 @@ async def generate_academic_draft(
         - The title, all paragraph texts, headings (if any), and evidence summaries MUST be strictly in English.
         - Under NO circumstances should any Indonesian words appear in the output.
         """
-        if is_personal_letter:
-            student_voice_rules = """
-        RULES FOR PERSONAL LETTER / CORRESPONDENCE TONE:
-        1. Adopt the voice of an articulate student or thinker writing a thoughtful, warm, and engaging letter to a friend, colleague, or mentor.
-        2. Open with a natural personal greeting appropriate to the letter format (e.g. 'Dear Friend,', 'Dear Editor,').
-        3. Discuss and reflect on the topic conversationally using first-person perspective ('I have been reflecting on...', 'In my view...'), while naturally interweaving the scholarly findings and citations as insights from your reading.
-        4. Close with a warm, natural sign-off (e.g. 'Warm regards,', 'Sincerely,') rather than robotic boilerplate.
-        5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster'.
-        """
-        elif is_reflective_opinion:
-            student_voice_rules = """
-        RULES FOR REFLECTIVE OPINION:
-        1. Write like a student sharing a view in a class discussion forum: polite, warm, and flowing, as if explaining to classmates, not like a formal report.
-        2. The first paragraph states your stance or core answer in your own words. Vary how you express opinions. Phrases like 'In my view' or 'I believe' may appear at most once in the whole text, and NEVER open every paragraph with an opinion phrase.
-        3. Connect concepts from the sources to specific, imaginable examples such as a certain profession, situation, or event, then explain why the example supports your view. Avoid vague examples like 'in our surroundings' or 'many people'.
-        4. Short to medium paragraphs of about 3 to 5 sentences. Keep most sentences under 25 words, mix short and medium sentences, and use plain everyday words. No subheadings and no bullet points unless the question asks for points.
-        5. The last paragraph restates your view in plain words and gives one concrete suggestion or hope. FORBIDDEN closing labels such as 'My final stance', 'In conclusion', 'Ultimately', 'That concludes my answer', or 'Hope this helps'.
-        6. STRICTLY FORBIDDEN openings such as 'Hello Tutor' or 'Good morning'.
-        7. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era'.
-        """
-        else:
-            student_voice_rules = """
-        RULES FOR GENUINE STUDENT VOICE AND TONE:
-        1. Adopt the voice of an articulate, genuine university student who truly understands the subject matter.
-        2. STRICTLY FORBIDDEN to include any opening salutations (e.g. 'Hello Tutor', 'Dear Lecturer', 'Good morning').
-        3. STRICTLY FORBIDDEN to include robotic boilerplate conclusions (e.g. 'In conclusion', 'That concludes my answer', 'Hope this helps').
-        4. Begin immediately with the opening paragraph or first heading.
-        5. FORBIDDEN AI CLICHES: Do NOT use overused AI tells such as 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'it is important to note', 'underscores', 'in today's modern era', 'beacon', 'foster', 'moreover' at the start of every sentence.
-        6. When the assignment asks for personal preference or opinion (e.g., 'explain your personal preference'), write naturally using first-person perspective ('I prefer...', 'In my view...') backed by solid reasoning and scholarly evidence.
-        7. Provide clear reasoning with grounded, concrete examples.
-        """
         distortion_rules = """
         STRICT RULES FOR ASSIGNMENT SHEETS AND GUIDELINES (ZERO DISTORTION):
         - Assignment sheets often contain a mix of:
@@ -668,38 +742,6 @@ async def generate_academic_draft(
         KEPATUHAN BAHASA WAJIB:
         - Topik dan tugas berbahasa INDONESIA.
         - Seluruh keluaran (judul, isi teks naskah, heading jika ada, dan evidence summary) WAJIB ditulis dalam BAHASA INDONESIA yang ilmiah, fasih, dan alami.
-        """
-        if is_personal_letter:
-            student_voice_rules = """
-        ATURAN GAYA SURAT PRIBADI DAN KORESPONDENSI:
-        1. Gunakan gaya penulisan surat pribadi yang hangat, akrab, reflektif, dan mengalir santai kepada sahabat, rekan, atau kolega.
-        2. Awali naskah dengan sapaan pembuka surat yang wajar dan bersahabat (contoh: 'Kepada Sahabatku,', 'Halo Kawan,', atau 'Salam Hangat,').
-        3. Tulis dari sudut pandang orang pertama ('saya' atau 'aku') secara reflektif, membagikan pemikiran dan pengalaman pribadi sambil menganyam rujukan ilmiah dan sitasi sebagai bahan bacaan menarik yang kamu temukan.
-        4. Akhiri dengan salam penutup surat yang hangat dan wajar (contoh: 'Salam hangat,', 'Sahabatmu,') tanpa kalimat klise kaku robotik.
-        5. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'menggarisbawahi'.
-        """
-        elif is_reflective_opinion:
-            student_voice_rules = """
-        ATURAN GAYA OPINI REFLEKTIF:
-        1. Tulis seperti mahasiswa yang berbagi pandangan di forum diskusi kelas: sopan, hangat, dan mengalir seperti menjelaskan ke teman sekelas, bukan seperti laporan resmi.
-        2. Paragraf pertama langsung menyatakan sikap atau jawaban inti dengan kalimat sendiri. Variasikan cara menyatakan pendapat. Frasa seperti 'Menurut saya' atau 'Saya melihat' paling banyak dipakai sekali di seluruh naskah, dan DILARANG membuka setiap paragraf dengan frasa pendapat.
-        3. Hubungkan konsep dari rujukan dengan contoh yang spesifik dan bisa dibayangkan, misalnya profesi, situasi, atau kejadian tertentu, lalu jelaskan kenapa contoh itu mendukung pendapatmu. Hindari contoh kabur seperti 'di lingkungan sekitar kita' atau 'banyak orang'.
-        4. Paragraf pendek sampai sedang, sekitar 3 sampai 5 kalimat. Sebagian besar kalimat di bawah 25 kata, campur kalimat pendek dengan kalimat sedang, dan pakai kata sehari-hari yang lazim diketik mahasiswa. Tanpa sub-judul dan tanpa daftar poin kecuali soal meminta poin.
-        5. Paragraf terakhir menegaskan lagi pendapatmu dengan kalimat biasa dan memberi satu saran atau harapan yang konkret. DILARANG label penutup seperti 'Sikap akhir saya', 'Demikian', 'Kesimpulannya', 'Pada akhirnya', atau 'Semoga bermanfaat'.
-        6. DILARANG sapaan pembuka seperti 'Halo Tutor', 'Selamat pagi', atau 'Izin menjawab'.
-        7. DILARANG menggunakan kata-kata klise sok pintar khas AI dan pujian berlebihan: 'krusial', 'esensial', 'ranah', 'sinergi', 'sangat ampuh', 'secara maksimal', 'dampak ganda', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'secara pribadi, saya melihat bahwa'.
-        """
-        else:
-            student_voice_rules = """
-        ATURAN GAYA DAN NADA BICARA MAHASISWA ASLI:
-        1. Gunakan suara mahasiswa tulen yang benar-benar memahami materi, bukan ensiklopedia kaku atau robot bot.
-        2. DILARANG KERAS menyertakan sapaan pembuka apapun (seperti 'Halo Tutor', 'Selamat pagi', 'Terima kasih atas pertanyaannya').
-        3. DILARANG KERAS menyertakan kata penutup klise apapun (seperti 'Demikian jawaban saya', 'In conclusion', 'Semoga membantu').
-        4. Langsung mulai dari inti pembahasan atau judul bagian pertama.
-        5. HINDARI struktur daftar poin (bullet points) tebal yang berlebihan. Utamakan paragraf-paragraf yang bersih, mengalir logis, dan saling terhubung.
-        6. DILARANG menggunakan kata-kata klise sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'delve', 'crucial', 'multifaceted', 'pivotal', 'secara keseluruhan', 'penting untuk dicatat', 'menggarisbawahi', 'menatap masa depan', 'dalam era modern ini'.
-        7. Tulis secara alami dari sudut pandang pemikiran mahasiswa (boleh menggunakan 'saya' jika relevan untuk analisis tugas atau pandangan pribadi).
-        8. Berikan penalaran yang jelas dengan contoh konkret dan membumi.
         """
         distortion_rules = """
         ATURAN MENGENAI LEMBAR SOAL, PETUNJUK TEKNIS, DAN KRITERIA DOSEN (BEBAS DISTORSI):
@@ -863,7 +905,7 @@ async def generate_academic_draft(
 
     {format_guideline}
 
-    {student_voice_rules}
+    {voice_rules(tone, is_en)}
 
     {distortion_rules}
 
@@ -992,7 +1034,7 @@ async def generate_academic_draft(
                     topic, sections, index, language=language,
                     instruction=f"Persingkat bagian ini jadi sekitar {round(limit * 0.9)} kata tanpa membuang poin yang diminta soal.",
                     word_limit=limit, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
-                    quote_citations=quote_citations,
+                    quote_citations=quote_citations, task_type=task_type, tone=tone,
                 )
             except Exception as e:
                 print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
@@ -1007,6 +1049,7 @@ async def generate_academic_draft(
             try:
                 sections = await adjust_total_length(
                     topic, sections, bounds, language=language, papers=papers_with_content, quote_citations=quote_citations,
+                    tone=tone, task_type=task_type,
                 )
             except Exception as e:
                 print(f"Peringatan: gagal menyesuaikan panjang naskah {total} kata ke rentang dosen: {e}")
@@ -1043,6 +1086,8 @@ async def adjust_total_length(
     language: str = "id",
     papers: Optional[List[Dict[str, Any]]] = None,
     quote_citations: bool = False,
+    tone: str = "",
+    task_type: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     """Memanjangkan atau memendekkan seluruh naskah ke rentang dosen dalam satu panggilan. Naskah asli dikembalikan jika hasilnya tidak valid."""
     total = sum(len(sec["content"].split()) for sec in sections)
@@ -1062,7 +1107,7 @@ async def adjust_total_length(
     - Pertahankan jumlah dan urutan bagian, heading, semua poin yang diminta soal, kutipan langsung persis kata per kata, dan sitasi.
     - DILARANG mengulang kalimat, berputar-putar, atau mengarang fakta. DILARANG memakai tag HTML, markdown, em dash, atau LaTeX.
     - Bahasa keluaran: {'ENGLISH' if language == 'en' else 'BAHASA INDONESIA'}.
-    {TEXT_FIDELITY_RULES}
+    {revision_style_rules(tone, language == 'en')}{TEXT_FIDELITY_RULES}{task_type_rule(task_type)}
     FORMAT KELUARAN (JSON MURNI): {{"sections": [{{"heading": "...", "content": "..."}}]}}
     """
     user_prompt = f"LEMBAR SOAL:\n{topic}\n\nNASKAH SEKARANG:\n{draft}\n"
@@ -1113,6 +1158,7 @@ async def rewrite_section(
     student_name: str = "",
     quote_citations: bool = True,
     task_type: Optional[str] = None,
+    tone: str = "",
 ) -> Dict[str, str]:
     """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
     if not 0 <= index < len(sections):
@@ -1156,7 +1202,7 @@ async def rewrite_section(
     - {signer_rule}
     - Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading.
     - DILARANG memakai em dash, en dash, atau LaTeX. Pisahkan paragraf dengan \n\n.
-    {TEXT_FIDELITY_RULES}{task_type_rule(task_type)}
+    {revision_style_rules(tone, is_en)}{TEXT_FIDELITY_RULES}{task_type_rule(task_type)}
     FORMAT KELUARAN (JSON MURNI): {{"content": "..."}}
     """
     user_prompt = f"""

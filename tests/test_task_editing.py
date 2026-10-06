@@ -103,6 +103,30 @@ async def test_rewrite_is_a_conservative_revision(monkeypatch):
     assert "isi dan kutipan tetap sama" in captured["user"]
 
 
+@pytest.mark.anyio
+async def test_revisions_keep_the_tone_chosen_in_step_one(monkeypatch):
+    import agents.generator as gen
+    captured = {}
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        captured["system"] = config.system_instruction
+        if '"sections"' in config.system_instruction:
+            return type("Res", (), {"text": '{"sections": [{"heading": "", "content": "%s"}]}' % " ".join(["kata"] * 95)})()
+        return type("Res", (), {"text": '{"content": "Versi baru."}'})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    sections = [{"heading": "", "content": "Versi lama."}]
+    await gen.rewrite_section("Bagaimana pendapatmu?", sections, 0, tone="opini reflektif", task_type="ut-diskusi")
+    assert "forum diskusi kelas" in captured["system"] and "DILARANG menambah identitas" in captured["system"]
+
+    await gen.adjust_total_length("Bagaimana pendapatmu?", sections, gen.length_bounds(90, None), tone="analisis kritis")
+    assert "ANALISIS KRITIS TAJAM" in captured["system"]
+
+    # Tiga gaya yang dulu memakai aturan sama sekarang menghasilkan penekanan berbeda
+    rules = {tone: gen.voice_rules(tone, False) for tone in ("akademis formal", "analisis kritis", "eksploratif")}
+    assert len(set(rules.values())) == 3
+
+
 def test_frozen_exe_stores_data_in_local_appdata(monkeypatch, tmp_path):
     import importlib, sys
     import tools.paths as paths

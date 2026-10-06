@@ -443,7 +443,12 @@
                     <option value="kutipan">Sitasi di dalam teks, juga setelah setiap kutipan</option>
                     <option value="daftar">Daftar pustaka saja, tanpa sitasi di dalam teks</option>
                   </select>
-                  <p id="citation-hint" class="text-[11px] text-ink-3 mt-1">Pilih daftar pustaka saja kalau dosen atau tutor hanya meminta referensi di akhir. Di jalur forum tanpa rujukan, pilihan ini mencantumkan modul BMP dari kode mata kuliah di Identitas.</p>
+                  <p id="citation-hint" class="text-[11px] text-ink-3 mt-1">Berlaku untuk rujukan yang dipilih di Tahap 2. Pilih daftar pustaka saja kalau dosen atau tutor hanya meminta referensi di akhir.</p>
+                  <!-- Daftar pustaka hanya berisi sumber yang isinya dibaca, jadi jalur forum tanpa bahan diarahkan ke Jalur Bahan -->
+                  <div id="citation-forum-note" class="hidden note mt-2 flex flex-wrap items-center gap-3">
+                    <p class="flex-1 min-w-[14rem]">Jalur forum menulis tanpa bahan, jadi naskah tanpa sitasi dan daftar pustaka. Kalau tutor meminta referensi, pakai Jalur Bahan lalu masukkan modul BMP lewat unggah berkas atau jepret RBV, supaya isi jawaban benar-benar dari modul.</p>
+                    <button type="button" id="btn-switch-bahan" class="btn btn-secondary px-3 py-1.5 text-xs">Pakai Jalur Bahan</button>
+                  </div>
                 </div>
               </div>
             </details>

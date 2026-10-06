@@ -591,6 +591,7 @@ const UI = {
     const mode = MODES[State.mode];
     dom.primaryLabel.textContent = mode.action;
     dom.primaryHint.textContent = mode.hint;
+    $("citation-forum-note").classList.toggle("hidden", State.mode !== "forum");
   },
 
   // Mata kuliah di header. Kode tampil jika dikenali katalog, nama saja jika diketik manual.
@@ -1461,9 +1462,7 @@ function buildGeneratePayload(paperIds) {
     custom_instructions: dom.instructions.value.trim(),
     answer_spec: readAnswerSpec(),
     quote_citations: dom.citation.value === "kutipan",
-    citation_style: dom.citation.value === "daftar" ? "list_only" : "in_text",
-    course_code: State.courseCode || null,
-    student_name: dom.studentName.value.trim(),
+    citation_style: dom.citation.value === "daftar" ? "list_only" : "in_text",    student_name: dom.studentName.value.trim(),
     student_id: dom.studentId.value.trim(),
     course_name: dom.courseName.value.trim(),
     task_type: State.taskType
@@ -2667,6 +2666,10 @@ function init() {
   dom.citation.value = storage.get(STORAGE.citation) || (storage.get(STORAGE.quoteCitations) === "1" ? "kutipan" : "teks");
   if (!dom.citation.value) dom.citation.value = "teks";
   dom.citation.addEventListener("change", () => storage.set(STORAGE.citation, dom.citation.value));
+  $("btn-switch-bahan").addEventListener("click", () => {
+    setMode("bahan");
+    UI.toast("Jalur Bahan dipilih. Masukkan modul BMP di Tahap 2.");
+  });
   document.querySelectorAll('input[name="tone"]').forEach((input) => input.addEventListener("change", () => {
     storage.set(STORAGE.tone, input.value);
     UI.renderSummaries();

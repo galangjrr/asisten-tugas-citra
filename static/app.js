@@ -66,7 +66,11 @@ const State = {
   doc: null,
   docBusy: false,
   // Versi lama tiap bagian sebelum diedit atau ditulis ulang, supaya bisa dikembalikan. Kunci: nomor bagian.
-  sectionHistory: {}
+  sectionHistory: {},
+  // Kode mata kuliah yang dikenali katalog UT, tampil di header bersama namanya
+  courseCode: "",
+  // Status login Tuton dari aplikasi desktop: checking, in, out, atau unknown jika sesi tidak bisa dicek
+  tuton: { state: "checking", name: "", nim: "" }
 };
 
 const storage = {
@@ -145,6 +149,16 @@ const $ = (id) => document.getElementById(id);
 
 const dom = {
   statusBadge: $("api-status-badge"),
+  coursePill: $("course-pill"),
+  coursePillCode: $("course-pill-code"),
+  coursePillName: $("course-pill-name"),
+  accountMenu: $("account-menu"),
+  accountAvatar: $("account-avatar"),
+  accountName: $("account-name"),
+  accountMeta: $("account-meta"),
+  accountDot: $("account-dot"),
+  accountStatus: $("account-status"),
+  btnTutonLogout: $("btn-tuton-logout"),
   stepper: $("stepper"),
   stepperNav: $("stepper-nav"),
   stepWelcome: $("step-welcome"),
@@ -498,6 +512,7 @@ const UI = {
       : "Login pakai email NIM@ecampus.ut.ac.id, salin teks soal dari halaman diskusi atau tugas, lalu tempel di tab Ketik langsung.";
     if (dom.btnSnapRbv) dom.btnSnapRbv.classList.toggle("hidden", !showUtTools);
     $("btn-write-tuton").classList.toggle("hidden", !showUtTools);
+    UI.renderAccount();
     dom.labelMaterialTitle.textContent = cfg.isUt ? "Judul naskah atau kode mata kuliah UT" : "Judul naskah";
     dom.materialTitle.placeholder = cfg.isUt ? "Robohnya Surau Kami, atau MKWU4108" : "Robohnya Surau Kami";
   },
@@ -577,7 +592,51 @@ const UI = {
     dom.primaryHint.textContent = mode.hint;
   },
 
+  // Mata kuliah di header. Kode tampil jika dikenali katalog, nama saja jika diketik manual.
+  renderCourse() {
+    const name = dom.courseName.value.trim();
+    dom.coursePill.classList.toggle("hidden", !name);
+    dom.coursePillCode.textContent = name ? State.courseCode : "";
+    dom.coursePillName.textContent = name;
+    dom.coursePill.title = [State.courseCode, name].filter(Boolean).join(" ");
+  },
+
+  // Chip akun Tuton. Browser biasa tidak bisa membaca sesi Tuton, jadi memakai identitas yang diisi sendiri.
+  renderAccount() {
+    const show = isUtTask();
+    dom.accountMenu.classList.toggle("hidden", !show);
+    if (!show) {
+      dom.accountMenu.open = false;
+      return;
+    }
+    const isDesktop = Boolean(window.desktop);
+    const { state, name: tutonName, nim: tutonNim } = State.tuton;
+    const loggedIn = isDesktop && state === "in";
+    const name = loggedIn ? tutonName : isDesktop ? "" : dom.studentName.value.trim();
+    const nim = loggedIn ? tutonNim : isDesktop ? "" : dom.studentId.value.trim();
+
+    let status;
+    if (!isDesktop) status = "Status login hanya terbaca di aplikasi desktop";
+    else if (loggedIn) status = "Terhubung ke Tuton";
+    else if (state === "checking") status = "Memeriksa sesi Tuton";
+    else if (state === "unknown") status = "Sesi Tuton belum bisa dicek, periksa internet";
+    else status = "Belum masuk. Buka Tuton untuk login";
+
+    dom.accountName.textContent = name || (isDesktop ? "Masuk Tuton" : "Tuton");
+    dom.accountMeta.textContent = nim ? `NIM ${nim}` : isDesktop ? (state === "checking" ? "Memeriksa" : "Belum terhubung") : "Buka di tab baru";
+    const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+    if (initials) dom.accountAvatar.textContent = initials;
+    else dom.accountAvatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+    dom.accountAvatar.classList.toggle("is-in", loggedIn);
+    dom.accountDot.classList.toggle("is-ready", loggedIn);
+    dom.accountStatus.textContent = status;
+    dom.accountMenu.querySelector("summary").setAttribute("aria-label", `Akun Tuton, ${status}`);
+    dom.btnTutonLogout.classList.toggle("hidden", !loggedIn);
+  },
+
   renderSummaries() {
+    UI.renderCourse();
+    UI.renderAccount();
     // Petunjuk dari lembar soal masuk diam diam ke catatan dosen, jadi ringkasannya memberi tahu kalau sudah terisi
     dom.notesSummary.textContent = dom.instructions.value.trim() ? "Terisi" : "Opsional";
 
@@ -1551,11 +1610,61 @@ async function applyDetectedCourse(code) {
   try {
     const data = await Api.utLookup(code);
     if (!data.found || !data.exact) return;
-    if (!dom.courseName.value.trim()) dom.courseName.value = data.course.nama;
+    if (!dom.courseName.value.trim()) {
+      dom.courseName.value = data.course.nama;
+      State.courseCode = data.course.kode;
+    }
     if (!dom.materialTitle.value.trim()) dom.materialTitle.value = data.course.formatted_title;
     UI.renderSummaries();
   } catch (err) {
     /* katalog opsional, kegagalan tidak mengganggu alur */
+  }
+}
+
+// Kolom mata kuliah menerima kode seperti MKWU4108. Kode yang dikenali katalog diganti nama mata kuliahnya.
+async function resolveCourseCode() {
+  const match = dom.courseName.value.match(/^\s*([A-Za-z]{4})\s*-?\s*(\d{4})\s*$/);
+  if (!match || !isUtTask()) return;
+  const code = match[1].toUpperCase() + match[2];
+  try {
+    const data = await Api.utLookup(code);
+    if (!data.found || !data.exact) {
+      UI.toast(`Kode ${code} belum ada di katalog. Tulis nama mata kuliahnya langsung.`);
+      return;
+    }
+    dom.courseName.value = data.course.nama;
+    State.courseCode = data.course.kode;
+    UI.renderSummaries();
+  } catch (err) {
+    /* katalog opsional, kode tetap tersimpan apa adanya */
+  }
+}
+
+// Status login dari aplikasi desktop. null berarti sesi tidak bisa dicek, misalnya jaringan mati.
+function applyTutonStatus(status) {
+  if (!status) State.tuton = { state: "unknown", name: "", nim: "" };
+  else if (status.loggedIn) State.tuton = { state: "in", name: status.name || "", nim: status.nim || "" };
+  else State.tuton = { state: "out", name: "", nim: "" };
+  if (State.tuton.state === "in") {
+    fillIdentityIfEmpty(dom.studentName, STORAGE.name, State.tuton.name);
+    fillIdentityIfEmpty(dom.studentId, STORAGE.nim, State.tuton.nim);
+  }
+  UI.renderSummaries();
+}
+
+async function logoutTuton() {
+  dom.accountMenu.open = false;
+  const ok = await UI.confirm({
+    title: "Keluar dari Tuton?",
+    message: "Sesi login Tuton di aplikasi ini dihapus dan jendela Tuton ditutup. Nama dan NIM di formulir tetap tersimpan.",
+    okLabel: "Keluar"
+  });
+  if (!ok) return;
+  try {
+    applyTutonStatus(await window.desktop.logoutTuton());
+    UI.toast("Sudah keluar dari Tuton");
+  } catch (err) {
+    UI.showAlert("Belum bisa keluar dari Tuton", err.message || "Coba lagi sebentar.");
   }
 }
 
@@ -1962,7 +2071,10 @@ function attachUtLookup() {
   const apply = (course) => {
     dom.materialTitle.value = course.formatted_title;
     if (!dom.materialAuthor.value.trim()) dom.materialAuthor.value = "Universitas Terbuka";
-    if (!dom.courseName.value.trim()) dom.courseName.value = course.nama;
+    if (!dom.courseName.value.trim()) {
+      dom.courseName.value = course.nama;
+      State.courseCode = course.kode;
+    }
     UI.renderUtResult(null);
     UI.renderSummaries();
   };
@@ -2363,6 +2475,7 @@ async function startNewTask() {
   dom.draftStatus.textContent = "";
   dom.instructions.value = "";
   dom.courseName.value = "";
+  State.courseCode = "";
   resetAnswerSpec();
   State.papers = [];
   State.selectedPaperIds.clear();
@@ -2437,7 +2550,23 @@ function init() {
       UI.renderSummaries();
     });
   });
-  dom.courseName.addEventListener("input", UI.renderSummaries);
+  // Ketikan manual membuat kode lama tidak berlaku lagi. Kode baru dicari saat kolom ditinggalkan.
+  dom.courseName.addEventListener("input", () => {
+    State.courseCode = "";
+    UI.renderSummaries();
+  });
+  dom.courseName.addEventListener("change", resolveCourseCode);
+
+  // Menu akun ditutup saat klik di luar, Esc, atau setelah memilih tautan
+  document.addEventListener("click", (e) => {
+    if (dom.accountMenu.open && !dom.accountMenu.contains(e.target)) dom.accountMenu.open = false;
+  });
+  dom.accountMenu.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !dom.accountMenu.open) return;
+    dom.accountMenu.open = false;
+    dom.accountMenu.querySelector("summary").focus();
+  });
+  dom.accountMenu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => { dom.accountMenu.open = false; }));
   if (!setRadio("tone", storage.get(STORAGE.tone))) setRadio("tone", "akademis formal");
   // Pilihan sitasi kutipan diingat, karena biasanya sama untuk semua tugas dari dosen yang sama
   // Pengguna lama yang dulu mencentang sitasi setelah kutipan tetap mendapat pilihan yang sama
@@ -2489,6 +2618,9 @@ function init() {
   }));
   bindDropzone(dom.questionDropzone, dom.questionFile, handleQuestionFile);
   if (window.desktop) {
+    window.desktop.onTutonStatus(applyTutonStatus);
+    window.desktop.getTutonStatus().then(applyTutonStatus, () => applyTutonStatus(null));
+    dom.btnTutonLogout.addEventListener("click", logoutTuton);
     window.desktop.onTutonCapture(handleTutonCapture);
     $("btn-write-tuton").addEventListener("click", () => writeToTuton());
     if (dom.btnSnapRbv) {

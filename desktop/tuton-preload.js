@@ -247,7 +247,14 @@ function mountLoginHint() {
   document.body.append(host);
 }
 
+// Status login untuk chip akun di Asisten. Teks menu akun dikirim mentah, proses utama yang mengurainya.
+function reportStatus() {
+  const usertext = firstText([".usermenu .usertext", ".usertext"]);
+  ipcRenderer.send("tuton-status", { usertext, onLoginPage: location.pathname.startsWith("/login") });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   mountButton();
   mountLoginHint();
+  reportStatus();
 });

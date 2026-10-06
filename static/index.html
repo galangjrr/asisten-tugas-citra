@@ -69,6 +69,32 @@
       </div>
       <div class="flex-1 self-stretch desktop-drag" aria-hidden="true"></div>
       <div class="flex items-center gap-2">
+        <!-- Mata kuliah muncul setelah kodenya dikenali katalog, atau namanya diisi -->
+        <p id="course-pill" class="course-pill hidden" aria-live="polite">
+          <span id="course-pill-code" class="course-pill-code"></span>
+          <span id="course-pill-name" class="course-pill-name"></span>
+        </p>
+
+        <!-- Akun Tuton. Di aplikasi desktop status login dibaca dari sesi jendela Tuton. -->
+        <details id="account-menu" class="account-menu hidden">
+          <summary class="account-chip" aria-label="Akun Tuton">
+            <span id="account-avatar" class="account-avatar" aria-hidden="true"></span>
+            <span class="hidden md:block min-w-0 leading-tight text-left">
+              <span id="account-name" class="block text-[12px] font-semibold truncate max-w-[11rem]"></span>
+              <span id="account-meta" class="block text-[10.5px] text-ink-3 tabular-nums truncate max-w-[11rem]"></span>
+            </span>
+          </summary>
+          <div class="account-pop">
+            <p class="flex items-center gap-2 px-3 pt-2 pb-2.5 text-[11px] text-ink-2 border-b border-line">
+              <span id="account-dot" class="status-dot bg-stone-400" aria-hidden="true"></span>
+              <span id="account-status"></span>
+            </p>
+            <a href="https://elearning.ut.ac.id/" target="_blank" rel="noopener" class="account-item">Buka Tuton</a>
+            <a href="https://pustaka.ut.ac.id/lib/ruangbaca/" target="_blank" rel="noopener" class="account-item">Buka RBV</a>
+            <button type="button" id="btn-tuton-logout" class="account-item account-item-danger hidden">Keluar dari Tuton</button>
+          </div>
+        </details>
+
         <div id="api-status-badge" role="status" aria-live="polite" class="status-badge">
           <span class="status-dot bg-stone-400"></span>
           <span>Memeriksa Gemini</span>
@@ -451,7 +477,8 @@
                   </div>
                   <div>
                     <label for="input-course-name" class="label">Mata kuliah</label>
-                    <input type="text" id="input-course-name" maxlength="150" autocomplete="off" placeholder="Pengantar Ilmu Komunikasi" class="field">
+                    <input type="text" id="input-course-name" maxlength="150" autocomplete="off" placeholder="Kode atau nama, misalnya MKWU4108" aria-describedby="course-name-hint" class="field">
+                    <p id="course-name-hint" class="text-[11px] text-ink-3 mt-1">Kode mata kuliah UT otomatis diganti namanya dan tampil di bagian atas.</p>
                   </div>
                 </div>
                 <p class="text-[11px] text-ink-3 mt-2">Dicetak di bawah judul dan jadi nama berkas unduhan. Nama dan NIM tersimpan otomatis untuk tugas berikutnya.</p>

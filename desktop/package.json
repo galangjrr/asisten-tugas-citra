@@ -17,7 +17,8 @@
       "main.js",
       "preload.js",
       "tuton-preload.js",
-      "tuton-fill.js"
+      "tuton-fill.js",
+      "tuton-account.js"
     ],
     "extraResources": [
       {

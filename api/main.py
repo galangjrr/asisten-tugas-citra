@@ -38,6 +38,16 @@ app.add_middleware(
 
 app.include_router(router)
 
+
+# Tanpa Cache-Control, browser dan Electron memakai theme.css atau app.js lama setelah aplikasi diperbarui.
+# no-cache tetap menyimpan salinan, tapi selalu dicek ulang ke server dan dibalas 304 jika tidak berubah.
+@app.middleware("http")
+async def revalidate_frontend(request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
 if os.path.exists(STATIC_DIR):

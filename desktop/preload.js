@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld("desktop", {
   fillTuton: (payload) => ipcRenderer.invoke("fill-tuton", payload),
   onTutonCapture: (callback) => ipcRenderer.on("tuton-capture", (_event, payload) => callback(payload)),
   onRbvScreenshot: (callback) => ipcRenderer.on("rbv-screenshot-captured", (_event, payload) => callback(payload)),
+  getTutonStatus: () => ipcRenderer.invoke("get-tuton-status"),
+  onTutonStatus: (callback) => ipcRenderer.on("tuton-status", (_event, payload) => callback(payload)),
+  logoutTuton: () => ipcRenderer.invoke("tuton-logout"),
 });

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, session, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
 const { fillAnswer } = require("./tuton-fill");
+const { parseUsertext, parseDashboard } = require("./tuton-account");
 
 const HOST = "127.0.0.1";
 const ROOT_DIR = path.join(__dirname, "..");
@@ -213,6 +214,50 @@ async function captureRbvPage() {
     }, 250);
   }
 }
+
+// ---------- Status login Tuton untuk chip akun di header Asisten ----------
+// null berarti belum diketahui, misalnya belum dicek atau jaringan mati
+let tutonStatus = null;
+
+function setTutonStatus(status) {
+  tutonStatus = status;
+  if (win && !win.isDestroyed()) win.webContents.send("tuton-status", status);
+}
+
+// Saat aplikasi dibuka jendela Tuton belum tentu terbuka, jadi sesi tersimpan dicek lewat halaman dasbor.
+// Moodle mengalihkan ke halaman login jika sesi sudah habis, dan halaman itu tidak punya menu akun.
+async function checkTutonLogin() {
+  try {
+    const res = await session.fromPartition("persist:tuton").fetch(new URL("my/", TUTON_URL).href);
+    if (!res.ok) return { loggedIn: false, name: "", nim: "" };
+    return parseDashboard(await res.text());
+  } catch (err) {
+    return null;
+  }
+}
+
+// Jendela Tuton melapor setiap halaman selesai dimuat. Halaman RBV atau login Microsoft tidak punya menu akun, jadi diabaikan.
+ipcMain.on("tuton-status", (event, payload) => {
+  if (!tutonWin || event.sender !== tutonWin.webContents || !isTutonUrl(event.senderFrame.url)) return;
+  if (!payload || typeof payload !== "object") return;
+  if (payload.usertext) setTutonStatus(parseUsertext(payload.usertext));
+  else if (payload.onLoginPage) setTutonStatus({ loggedIn: false, name: "", nim: "" });
+});
+
+ipcMain.handle("get-tuton-status", async (event) => {
+  if (!win || event.sender !== win.webContents) return null;
+  if (!tutonStatus) tutonStatus = await checkTutonLogin();
+  return tutonStatus;
+});
+
+// Keluar berarti menghapus cookie sesi Tuton di aplikasi ini saja. Akun Microsoft di browser lain tidak tersentuh.
+ipcMain.handle("tuton-logout", async (event) => {
+  if (!win || event.sender !== win.webContents) return null;
+  if (tutonWin && !tutonWin.isDestroyed()) tutonWin.close();
+  await session.fromPartition("persist:tuton").clearStorageData();
+  setTutonStatus({ loggedIn: false, name: "", nim: "" });
+  return tutonStatus;
+});
 
 ipcMain.on("capture-rbv-page", (event) => {
   if (win && event.sender === win.webContents) captureRbvPage();

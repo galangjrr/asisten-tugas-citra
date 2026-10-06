@@ -220,6 +220,11 @@ class TaskEditRequest(BaseModel):
 class SectionRewriteRequest(BaseModel):
     # Arahan opsional dari pengguna, misal "lebih santai" atau "persingkat"
     instruction: str = Field(default="", max_length=500)
+    # Nomor paragraf di bagian itu, mulai 0. Kosong berarti seluruh bagian ditulis ulang.
+    paragraph: Optional[int] = Field(default=None, ge=0, le=200)
+    # Arahan cepat dari tombol pilihan. Teks perintahnya disusun di server supaya konsisten.
+    presets: List[Literal["clarify", "example", "natural", "formal"]] = Field(default_factory=list, max_length=4)
+    length: Literal["same", "shorter", "longer"] = "same"
 
 
 class TaskUpdateResponse(BaseModel):

@@ -137,7 +137,12 @@ async def rewrite_task_section(task_id: str, index: int, payload: SectionRewrite
             task_type=task.get("task_type"),
             tone=task.get("tone", ""),
             citation_style=task.get("citation_style", "in_text"),
+            paragraph=payload.paragraph,
+            presets=payload.presets,
+            length=payload.length,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"Error tulis ulang bagian: {e}")
         raise HTTPException(status_code=503, detail="Gemini sedang sibuk atau kena limit. Tunggu status kembali hijau lalu coba lagi.")

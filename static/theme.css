@@ -533,6 +533,31 @@ select.field { cursor: pointer; }
 }
 .doc-field:focus { outline: none; border-color: #1c1917; box-shadow: 0 0 0 3px rgba(28, 25, 23, 0.12); }
 .doc-skeleton { height: 12px; margin: 10px 0; border-radius: 4px; background: linear-gradient(90deg, #f5f5f4, #e7e5e4, #f5f5f4); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+/* Formulir tulis ulang modular dan bilah tinjau. Kertas A4 selalu terang, jadi warnanya tetap terang di tema gelap. */
+.rewrite-form, .rw-review {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif; margin-top: 0.75rem; padding: 0.875rem; border-radius: 10px;
+  border: 1px solid #e7e5e4; background: #fafaf9; display: flex; flex-direction: column; gap: 0.75rem;
+}
+.rw-label { display: block; font-size: 11px; font-weight: 600; color: #57534e; margin-bottom: 0.375rem; }
+.rw-group { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.rw-group > legend { width: 100%; }
+.rw-pill { cursor: pointer; }
+.rw-pill > span {
+  display: inline-block; padding: 0.3rem 0.65rem; border-radius: 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid #d6d3d1; color: #57534e; background: #ffffff; transition: all 150ms ease;
+}
+.rw-pill:hover > span { border-color: #78716c; color: #1c1917; }
+.rw-pill:has(input:checked) > span { background: #1c1917; border-color: #1c1917; color: #ffffff; }
+.rw-pill:has(input:focus-visible) > span { outline: 2px solid #1c1917; outline-offset: 2px; }
+.rw-pill:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
+.paper p.is-target { background: #fef3c7; box-shadow: 0 0 0 4px #fef3c7; border-radius: 2px; }
+.paper p.is-new { background: #ecfdf5; box-shadow: 0 0 0 4px #ecfdf5; border-radius: 2px; transition: background-color 600ms ease, box-shadow 600ms ease; }
+.rw-review { border-color: #a7f3d0; background: #f0fdf4; }
+.rw-review-text { font-size: 12px; font-weight: 600; color: #064e3b; text-indent: 0 !important; margin: 0 !important; }
+.rw-old > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #57534e; width: fit-content; }
+.rw-old > summary:focus-visible { outline: 2px solid #1c1917; outline-offset: 2px; }
+.rw-old-body { margin-top: 0.5rem; padding: 0.625rem 0.75rem; border-radius: 8px; background: #ffffff; border: 1px dashed #d6d3d1; color: #57534e; font-family: "Newsreader", Georgia, serif; font-size: 14px; }
+.rw-old-body p { margin-bottom: 0.4em; }
 .doc-error { font-family: "Plus Jakarta Sans", system-ui, sans-serif; font-size: 12px; font-weight: 500; color: #be123c; margin-top: 0.5rem; }
 .cite {
   font: inherit; color: inherit; background: none; border: 0; padding: 0 1px; cursor: pointer; border-radius: 3px;

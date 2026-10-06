@@ -136,7 +136,8 @@ const Api = {
   utLookup: (query) => Api.request(`/api/ut-course-lookup?query=${encodeURIComponent(query)}`),
   extractScreenshot: (dataUrl) => Api.postJson("/api/extract-screenshot", { image_data: dataUrl }),
   updateTask: (id, doc) => Api.request(`/api/tasks/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) }),
-  rewriteSection: (id, index, instruction) => Api.postJson(`/api/tasks/${id}/sections/${index}/rewrite`, { instruction }),
+  // options: instruction, paragraph (nomor paragraf atau null), presets, length
+  rewriteSection: (id, index, options) => Api.postJson(`/api/tasks/${id}/sections/${index}/rewrite`, options),
   getSavedModules: () => Api.request("/api/saved-modules"),
   loadSavedModule: (moduleId) => Api.postJson("/api/saved-modules/load", { module_id: moduleId }),
   saveSavedModule: (payload) => Api.postJson("/api/saved-modules/save", payload)
@@ -1145,29 +1146,114 @@ const UI = {
     contentInput.focus();
   },
 
+  // Tulis ulang modular: pilih cakupan, panjang, dan arahan cepat supaya hasilnya tidak melenceng dari versi sekarang
   openRewriteForm(article, index) {
     if (article.querySelector(".rewrite-form")) return;
-    const form = el("div", "rewrite-form font-sans mt-3 p-3 rounded-lg bg-stone-50 border border-stone-200 space-y-2");
+    const paragraphs = Array.from(article.querySelectorAll(".section-body > p"));
+    const uid = `rw-${index}`;
+    const form = el("div", "rewrite-form");
+    form.setAttribute("role", "group");
+    form.setAttribute("aria-label", "Pengaturan tulis ulang");
+
+    // Cakupan. Satu paragraf paling aman karena paragraf lain disambung ulang persis oleh server.
+    const scope = el("select", "doc-field");
+    scope.id = `${uid}-scope`;
+    scope.append(new Option("Seluruh bagian ini", ""));
+    paragraphs.forEach((p, i) => {
+      const text = p.textContent.trim();
+      scope.append(new Option(`Paragraf ${i + 1}: ${text.length > 60 ? `${text.slice(0, 60)}...` : text}`, String(i)));
+    });
+    const scopeWrap = el("div");
+    const scopeLabel = el("label", "rw-label", "Yang ditulis ulang");
+    scopeLabel.htmlFor = scope.id;
+    scopeWrap.append(scopeLabel, scope);
+    if (paragraphs.length < 2) scopeWrap.classList.add("hidden");
+
+    const pillGroup = (legend, type, name, items) => {
+      const set = el("fieldset", "rw-group");
+      set.append(el("legend", "rw-label", legend));
+      items.forEach(([value, text, checked]) => {
+        const label = el("label", "rw-pill");
+        const input = el("input", "sr-only");
+        Object.assign(input, { type, name, value, checked: Boolean(checked) });
+        label.append(input, el("span", "", text));
+        set.append(label);
+      });
+      return set;
+    };
+    const lengthSet = pillGroup("Panjang", "radio", `${uid}-length`, [["same", "Tetap", true], ["shorter", "Lebih pendek"], ["longer", "Lebih panjang"]]);
+    const presetSet = pillGroup("Ubah", "checkbox", `${uid}-preset`, [["clarify", "Perjelas kalimat"], ["example", "Tambah contoh konkret"], ["natural", "Lebih natural"], ["formal", "Lebih formal"]]);
+    // Natural dan formal saling bertolak belakang, jadi hanya satu yang boleh aktif
+    presetSet.addEventListener("change", (e) => {
+      const other = { natural: "formal", formal: "natural" }[e.target.value];
+      if (e.target.checked && other) presetSet.querySelector(`input[value="${other}"]`).checked = false;
+    });
+
     const input = el("input", "doc-field");
     input.maxLength = 500;
-    input.placeholder = "Arahan opsional, misalnya lebih santai, persingkat, tambah contoh";
-    input.setAttribute("aria-label", "Arahan tulis ulang");
-    const run = () => rewriteSection(article, index, input.value.trim());
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") run();
-      if (e.key === "Escape") form.remove();
+    input.placeholder = "Arahan lain, opsional. Misalnya fokus ke contoh UMKM";
+    input.setAttribute("aria-label", "Arahan lain untuk tulis ulang");
+
+    const runButton = UI.docButton("Tulis ulang bagian ini", true, () => run());
+    const markTarget = () => {
+      paragraphs.forEach((p, i) => p.classList.toggle("is-target", String(i) === scope.value));
+      runButton.textContent = scope.value === "" ? "Tulis ulang bagian ini" : `Tulis ulang paragraf ${Number(scope.value) + 1}`;
+    };
+    scope.addEventListener("change", markTarget);
+    const close = () => {
+      paragraphs.forEach((p) => p.classList.remove("is-target"));
+      form.remove();
+    };
+    const run = () => rewriteSection(article, index, {
+      instruction: input.value.trim(),
+      paragraph: scope.value === "" ? null : Number(scope.value),
+      presets: Array.from(presetSet.querySelectorAll("input:checked")).map((i) => i.value),
+      length: lengthSet.querySelector("input:checked").value,
     });
+    form.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close();
+      if (e.key === "Enter" && e.target === input) run();
+    });
+
     const actions = el("div", "flex justify-end gap-2");
-    actions.append(UI.docButton("Batal", false, () => form.remove()), UI.docButton("Tulis ulang bagian ini", true, run));
-    form.append(input, actions);
+    actions.append(UI.docButton("Batal", false, close), runButton);
+    form.append(scopeWrap, lengthSet, presetSet, input, actions);
     article.append(form);
-    input.focus();
+    (paragraphs.length > 1 ? scope : lengthSet.querySelector("input")).focus();
+  },
+
+  // Hasil tulis ulang ditinjau dulu: versi lama bisa dilihat dan dikembalikan dengan satu klik
+  showRewriteReview(index, previousText, paragraph) {
+    const article = dom.paper.querySelectorAll(".doc-section")[index];
+    if (!article) return;
+    const changed = paragraph === null
+      ? Array.from(article.querySelectorAll(".section-body > p"))
+      : [article.querySelectorAll(".section-body > p")[paragraph]].filter(Boolean);
+    changed.forEach((p) => p.classList.add("is-new"));
+
+    const bar = el("div", "rw-review");
+    bar.setAttribute("role", "status");
+    bar.append(el("p", "rw-review-text", paragraph === null ? "Bagian ini sudah ditulis ulang." : `Paragraf ${paragraph + 1} sudah ditulis ulang, paragraf lain tidak berubah.`));
+    const old = el("details", "rw-old");
+    old.append(el("summary", "", "Lihat versi lama"));
+    const oldBody = el("div", "rw-old-body");
+    UI.fillParagraphs(oldBody, previousText);
+    old.append(oldBody);
+    const actions = el("div", "flex flex-wrap justify-end gap-2");
+    const keep = () => {
+      changed.forEach((p) => p.classList.remove("is-new"));
+      bar.remove();
+    };
+    actions.append(UI.docButton("Kembalikan versi lama", false, () => restoreSection(article, index)), UI.docButton("Pertahankan", true, keep));
+    bar.append(old, actions);
+    article.append(bar);
+    bar.querySelector(".doc-btn-primary").focus();
   },
 
   setDocBusy(busy) {
     State.docBusy = busy;
     dom.paper.setAttribute("aria-busy", String(busy));
-    dom.paper.querySelectorAll("button, input, textarea").forEach((node) => { node.disabled = busy; });
+    dom.paper.querySelectorAll("button, input, textarea, select").forEach((node) => { node.disabled = busy; });
     dom.btnRegenerate.disabled = busy;
   }
 };
@@ -2308,26 +2394,32 @@ async function saveDocument(doc, container, changedIndex = null) {
   }
 }
 
-async function rewriteSection(article, index, instruction) {
+async function rewriteSection(article, index, options) {
   const body = article.querySelector(".section-body");
   const original = State.doc.sections[index].content;
-  body.replaceChildren(...[100, 92, 96, 70].map((w) => {
+  const paragraph = options.paragraph ?? null;
+  const target = paragraph === null ? null : body.querySelectorAll(":scope > p")[paragraph];
+  const previousText = target ? target.textContent : original;
+  const skeleton = [100, 92, 96, 70].slice(0, target ? 2 : 4).map((w) => {
     const bar = el("div", "doc-skeleton");
     bar.style.width = `${w}%`;
     return bar;
-  }));
-  const status = el("p", "doc-error !text-stone-500", "Gemini sedang menulis ulang bagian ini");
+  });
+  const status = el("p", "doc-error !text-stone-500", target ? `Gemini sedang menulis ulang paragraf ${paragraph + 1}` : "Gemini sedang menulis ulang bagian ini");
   status.setAttribute("role", "status");
-  body.append(status);
+  // Satu paragraf: hanya paragraf itu yang diganti kerangka, paragraf lain tetap terbaca
+  if (target) target.replaceWith(...skeleton, status);
+  else body.replaceChildren(...skeleton, status);
+  article.querySelector(".rewrite-form")?.remove();
   UI.setDocBusy(true);
   try {
     const previous = State.doc.sections[index];
-    const data = await Api.rewriteSection(State.taskId, index, instruction);
+    const data = await Api.rewriteSection(State.taskId, index, options);
     rememberSection(index, previous);
     Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
     UI.setDocBusy(false);
     UI.renderDocument();
-    UI.toast("Bagian ditulis ulang. Tekan Kembalikan jika versi lama lebih baik");
+    UI.showRewriteReview(index, previousText, paragraph);
   } catch (err) {
     UI.setDocBusy(false);
     UI.fillParagraphs(body, original);
@@ -2357,8 +2449,9 @@ async function expandToMinimum() {
       const want = current + Math.ceil((goal - State.doc.wordCount) / Math.min(order.length - step, 2));
       dom.resultShortfall.firstChild.textContent = `Mengembangkan bagian ${index + 1} jadi sekitar ${want} kata...`;
       const previous = State.doc.sections[index];
-      const data = await Api.rewriteSection(State.taskId, index,
-        `Kembangkan bagian ini menjadi sekitar ${want} kata dengan penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. Pertahankan semua poin, kutipan, dan sitasi yang sudah ada. DILARANG mengulang kalimat atau mengarang fakta.`);
+      const data = await Api.rewriteSection(State.taskId, index, {
+        instruction: `Kembangkan bagian ini menjadi sekitar ${want} kata dengan penjelasan, contoh, dan alasan yang relevan dengan soal dan materi. Pertahankan semua poin, kutipan, dan sitasi yang sudah ada. DILARANG mengulang kalimat atau mengarang fakta.`
+      });
       rememberSection(index, previous);
       Object.assign(State.doc, { title: data.title, sections: data.sections, wordCount: data.word_count });
     }

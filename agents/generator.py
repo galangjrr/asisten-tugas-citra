@@ -371,7 +371,7 @@ def revision_style_rules(tone: str, is_en: bool) -> str:
     """Revisi dan penyesuaian panjang memakai aturan gaya yang sama dengan naskah awal supaya suaranya tidak kembali ke gaya umum."""
     return f"""
     GAYA DAN IDENTITAS DARI PILIHAN MAHASISWA (WAJIB DIPERTAHANKAN):
-    - Pertahankan gaya bahasa, sudut pandang, dan nada versi sekarang. DILARANG mengubahnya jadi lebih kaku, lebih santai, atau gaya lain.
+    - Pertahankan gaya bahasa, sudut pandang, dan nada versi sekarang. DILARANG mengubahnya jadi lebih kaku, lebih santai, atau gaya lain, kecuali arahan revisi memintanya.
     - Aturan sapaan pembuka dan salam penutup di bawah hanya berlaku untuk bagian pertama dan terakhir naskah.
     - DILARANG menambah identitas mahasiswa seperti nama, NIM, atau mata kuliah yang tidak ada di versi sekarang.
     {voice_rules(tone, is_en)}"""
@@ -1203,6 +1203,35 @@ async def adjust_total_length(
     return adjusted
 
 
+# Arahan cepat dari tombol pilihan di Tahap 3. Teksnya tetap di server supaya perintah ke model selalu sama.
+REWRITE_PRESETS = {
+    "clarify": "Perjelas kalimat yang berbelit dan rapikan alurnya. Isi, poin, dan contoh tetap sama.",
+    "example": "Tambahkan satu contoh konkret yang relevan dengan soal, misalnya pelaku, situasi, atau angka tertentu. DILARANG mengarang data penelitian atau sumber.",
+    "natural": "Buat terasa lebih natural seperti tulisan mahasiswa: kalimat lebih pendek, kata sehari-hari, tanpa ungkapan klise dan kata sok pintar.",
+    "formal": "Buat lebih formal dengan bahasa baku dan kalimat efektif, tanpa kata santai.",
+}
+REWRITE_LENGTHS = {
+    "shorter": "Persingkat jadi sekitar 70 persen panjang sekarang tanpa membuang poin yang diminta soal.",
+    "longer": "Perpanjang jadi sekitar 130 persen panjang sekarang dengan penjelasan atau contoh yang relevan, bukan pengulangan.",
+}
+
+
+def build_revision_instruction(instruction: str = "", presets=(), length: str = "same") -> str:
+    """Menggabungkan arahan cepat, pilihan panjang, dan arahan bebas jadi satu arahan revisi."""
+    lines = [REWRITE_PRESETS[p] for p in presets if p in REWRITE_PRESETS]
+    if length in REWRITE_LENGTHS:
+        lines.append(REWRITE_LENGTHS[length])
+    if instruction.strip():
+        lines.append(instruction.strip())
+    return " ".join(lines)
+
+
+def split_paragraphs(content: str):
+    """Memecah isi bagian per baris seperti tampilan Tahap 3. Pemisah ikut disimpan supaya paragraf lain bisa disambung ulang persis."""
+    parts = re.split(r"(\n+)", content or "")
+    return parts, [i for i in range(0, len(parts), 2) if parts[i].strip()]
+
+
 async def rewrite_section(
     topic: str,
     sections: List[Dict[str, str]],
@@ -1217,13 +1246,24 @@ async def rewrite_section(
     task_type: Optional[str] = None,
     tone: str = "",
     citation_style: str = "in_text",
+    paragraph: Optional[int] = None,
+    presets=(),
+    length: str = "same",
 ) -> Dict[str, str]:
-    """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
+    """
+    Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada.
+    paragraph terisi berarti hanya satu paragraf yang ditulis ulang. Paragraf lain disambung ulang di sini, bukan oleh model.
+    """
     if not 0 <= index < len(sections):
         raise ValueError("Nomor bagian di luar jangkauan.")
 
     is_en = language == "en"
     target = sections[index]
+    instruction = build_revision_instruction(instruction, presets, length)
+    parts, paragraph_slots = split_paragraphs(target.get("content", ""))
+    if paragraph is not None and not 0 <= paragraph < len(paragraph_slots):
+        raise ValueError("Nomor paragraf di luar jangkauan.")
+    old_paragraph = parts[paragraph_slots[paragraph]] if paragraph is not None else ""
     draft = "\n\n".join(
         f"[BAGIAN {i + 1}{' (YANG DITULIS ULANG)' if i == index else ''}]\n{s.get('heading', '')}\n{s.get('content', '')}"
         for i, s in enumerate(sections)
@@ -1247,14 +1287,28 @@ async def rewrite_section(
         )
     else:
         citation_rule = "Tugas ini tanpa rujukan. DILARANG menulis sitasi atau mengarang sumber."
-    limit_rule = f"Bagian ini maksimal {word_limit} kata." if word_limit else "Panjang kurang lebih sama dengan versi sekarang kecuali arahan meminta lain."
+    if paragraph is None:
+        scope_rule = "Kamu mahasiswa yang merevisi SATU bagian jawaban tugasnya sendiri. Revisi hanya bagian yang ditandai, dengan suara mahasiswa yang alami dan bebas klise AI."
+        output_rule = "Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading."
+        limit_rule = f"Bagian ini maksimal {word_limit} kata." if word_limit else "Panjang kurang lebih sama dengan versi sekarang kecuali arahan meminta lain."
+    else:
+        scope_rule = (
+            f"Kamu mahasiswa yang merevisi SATU paragraf, yaitu paragraf ke-{paragraph + 1} di bagian {index + 1}. "
+            "Paragraf lain tetap persis seperti sekarang dan tidak ikut ditulis. Revisi dengan suara mahasiswa yang alami dan bebas klise AI."
+        )
+        output_rule = "Tulis isi paragraf baru saja sebagai satu paragraf tanpa baris baru. Paragraf baru harus tetap nyambung dengan paragraf sebelum dan sesudahnya."
+        other_words = len(" ".join(parts[i] for i in paragraph_slots if i != paragraph_slots[paragraph]).split())
+        limit_rule = (
+            f"Seluruh bagian maksimal {word_limit} kata, jadi paragraf baru paling banyak {max(20, word_limit - other_words)} kata."
+            if word_limit else "Panjang paragraf kurang lebih sama dengan versi sekarang kecuali arahan meminta lain."
+        )
     signer_rule = (
         f"Jika bagian ini butuh nama penulis, pakai nama '{student_name}'."
         if student_name else "DILARANG mengarang nama penulis."
     )
 
     system_instruction = f"""
-    Kamu mahasiswa yang merevisi SATU bagian jawaban tugasnya sendiri. Revisi hanya bagian yang ditandai, dengan suara mahasiswa yang alami dan bebas klise AI.
+    {scope_rule}
     - Ini REVISI, bukan menulis dari nol. Pertahankan poin, urutan argumen, contoh, kutipan langsung, sitasi, jumlah paragraf, dan panjang versi sekarang. Ubah hanya yang diminta arahan revisi. Tanpa arahan, cukup perbaiki kejelasan kalimat, alur, dan salah ketik.
     - Ganti, tambah, atau buang poin dan kutipan HANYA jika arahan revisi memintanya.
     - Tulis teks biasa. DILARANG memakai tag HTML seperti <p> atau <br>, dan DILARANG markdown seperti ** atau #.
@@ -1263,7 +1317,7 @@ async def rewrite_section(
     - {limit_rule}
     - {citation_rule}
     - {signer_rule}
-    - Jangan mengulang isi bagian lain. Tulis isi bagiannya saja tanpa heading.
+    - {output_rule}
     - DILARANG memakai em dash, en dash, atau LaTeX. Pisahkan paragraf dengan \n\n.
     {revision_style_rules(tone, is_en)}{TEXT_FIDELITY_RULES}{task_type_rule(task_type)}
     FORMAT KELUARAN (JSON MURNI): {{"content": "..."}}
@@ -1280,6 +1334,8 @@ async def rewrite_section(
 
     ARAHAN REVISI DARI MAHASISWA: {instruction.strip() or 'Tidak ada arahan khusus. Perbaiki kejelasan kalimat dan alur seperlunya, isi dan kutipan tetap sama.'}
     """
+    if paragraph is not None:
+        user_prompt += f"\n    PARAGRAF YANG DITULIS ULANG (paragraf ke-{paragraph + 1} di bagian {index + 1}):\n    {old_paragraph.strip()}\n"
     # Tanpa isi naskah, model tidak bisa mengecek kutipan, halaman, dan siapa yang berbicara saat menulis ulang
     if papers:
         user_prompt += f"\n    BAHAN SUMBER:\n{format_sources_text(papers)}\n"
@@ -1307,5 +1363,9 @@ async def rewrite_section(
     if not isinstance(parsed, dict) or not str(parsed.get("content") or "").strip():
         raise RuntimeError("Gemini tidak mengembalikan bagian yang bisa dipakai.")
     # Heading dipertahankan apa adanya supaya nomor butir tidak hilang. Pengguna bisa mengubahnya lewat Edit.
-    content = clean_output_text(str(parsed["content"]))
-    return {"heading": target.get("heading", ""), "content": finalize_text(content, quote_citations, citation_style)}
+    content = finalize_text(clean_output_text(str(parsed["content"])), quote_citations, citation_style)
+    if paragraph is not None:
+        # Model kadang memecah jawaban jadi beberapa baris. Satu paragraf diganti satu paragraf, sisanya disambung persis.
+        parts[paragraph_slots[paragraph]] = re.sub(r"\s*\n+\s*", " ", content).strip()
+        content = "".join(parts)
+    return {"heading": target.get("heading", ""), "content": content}

@@ -104,6 +104,45 @@ async def test_rewrite_is_a_conservative_revision(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_paragraph_rewrite_leaves_other_paragraphs_untouched(monkeypatch):
+    import agents.generator as gen
+    captured = {}
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        captured["system"], captured["user"] = config.system_instruction, contents
+        return type("Res", (), {"text": '{"content": "Paragraf dua baru.\\nBaris nyasar."}'})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    content = "Paragraf satu (Prakosa, 2022).\n\nParagraf dua lama.\n\nParagraf tiga."
+    result = await gen.rewrite_section("1. Jelaskan.", [{"heading": "1. A", "content": content}], 0,
+                                       paragraph=1, presets=["example", "natural"], length="shorter")
+    # Paragraf lain disambung persis, termasuk pemisahnya, dan jawaban model dirapikan jadi satu paragraf
+    assert result["content"] == "Paragraf satu (Prakosa, 2022).\n\nParagraf dua baru. Baris nyasar.\n\nParagraf tiga."
+    assert "paragraf ke-2 di bagian 1" in captured["system"]
+    assert "Paragraf dua lama." in captured["user"]
+    assert "Tambahkan satu contoh konkret" in captured["user"] and "lebih natural" in captured["user"] and "70 persen" in captured["user"]
+
+    with pytest.raises(ValueError):
+        await gen.rewrite_section("1. Jelaskan.", [{"heading": "1. A", "content": content}], 0, paragraph=3)
+
+
+def test_rewrite_endpoint_validates_presets_and_paragraph(monkeypatch):
+    make_task("rw2")
+    seen = {}
+
+    async def fake_rewrite(**kwargs):
+        seen.update(kwargs)
+        return {"heading": "1. A", "content": "Baru."}
+
+    monkeypatch.setattr(routes, "rewrite_section", fake_rewrite)
+    res = client.post("/api/tasks/rw2/sections/0/rewrite", json={"paragraph": 0, "presets": ["clarify"], "length": "longer"})
+    assert res.status_code == 200
+    assert seen["paragraph"] == 0 and seen["presets"] == ["clarify"] and seen["length"] == "longer"
+    assert client.post("/api/tasks/rw2/sections/0/rewrite", json={"presets": ["bebas"]}).status_code == 422
+    assert client.post("/api/tasks/rw2/sections/0/rewrite", json={"paragraph": -1}).status_code == 422
+
+
+@pytest.mark.anyio
 async def test_revisions_keep_the_tone_chosen_in_step_one(monkeypatch):
     import agents.generator as gen
     captured = {}

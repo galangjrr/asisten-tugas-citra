@@ -365,6 +365,44 @@ async def test_error_task_rules_and_forum_heading(monkeypatch):
     assert result["sections"][0]["heading"] == "1. A"
 
 
+def test_concatenated_json_strings_are_recovered():
+    from agents.generator import robust_json_dict_parse
+    raw = '{"title": "T", "sections": [{"heading": "", "content": "1. Wrong: " + "improving" + "\\nFix: " + "increasing"}]}'
+    assert robust_json_dict_parse(raw)["sections"][0]["content"] == "1. Wrong: improving\nFix: increasing"
+
+
+@pytest.mark.anyio
+async def test_broken_output_is_retried_then_rejected_never_shown(monkeypatch):
+    import agents.generator as gen
+    calls = {"n": 0}
+    outputs = ["ini bukan json sama sekali", '{"title": "Tugas", "sections": [{"heading": "", "content": "Isi baik."}]}']
+
+    async def fake_generate(category, contents, config=None, **kwargs):
+        calls["n"] += 1
+        return type("Res", (), {"text": outputs[min(calls["n"] - 1, len(outputs) - 1)]})()
+
+    monkeypatch.setattr(gen, "generate_with_fallback", fake_generate)
+    result = await gen.generate_academic_draft("Jelaskan inflasi.", [])
+    assert calls["n"] == 2 and result["sections"][0]["content"] == "Isi baik."
+
+    # Dua kali rusak: gagal dengan jelas, teks mentah tidak pernah jadi naskah
+    outputs[:] = ["rusak", '{"title": "T", "sections": []}']
+    calls["n"] = 0
+    with pytest.raises(RuntimeError):
+        await gen.generate_academic_draft("Jelaskan inflasi.", [])
+
+
+@pytest.mark.anyio
+async def test_output_language_reminder_comes_last(monkeypatch):
+    gen, captured = _capture_prompts(monkeypatch)
+    await gen.generate_academic_draft("The following text contains 2 mistakes. Can you find them?", [],
+                                      tone="opini reflektif", answer_spec={"answer_language": "en"})
+    system = captured["system"]
+    assert system.index("BAHASA KELUARAN WAJIB: ENGLISH") > system.index("PROFIL GAYA OPINI REFLEKTIF")
+    # Aturan cari kesalahan tidak memberi label berbahasa Indonesia yang bisa ditiru model
+    assert "Koreksi:" not in system and "bagian yang salah dikutip" in system
+
+
 def test_letter_greeting_and_signoff_get_their_own_lines():
     import agents.generator as gen
     assert gen.LETTER_GREETING.sub(r"\1\n\n", "Dear Sarah, It has been so long.") == "Dear Sarah,\n\nIt has been so long."

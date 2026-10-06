@@ -134,9 +134,11 @@ def robust_json_dict_parse(text: str) -> Optional[Dict[str, Any]]:
             if isinstance(data, dict):
                 return data
         except Exception:
-            # 4. Tangani kemungkinan karakter kontrol liar dan koma menggantung (trailing commas)
+            # 4. Tangani karakter kontrol liar, koma menggantung, dan string yang disambung gaya JavaScript
+            #    seperti "1. Salah: " + "improving" yang kadang dikirim model cadangan
             try:
                 sanitized = re.sub(r",\s*([\]}])", r"\1", snippet)
+                sanitized = re.sub(r'"\s*\+\s*"', "", sanitized)
                 sanitized = re.sub(r"(?<!\\)[\x00-\x1f]", lambda m: f"\\u{ord(m.group(0)):04x}", sanitized)
                 data = json.loads(sanitized)
                 if isinstance(data, dict):
@@ -170,7 +172,7 @@ ERROR_TASK = re.compile(
 ERROR_TASK_RULES = """
     SOAL MENCARI DAN MEMBETULKAN KESALAHAN (MENGATUR SUSUNAN JAWABAN, NADA TETAP MENGIKUTI PROFIL GAYA):
     - Jumlah temuan WAJIB sama dengan jumlah kesalahan yang disebut soal. Pilih kesalahan yang jelas melanggar aturan tata bahasa, makna, hitungan, atau konsep, bukan pilihan kata yang sebenarnya masih benar.
-    - Tulis per temuan dengan nomor 1, 2, dan seterusnya, masing-masing di baris baru dengan \\n. Isi tiap temuan: bagian yang salah dikutip persis dari teks, koreksinya, kalimat utuh yang sudah dibetulkan, lalu alasan yang menyebut aturan atau makna yang dilanggar.
+    - Bahas per temuan dengan nomor 1, 2, dan seterusnya. Dalam kalimat biasa berbahasa keluaran naskah, tiap temuan menyebut bagian yang salah dikutip persis dari teks, perbaikannya, kalimat utuh yang sudah dibetulkan, lalu alasan yang menyebut aturan atau makna yang dilanggar.
     - Satu kalimat pengantar singkat boleh. DILARANG paragraf penutup yang hanya mengulang atau memuji perbaikan. Aturan paragraf penutup di profil gaya tidak berlaku untuk soal ini.
 """
 
@@ -990,7 +992,9 @@ async def generate_academic_draft(
     - Aturan format, jumlah butir, langkah hitungan, kutipan, sitasi, dan batas kata di atas tetap wajib. Ada atau tidaknya sitasi ditentukan rujukan yang dipilih mahasiswa, bukan oleh gaya. Gaya di bawah mengatur cara menulisnya, bukan isinya.
     {voice_rules(tone, is_en)}
 
-    FORMAT KELUARAN (JSON MURNI):
+    BAHASA KELUARAN WAJIB: {'ENGLISH. Seluruh judul dan isi naskah ditulis dalam bahasa Inggris, walau instruksi ini berbahasa Indonesia.' if is_en else 'BAHASA INDONESIA.'}
+
+    FORMAT KELUARAN (JSON MURNI DAN SAH, setiap nilai string ditulis utuh tanpa tanda + penyambung):
     {json_example}
     """
 
@@ -1042,32 +1046,32 @@ async def generate_academic_draft(
 
     # Soal hitungan dan logika sering salah tanpa mode berpikir. Esai dan makalah tidak butuh dan jadi jauh lebih lambat.
     needs_reasoning = is_direct_answer or is_math or (answer_type not in ("esai", "makalah") and bool(REASONING_HINT.search(topic)))
-    response = await generate_with_fallback(
-        "generation",
-        user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=0.4,
-            # 8192 memotong JSON untuk target 3000+ kata
-            max_output_tokens=32768,
-            response_mime_type="application/json",
-            thinking_config=types.ThinkingConfig(thinking_level="high") if needs_reasoning else None,
-        ),
-        timeout=150.0 if needs_reasoning else 75.0,
-        total_budget=300.0 if needs_reasoning else 240.0,
-    )
+    # Jawaban yang JSON-nya rusak dicoba ulang sekali. Teks mentah dari model tidak pernah ditampilkan sebagai naskah,
+    # karena dulu hasilnya berupa kode JSON utuh di kertas dan seluruh soal jadi judul.
+    parsed = None
+    for _attempt in range(2):
+        response = await generate_with_fallback(
+            "generation",
+            user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.4,
+                # 8192 memotong JSON untuk target 3000+ kata
+                max_output_tokens=32768,
+                response_mime_type="application/json",
+                thinking_config=types.ThinkingConfig(thinking_level="high") if needs_reasoning else None,
+            ),
+            timeout=150.0 if needs_reasoning else 75.0,
+            total_budget=300.0 if needs_reasoning else 240.0,
+        )
+        parsed = robust_json_dict_parse(response.text)
+        if isinstance(parsed, dict) and any(isinstance(sec, dict) and str(sec.get("content") or "").strip() for sec in parsed.get("sections") or []):
+            break
+        print("Peringatan: Gemini mengirim naskah dengan format rusak, dicoba ulang sekali.")
+    else:
+        raise RuntimeError("Gemini dua kali mengirim naskah dengan format rusak.")
 
     language = "en" if is_en else "id"
-    parsed = robust_json_dict_parse(response.text)
-    if not isinstance(parsed, dict):
-        return {
-            "title": topic.title(),
-            "sections": [
-                {"heading": "" if format_type in ("esai", "otomatis") else ("Main Analysis" if is_en else "Analisis Utama"), "content": clean_output_text(response.text)}
-            ],
-            "evidence_log": [],
-            "language": language,
-        }
 
     # Rapikan keluaran model agar exporter tidak crash oleh nilai null atau tipe salah
     sections = [
@@ -1130,7 +1134,8 @@ async def generate_academic_draft(
         sections[0]["content"] = LETTER_GREETING.sub(r"\1\n\n", sections[0]["content"])
         sections[-1]["content"] = LETTER_SIGNOFF.sub(r"\n\n\1\n\2", sections[-1]["content"])
     return {
-        "title": clean_output_text(str(parsed.get("title") or topic.title())),
+        # Tanpa judul dari model, pakai baris pertama soal yang dipendekkan, bukan seluruh soal
+        "title": clean_output_text(str(parsed.get("title") or "")) or topic.strip().split("\n")[0][:80],
         "sections": sections,
         "evidence_log": parsed.get("evidence_log") or [],
         "language": language,
@@ -1374,12 +1379,8 @@ async def rewrite_section(
         timeout=90.0,
         total_budget=180.0,
     )
-    try:
-        parsed = json.loads(response.text)
-    except ValueError:
-        parsed = None
-    if isinstance(parsed, list) and parsed:
-        parsed = parsed[0]
+    # Pengurai yang sama dengan naskah utuh, supaya JSON dengan blok markdown atau string tersambung tetap terbaca
+    parsed = robust_json_dict_parse(response.text)
     if not isinstance(parsed, dict) or not str(parsed.get("content") or "").strip():
         raise RuntimeError("Gemini tidak mengembalikan bagian yang bisa dipakai.")
     # Heading dipertahankan apa adanya supaya nomor butir tidak hilang. Pengguna bisa mengubahnya lewat Edit.

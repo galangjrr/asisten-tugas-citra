@@ -557,7 +557,7 @@ async def generate_task(payload: GenerateRequest):
         print(f"Error pada generasi Gemini: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"Layanan Gemini sedang mengalami lonjakan antrean. Silakan tekan tombol tulis sekali lagi."
+            detail="Gemini sedang sibuk atau mengirim naskah yang rusak. Silakan tekan tombol tulis sekali lagi."
         )
 
     task_id = str(uuid.uuid4())[:8]

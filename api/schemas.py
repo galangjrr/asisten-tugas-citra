@@ -77,6 +77,8 @@ class GenerateRequest(BaseModel):
     course_name: str = Field(default="", max_length=150)
     # False: kutipan langsung cukup bertanda petik tanpa sitasi kurung, misal (Cather, 1896, hlm. 5)
     quote_citations: bool = False
+    # list_only: rujukan cukup di daftar pustaka, badan naskah tanpa sitasi seperti (Prakosa, 2022). Sering diminta di forum Tuton.
+    citation_style: Literal["in_text", "list_only"] = "in_text"
     # Jenis tugas dari layar sambutan. Kosong berarti klien lama, prompt tidak diberi konteks kampus.
     task_type: Optional[Literal["ut-diskusi", "ut-tugas", "umum"]] = None
 

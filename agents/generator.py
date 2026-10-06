@@ -202,6 +202,23 @@ def strip_quote_citations(text: str) -> str:
     return re.sub(r'([?!.])(["”])\.', r"\1\2", text)
 
 
+# Sitasi kurung di badan naskah, misal '(Prakosa, 2022)', '(Ruiz & Lee, 2021; Prakosa dkk., 2022, hlm. 5)'.
+# Wajib ada koma sebelum tahun supaya kurung biasa seperti '(UU No. 13 Tahun 2003)' tidak ikut terbuang.
+IN_TEXT_CITATION = re.compile(r"[ \t]?\((?:[A-Z][^()]*?,\s*(?:\d{4}[a-z]?|n\.d\.)(?:,\s*(?:hlm|p|pp|h)\.\s*[\d\-–, ]+)?;?\s*)+\)")
+
+
+# Kata sambung penutup khas AI di awal kalimat. Model cadangan saat kuota padat tetap memakainya walau sudah dilarang di prompt.
+CLICHE_OPENER = re.compile(r"(^|[.!?]\s+)(?:Pada akhirnya|Secara keseluruhan|Kesimpulannya|In conclusion|Ultimately|Overall),\s*(\w)", re.M)
+
+
+def finalize_text(text: str, quote_citations: bool, citation_style: str = "in_text") -> str:
+    """Menegakkan pilihan sitasi pengguna dan membuang pembuka kalimat klise pada teks keluaran model."""
+    text = CLICHE_OPENER.sub(lambda m: m.group(1) + m.group(2).upper(), text)
+    if citation_style == "list_only":
+        return IN_TEXT_CITATION.sub("", text)
+    return text if quote_citations else strip_quote_citations(text)
+
+
 # Model cadangan sering menempelkan sapaan dan salam penutup surat ke paragraf, misal 'Dear Sarah, I hope...' dan '... soon. Warm regards, Citra.'
 # Kata kuncinya wajib berhuruf kapital supaya kalimat biasa seperti 'I would love to, Citra' tidak ikut dipecah.
 LETTER_GREETING = re.compile(r"^((?:Dear|Hi|Hello|Halo|Hai|Kepada|Untuk|Teruntuk)\b[^,\n.!?]{0,40},)[ \t]+(?=\S)")
@@ -249,6 +266,7 @@ BASE_VOICE_RULES = """
     - Beri alasan yang jelas dengan contoh sederhana yang membumi dan bisa dibayangkan.
     - DILARANG kata sok pintar khas AI: 'krusial', 'esensial', 'ranah', 'sinergi', 'menggarisbawahi', 'secara keseluruhan', 'penting untuk dicatat', 'dalam era modern ini', 'menatap masa depan', 'delve', 'crucial', 'multifaceted', 'pivotal', 'testament', 'tapestry', 'underscores', 'foster', 'beacon', 'it is important to note', 'in today's modern era'.
     - DILARANG ungkapan klise dan peribahasa basi: 'bagai pisau bermata dua', 'dua sisi mata uang', 'di era digital ini', 'tidak dapat dipungkiri', 'Semoga ke depannya', 'I hope this letter finds you well', 'time flies', 'a double-edged sword'. Tulis maksudnya langsung dengan kalimat biasa.
+    - DILARANG frasa birokratis kosong: 'motor penggerak perekonomian', 'berjalan optimal', 'tantangan tersendiri', 'secara signifikan', 'memegang peranan penting', 'roda perekonomian', 'Pada akhirnya', 'menjadi kunci', 'derasnya arus'.
 """
 
 # Profil per gaya. Contoh nada sengaja bertopik netral supaya model meniru suaranya, bukan isinya.
@@ -292,6 +310,8 @@ TONE_PROFILES = [
             "Pakai bahasa baku dan kalimat efektif yang jernih, bukan berbelit. Hindari kata santai seperti 'banget', 'nggak', atau 'aku', dan kontraksi dalam bahasa Inggris.",
             "Pakai 'saya' hanya jika soal meminta pendapat.",
             "Kalimat pertama tiap paragraf memuat gagasan utamanya, lalu diikuti penjelasan dan bukti.",
+            "Formal bukan berarti panjang. Satu kalimat satu gagasan.",
+            "WAJIB ada paling sedikit satu ilustrasi konkret yang diawali 'misalnya' atau 'contohnya', menyebut pelaku, situasi, atau angka tertentu, seperti pemilik usaha katering yang menunda membeli oven baru karena cicilannya naik. Uraian yang seluruhnya umum tanpa ilustrasi dianggap gagal.",
         ],
         "example": (
             "Inflasi yang terkendali sebenarnya dibutuhkan dalam perekonomian. Kenaikan harga yang moderat mendorong produsen menambah produksi karena keuntungan yang diharapkan ikut naik. Masalah muncul ketika inflasi melampaui kenaikan pendapatan, sebab daya beli rumah tangga turun dan konsumsi melemah.",
@@ -318,6 +338,8 @@ TONE_PROFILES = [
             "Tulis seperti esai bertutur yang menelusuri gagasan langkah demi langkah.",
             "Boleh dibuka dengan pertanyaan, pengamatan, atau situasi konkret, lalu dikembangkan pelan-pelan sampai menjawab soal.",
             "Perpindahan antarparagraf terasa alami, bukan daftar poin. 'Saya' boleh dipakai secukupnya.",
+            "Nada bertutur bertahan sampai akhir. Paragraf tengah tetap memakai pengamatan atau contoh konkret, misalnya teman, kejadian, atau kebiasaan tertentu, bukan berubah jadi uraian umum.",
+            "Tutup dengan pikiran yang masih terbuka, misalnya pertanyaan atau hal yang ingin kamu coba sendiri, bukan nasihat moral atau ringkasan.",
         ],
         "example": (
             "Waktu pertama kali naik KRL di jam sibuk, saya heran kenapa hampir tidak ada yang bicara. Semua orang menunduk ke layar ponsel. Dari situ saya mulai bertanya, apakah teknologi membuat kita lebih dekat atau justru membangun tembok kecil di sekitar masing-masing orang.",
@@ -368,6 +390,7 @@ async def generate_academic_draft(
     course_name: str = "",
     quote_citations: bool = False,
     task_type: Optional[str] = None,
+    citation_style: str = "in_text",
 ) -> Dict[str, Any]:
     """
     Menyusun naskah tugas berbasis fakta dan nomor halaman dari dokumen yang diunduh.
@@ -867,7 +890,18 @@ async def generate_academic_draft(
             "Tetap catat halaman setiap kutipan di 'evidence_log' sesuai label halaman, dan DILARANG mengarang nomor halaman."
         )
 
-    if papers_with_content:
+    if papers_with_content and citation_style == "list_only":
+        citation_rules = f"""
+    ATURAN RUJUKAN DAFTAR PUSTAKA SAJA:
+    - Pengguna memilih {len(papers_with_content)} sumber berikut:
+{summary_sources_text}
+    - Dosen hanya meminta daftar pustaka di akhir. Daftar pustaka disusun otomatis oleh aplikasi, jadi JANGAN menulisnya di 'sections'.
+    - Pakai gagasan dari sumber sebagai dasar jawaban, ditulis dengan kalimatmu sendiri.
+    - DILARANG sitasi dalam kurung seperti (NamaBelakang, Tahun) atau (NamaBelakang, Tahun, hlm. 12), DILARANG frasa 'Menurut NamaBelakang', dan DILARANG menyebut nama penulis, judul, nama jurnal, atau nomor halaman di badan naskah.
+    - Kutipan langsung, jika soal memintanya, cukup di dalam tanda petik ganda tanpa keterangan sumber.
+    - Tetap catat sumber yang dipakai di array 'evidence_log' supaya bisa dicek.
+    """
+    elif papers_with_content:
         # Sitasi dibuat seperti tulisan mahasiswa biasa. Aturan lama yang serba wajib membuat tiap kalimat menyebut sumber dan terbaca lebay.
         citation_rules = f"""
     ATURAN SITASI YANG WAJAR:
@@ -1028,10 +1062,9 @@ async def generate_academic_draft(
         for sec in parsed.get("sections") or []
         if isinstance(sec, dict)
     ]
-    # Model kadang tetap menempel sitasi setelah kutipan walau pengguna tidak memintanya
-    if not quote_citations:
-        for sec in sections:
-            sec["content"] = strip_quote_citations(sec["content"])
+    # Model kadang tetap menempel sitasi yang tidak diminta pengguna
+    for sec in sections:
+        sec["content"] = finalize_text(sec["content"], quote_citations, citation_style)
     # Heading bagian wajib dikunci persis sesuai tulisan dosen, model sering menambah nomor atau kata BAB
     if format_type == "wajib" and len(sections) == len(required_sections):
         for name, sec in zip(required_sections, sections):
@@ -1054,7 +1087,7 @@ async def generate_academic_draft(
                     topic, sections, index, language=language,
                     instruction=f"Persingkat bagian ini jadi sekitar {round(limit * 0.9)} kata tanpa membuang poin yang diminta soal.",
                     word_limit=limit, papers=papers_with_content, guidelines=custom_instructions, student_name=student_name,
-                    quote_citations=quote_citations, task_type=task_type, tone=tone,
+                    quote_citations=quote_citations, task_type=task_type, tone=tone, citation_style=citation_style,
                 )
             except Exception as e:
                 print(f"Peringatan: gagal memangkas butir {index + 1} ke batas {limit} kata: {e}")
@@ -1069,7 +1102,7 @@ async def generate_academic_draft(
             try:
                 sections = await adjust_total_length(
                     topic, sections, bounds, language=language, papers=papers_with_content, quote_citations=quote_citations,
-                    tone=tone, task_type=task_type,
+                    tone=tone, task_type=task_type, citation_style=citation_style,
                 )
             except Exception as e:
                 print(f"Peringatan: gagal menyesuaikan panjang naskah {total} kata ke rentang dosen: {e}")
@@ -1111,6 +1144,7 @@ async def adjust_total_length(
     quote_citations: bool = False,
     tone: str = "",
     task_type: Optional[str] = None,
+    citation_style: str = "in_text",
 ) -> List[Dict[str, str]]:
     """Memanjangkan atau memendekkan seluruh naskah ke rentang dosen dalam satu panggilan. Naskah asli dikembalikan jika hasilnya tidak valid."""
     total = sum(len(sec["content"].split()) for sec in sections)
@@ -1159,7 +1193,7 @@ async def adjust_total_length(
         content = clean_output_text(str(new.get("content") or ""))
         if not content.strip():
             raise ValueError("ada bagian kosong")
-        adjusted.append({"heading": old["heading"], "content": content if quote_citations else strip_quote_citations(content)})
+        adjusted.append({"heading": old["heading"], "content": finalize_text(content, quote_citations, citation_style)})
     # Model yang memangkas atau menambah kebablasan bisa membuat naskah makin jauh dari aturan dosen, jadi hasilnya dicek dulu
     new_total = sum(len(sec["content"].split()) for sec in adjusted)
     if new_total < bounds["low"] and new_total < total:
@@ -1182,6 +1216,7 @@ async def rewrite_section(
     quote_citations: bool = True,
     task_type: Optional[str] = None,
     tone: str = "",
+    citation_style: str = "in_text",
 ) -> Dict[str, str]:
     """Menulis ulang satu bagian jawaban tanpa menyentuh bagian lain, mengikuti arahan pengguna jika ada."""
     if not 0 <= index < len(sections):
@@ -1193,7 +1228,12 @@ async def rewrite_section(
         f"[BAGIAN {i + 1}{' (YANG DITULIS ULANG)' if i == index else ''}]\n{s.get('heading', '')}\n{s.get('content', '')}"
         for i, s in enumerate(sections)
     )
-    if papers:
+    if papers and citation_style == "list_only":
+        citation_rule = (
+            "Rujukan tugas ini hanya dicantumkan di daftar pustaka. DILARANG sitasi kurung, frasa 'Menurut NamaBelakang', "
+            "menyebut nama penulis, atau nomor halaman di isi bagian. Kutipan langsung cukup bertanda petik dan disalin persis dari BAHAN SUMBER."
+        )
+    elif papers:
         ref_lines = "\n".join(
             f"- {', '.join(p.get('authors') or ['Anonim'])} ({p.get('year') or 'n.d.'}). {p.get('title', '')}"
             for p in papers
@@ -1268,4 +1308,4 @@ async def rewrite_section(
         raise RuntimeError("Gemini tidak mengembalikan bagian yang bisa dipakai.")
     # Heading dipertahankan apa adanya supaya nomor butir tidak hilang. Pengguna bisa mengubahnya lewat Edit.
     content = clean_output_text(str(parsed["content"]))
-    return {"heading": target.get("heading", ""), "content": content if quote_citations else strip_quote_citations(content)}
+    return {"heading": target.get("heading", ""), "content": finalize_text(content, quote_citations, citation_style)}

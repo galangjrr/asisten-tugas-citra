@@ -410,13 +410,15 @@
                   </div>
                 </div>
 
-                <label for="input-quote-citations" class="flex items-start gap-2.5 cursor-pointer">
-                  <input type="checkbox" id="input-quote-citations" class="mt-0.5 h-4 w-4 shrink-0 accent-accent" aria-describedby="quote-citations-hint">
-                  <span>
-                    <span class="block text-xs font-semibold text-ink">Cantumkan sitasi setelah kutipan</span>
-                    <span id="quote-citations-hint" class="block text-[11px] text-ink-3 mt-0.5">Contoh "..." (Cather, 1896, hlm. 5). Matikan jika dosen cukup meminta tanda petik.</span>
-                  </span>
-                </label>
+                <div>
+                  <label for="select-citation" class="label">Cara mencantumkan rujukan</label>
+                  <select id="select-citation" class="field sm:!w-auto" aria-describedby="citation-hint">
+                    <option value="teks">Sitasi di dalam teks dan daftar pustaka</option>
+                    <option value="kutipan">Sitasi di dalam teks, juga setelah setiap kutipan</option>
+                    <option value="daftar">Daftar pustaka saja, tanpa sitasi di dalam teks</option>
+                  </select>
+                  <p id="citation-hint" class="text-[11px] text-ink-3 mt-1">Berlaku jika rujukan dipilih di Tahap 2. Pilih daftar pustaka saja kalau dosen atau tutor hanya meminta referensi di akhir.</p>
+                </div>
               </div>
             </details>
 

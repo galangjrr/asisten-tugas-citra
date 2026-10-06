@@ -199,3 +199,27 @@ async def test_quote_citations_are_optional_and_off_by_default(monkeypatch):
     result = await gen.generate_academic_draft("1. Analisis tokoh dengan kutipan.", [paper], answer_spec={"answer_type": "jawaban_bernomor"}, quote_citations=True)
     assert "WAJIB diikuti sitasi dengan halaman" in captured["system"]
     assert "(Navis, 1956, hlm. 3)" in result["sections"][0]["content"]
+
+    # Daftar pustaka saja: semua sitasi kurung dibuang, kutipan dan sumbernya tetap dipakai
+    result = await gen.generate_academic_draft("1. Analisis tokoh dengan kutipan.", [paper], answer_spec={"answer_type": "jawaban_bernomor"},
+                                               quote_citations=True, citation_style="list_only")
+    assert "ATURAN RUJUKAN DAFTAR PUSTAKA SAJA" in captured["system"] and "ATURAN SITASI YANG WAJAR" not in captured["system"]
+    assert result["sections"][0]["content"] == 'Ia berkata, "Aku pulang". Itu tandanya.'
+
+
+def test_in_text_citation_removal_spares_ordinary_parentheses():
+    from agents.generator import finalize_text
+    text = ("Kerukunan butuh kesadaran bersama (Prakosa, 2022). Dua teori ini saling melengkapi (Ruiz & Lee, 2021; Prakosa dkk., 2022, hlm. 5). "
+            "Aturannya ada di undang-undang (UU No. 13 Tahun 2003) dan tabel (lihat Tabel 1).")
+    assert finalize_text(text, False, "list_only") == (
+        "Kerukunan butuh kesadaran bersama. Dua teori ini saling melengkapi. "
+        "Aturannya ada di undang-undang (UU No. 13 Tahun 2003) dan tabel (lihat Tabel 1)."
+    )
+    # Pilihan biasa tidak menyentuh sitasi parafrase
+    assert finalize_text(text, False) == text
+
+
+def test_cliche_sentence_openers_are_dropped():
+    from agents.generator import finalize_text
+    text = "Pada akhirnya, media sosial jadi panggung. Secara keseluruhan, ini wajar.\n\nOverall, it works. Ia menyebut pada akhirnya, semua usai."
+    assert finalize_text(text, True) == "Media sosial jadi panggung. Ini wajar.\n\nIt works. Ia menyebut pada akhirnya, semua usai."

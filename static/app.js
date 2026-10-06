@@ -8,6 +8,7 @@ const STORAGE = {
   theme: "atc-theme",
   tone: "atc-user-tone",
   quoteCitations: "atc-quote-citations",
+  citation: "atc-citation-style",
   name: "atc-student-name",
   nim: "atc-student-id",
   draft: "atc-question-draft",
@@ -190,7 +191,7 @@ const dom = {
   customWordsWrapper: $("custom-words-wrapper"),
   customWords: $("input-custom-words"),
   selectDepth: $("select-depth"),
-  quoteCitations: $("input-quote-citations"),
+  citation: $("select-citation"),
   instructions: $("input-instructions"),
   identitySummary: $("identity-summary"),
   studentName: $("input-student-name"),
@@ -1314,7 +1315,8 @@ function buildGeneratePayload(paperIds) {
     paper_ids: paperIds,
     custom_instructions: dom.instructions.value.trim(),
     answer_spec: readAnswerSpec(),
-    quote_citations: dom.quoteCitations.checked,
+    quote_citations: dom.citation.value === "kutipan",
+    citation_style: dom.citation.value === "daftar" ? "list_only" : "in_text",
     student_name: dom.studentName.value.trim(),
     student_id: dom.studentId.value.trim(),
     course_name: dom.courseName.value.trim(),
@@ -2438,8 +2440,10 @@ function init() {
   dom.courseName.addEventListener("input", UI.renderSummaries);
   if (!setRadio("tone", storage.get(STORAGE.tone))) setRadio("tone", "akademis formal");
   // Pilihan sitasi kutipan diingat, karena biasanya sama untuk semua tugas dari dosen yang sama
-  dom.quoteCitations.checked = storage.get(STORAGE.quoteCitations) === "1";
-  dom.quoteCitations.addEventListener("change", () => storage.set(STORAGE.quoteCitations, dom.quoteCitations.checked ? "1" : "0"));
+  // Pengguna lama yang dulu mencentang sitasi setelah kutipan tetap mendapat pilihan yang sama
+  dom.citation.value = storage.get(STORAGE.citation) || (storage.get(STORAGE.quoteCitations) === "1" ? "kutipan" : "teks");
+  if (!dom.citation.value) dom.citation.value = "teks";
+  dom.citation.addEventListener("change", () => storage.set(STORAGE.citation, dom.citation.value));
   document.querySelectorAll('input[name="tone"]').forEach((input) => input.addEventListener("change", () => {
     storage.set(STORAGE.tone, input.value);
     UI.renderSummaries();

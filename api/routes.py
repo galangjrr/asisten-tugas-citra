@@ -136,6 +136,7 @@ async def rewrite_task_section(task_id: str, index: int, payload: SectionRewrite
             quote_citations=task.get("quote_citations", True),
             task_type=task.get("task_type"),
             tone=task.get("tone", ""),
+            citation_style=task.get("citation_style", "in_text"),
         )
     except Exception as e:
         print(f"Error tulis ulang bagian: {e}")
@@ -545,6 +546,7 @@ async def generate_task(payload: GenerateRequest):
             course_name=payload.course_name.strip(),
             quote_citations=payload.quote_citations,
             task_type=payload.task_type,
+            citation_style=payload.citation_style,
         )
     except Exception as e:
         print(f"Error pada generasi Gemini: {e}")
@@ -582,6 +584,7 @@ async def generate_task(payload: GenerateRequest):
         "student_id": payload.student_id,
         "task_type": payload.task_type,
         "tone": payload.tone,
+        "citation_style": payload.citation_style,
     }
     build_task_files(task_id, task)
     TASKS_DB[task_id] = task
